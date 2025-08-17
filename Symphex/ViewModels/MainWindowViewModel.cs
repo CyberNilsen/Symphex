@@ -430,6 +430,7 @@ namespace Symphex.ViewModels
         @"\s*\(4K\)",
         @"\s*\[Official Video\]",
         @"\s*\[Official Audio\]",
+        @"\s*\[Official Music Video\]",
         @"\s*\[Lyrics\]",
         @"\s*\[HD\]"
     };
