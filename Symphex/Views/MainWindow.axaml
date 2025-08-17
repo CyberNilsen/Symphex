@@ -43,7 +43,7 @@
 									   FontSize="24"
 									   FontWeight="SemiBold"
 									   Foreground="#FFFFFF"/>
-							<TextBlock Text="Professional Music Downloader with Metadata"
+							<TextBlock Text="Professional Music Downloader with Real Album Art"
 									   FontSize="13"
 									   Foreground="#999999"/>
 						</StackPanel>
@@ -149,6 +149,24 @@
 									Padding="20,12"
 									FontSize="14"/>
 
+							<Button Content="Get FFmpeg"
+									Command="{Binding DownloadFfmpegCommand}"
+									Background="#8B5A2B"
+									Foreground="White"
+									BorderThickness="0"
+									CornerRadius="6"
+									Padding="20,12"
+									FontSize="14"/>
+
+							<Button Content="Check Dependencies"
+									Command="{Binding CheckDependenciesCommand}"
+									Background="#404040"
+									Foreground="White"
+									BorderThickness="0"
+									CornerRadius="6"
+									Padding="20,12"
+									FontSize="14"/>
+
 							<Button Content="Clear"
 									Command="{Binding ClearCommand}"
 									Background="Transparent"
@@ -172,10 +190,47 @@
 					<Grid Margin="25,20">
 						<Grid.ColumnDefinitions>
 							<ColumnDefinition Width="Auto"/>
+							<ColumnDefinition Width="Auto"/>
 							<ColumnDefinition Width="*"/>
 						</Grid.ColumnDefinitions>
 
 						<Border Grid.Column="0"
+								Width="120"
+								Height="120"
+								CornerRadius="8"
+								Background="#262626"
+								Margin="0,0,15,0">
+							<Border CornerRadius="8"
+									ClipToBounds="True">
+								<Grid>
+									<Border Background="#333333"
+											IsVisible="{Binding CurrentTrack.Thumbnail, Converter={x:Static ObjectConverters.IsNull}}">
+										<TextBlock Text="📹"
+												   FontSize="40"
+												   Foreground="#666666"
+												   HorizontalAlignment="Center"
+												   VerticalAlignment="Center"/>
+									</Border>
+
+									<Image Source="{Binding CurrentTrack.Thumbnail}"
+										   Stretch="UniformToFill"
+										   IsVisible="{Binding CurrentTrack.Thumbnail, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+
+									<Border Background="#00000080"
+											Height="20"
+											VerticalAlignment="Bottom">
+										<TextBlock Text="VIDEO"
+												   FontSize="10"
+												   FontWeight="Bold"
+												   Foreground="White"
+												   HorizontalAlignment="Center"
+												   VerticalAlignment="Center"/>
+									</Border>
+								</Grid>
+							</Border>
+						</Border>
+
+						<Border Grid.Column="1"
 								Width="120"
 								Height="120"
 								CornerRadius="8"
@@ -185,23 +240,39 @@
 									ClipToBounds="True">
 								<Grid>
 									<Border Background="#333333"
-											IsVisible="{Binding CurrentTrack.Thumbnail, Converter={x:Static ObjectConverters.IsNull}}">
-										<TextBlock Text="♫"
-												   FontSize="40"
+											IsVisible="{Binding CurrentTrack.AlbumArt, Converter={x:Static ObjectConverters.IsNull}}">
+										<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+											<TextBlock Text="🎵"
+													   FontSize="30"
+													   Foreground="#666666"
+													   HorizontalAlignment="Center"/>
+											<TextBlock Text="Searching..."
+													   FontSize="10"
+													   Foreground="#666666"
+													   HorizontalAlignment="Center"
+													   Margin="0,5,0,0"/>
+										</StackPanel>
+									</Border>
+
+									<Image Source="{Binding CurrentTrack.AlbumArt}"
+										   Stretch="UniformToFill"
+										   IsVisible="{Binding CurrentTrack.AlbumArt, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+
+									<Border Background="#00000080"
+											Height="20"
+											VerticalAlignment="Bottom">
+										<TextBlock Text="{Binding CurrentTrack.HasRealAlbumArt, Converter={x:Static converters:BoolToAlbumArtLabelConverter.Instance}}"
+												   FontSize="10"
 												   FontWeight="Bold"
-												   Foreground="#666666"
+												   Foreground="White"
 												   HorizontalAlignment="Center"
 												   VerticalAlignment="Center"/>
 									</Border>
-
-									<Image Source="{Binding CurrentTrack.Thumbnail}"
-										   Stretch="UniformToFill"
-										   IsVisible="{Binding CurrentTrack.Thumbnail, Converter={x:Static ObjectConverters.IsNotNull}}"/>
 								</Grid>
 							</Border>
 						</Border>
 
-						<StackPanel Grid.Column="1"
+						<StackPanel Grid.Column="2"
 									VerticalAlignment="Center"
 									Spacing="8">
 							<TextBlock Text="{Binding CurrentTrack.Title}"
@@ -222,6 +293,17 @@
 									   TextWrapping="Wrap"
 									   IsVisible="{Binding CurrentTrack.Album, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 
+							<Border Background="{Binding CurrentTrack.HasRealAlbumArt, Converter={x:Static converters:BoolToAlbumArtStatusColorConverter.Instance}}"
+									CornerRadius="12"
+									Padding="8,4"
+									HorizontalAlignment="Left"
+									IsVisible="{Binding CurrentTrack.AlbumArt, Converter={x:Static ObjectConverters.IsNotNull}}">
+								<TextBlock Text="{Binding CurrentTrack.HasRealAlbumArt, Converter={x:Static converters:BoolToAlbumArtStatusConverter.Instance}}"
+										   FontSize="11"
+										   FontWeight="Medium"
+										   Foreground="White"/>
+							</Border>
+
 							<StackPanel Orientation="Horizontal" Spacing="20" Margin="0,8,0,0">
 								<StackPanel Orientation="Horizontal" Spacing="6"
 											IsVisible="{Binding CurrentTrack.Duration, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
@@ -233,14 +315,33 @@
 								</StackPanel>
 
 								<StackPanel Orientation="Horizontal" Spacing="6"
-											IsVisible="{Binding CurrentTrack.FileName, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-									<TextBlock Text="📁" FontSize="12" VerticalAlignment="Center"/>
-									<TextBlock Text="{Binding CurrentTrack.FileName}"
+											IsVisible="{Binding CurrentTrack.UploadDate, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+									<TextBlock Text="📅" FontSize="12" VerticalAlignment="Center"/>
+									<TextBlock Text="{Binding CurrentTrack.UploadDate}"
+											   FontSize="12"
+											   Foreground="#999999"
+											   VerticalAlignment="Center"/>
+								</StackPanel>
+
+								<StackPanel Orientation="Horizontal" Spacing="6">
+									<TextBlock Text="👁️" FontSize="12" VerticalAlignment="Center"
+											   IsVisible="{Binding CurrentTrack.ViewCount, Converter={x:Static converters:NumberToVisibilityConverter.Instance}}"/>
+									<TextBlock Text="{Binding CurrentTrack.ViewCount, StringFormat='{}{0:N0} views'}"
 											   FontSize="12"
 											   Foreground="#999999"
 											   VerticalAlignment="Center"
-											   TextWrapping="Wrap"/>
+											   IsVisible="{Binding CurrentTrack.ViewCount, Converter={x:Static converters:NumberToVisibilityConverter.Instance}}"/>
 								</StackPanel>
+							</StackPanel>
+
+							<StackPanel Orientation="Horizontal" Spacing="6" Margin="0,8,0,0"
+										IsVisible="{Binding CurrentTrack.FileName, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+								<TextBlock Text="📁" FontSize="12" VerticalAlignment="Center"/>
+								<TextBlock Text="{Binding CurrentTrack.FileName}"
+										   FontSize="12"
+										   Foreground="#007ACC"
+										   VerticalAlignment="Center"
+										   TextWrapping="Wrap"/>
 							</StackPanel>
 						</StackPanel>
 					</Grid>
@@ -342,6 +443,15 @@
 										   FontWeight="SemiBold"
 										   Foreground="#FFFFFF"/>
 								<Button Grid.Column="1"
+										Content="Copy"
+										Command="{Binding CopyOutputCommand}"
+										Background="#007ACC"
+										Foreground="White"
+										BorderThickness="0"
+										CornerRadius="4"
+										Padding="10,6"
+										FontSize="11"/>
+								<Button Grid.Column="1"
 										Content="Clear"
 										Command="{Binding ClearLogCommand}"
 										Background="Transparent"
@@ -350,7 +460,8 @@
 										BorderThickness="1"
 										CornerRadius="4"
 										Padding="10,6"
-										FontSize="11"/>
+										FontSize="11"
+										Margin="55,0,0,0"/>
 							</Grid>
 
 							<Border Grid.Row="1"
