@@ -8,9 +8,38 @@ using System.Text;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
+using System.Text.Json;
+using System.Collections.Generic;
+using System.Linq;
+using Avalonia.Media.Imaging;
+using System.Net.Http;
 
 namespace Symphex.ViewModels
 {
+    public partial class TrackInfo : ObservableObject
+    {
+        [ObservableProperty]
+        private string title = "";
+
+        [ObservableProperty]
+        private string artist = "";
+
+        [ObservableProperty]
+        private string album = "";
+
+        [ObservableProperty]
+        private string duration = "";
+
+        [ObservableProperty]
+        private Bitmap? thumbnail;
+
+        [ObservableProperty]
+        private string fileName = "";
+
+        [ObservableProperty]
+        private string url = "";
+    }
+
     public partial class MainWindowViewModel : ViewModelBase
     {
         [ObservableProperty]
@@ -31,10 +60,17 @@ namespace Symphex.ViewModels
         private bool isDownloading = false;
 
         [ObservableProperty]
-        private string downloadFolder;
+        private string downloadFolder = "";
+
+        [ObservableProperty]
+        private TrackInfo? currentTrack;
+
+        [ObservableProperty]
+        private bool showMetadata = false;
 
         private string YtDlpPath { get; set; } = "";
         private string YtDlpExecutableName => GetYtDlpExecutableName();
+        private readonly HttpClient httpClient = new();
 
         public MainWindowViewModel()
         {
@@ -156,6 +192,125 @@ namespace Symphex.ViewModels
             catch { }
         }
 
+        private async Task<TrackInfo?> ExtractMetadata(string url)
+        {
+            try
+            {
+                LogToCli("Extracting metadata...");
+
+                bool isUrl = url.StartsWith("http://") || url.StartsWith("https://");
+                string searchPrefix = isUrl ? "" : "ytsearch1:";
+                string fullUrl = $"{searchPrefix}{url}";
+
+                var output = new StringBuilder();
+                var args = $"\"{fullUrl}\" --dump-json --no-playlist";
+
+                var result = await Cli.Wrap(YtDlpPath)
+                    .WithArguments(args)
+                    .WithStandardOutputPipe(PipeTarget.ToStringBuilder(output))
+                    .WithValidation(CommandResultValidation.None)
+                    .ExecuteAsync();
+
+                if (result.ExitCode != 0)
+                {
+                    LogToCli("Failed to extract metadata");
+                    return null;
+                }
+
+                var jsonOutput = output.ToString().Trim();
+                var lines = jsonOutput.Split('\n');
+                var jsonLine = lines.FirstOrDefault(line => line.StartsWith("{"));
+
+                if (string.IsNullOrEmpty(jsonLine))
+                {
+                    LogToCli("No valid JSON found in metadata output");
+                    return null;
+                }
+
+                using var doc = JsonDocument.Parse(jsonLine);
+                var root = doc.RootElement;
+
+                var trackInfo = new TrackInfo
+                {
+                    Title = root.TryGetProperty("title", out var title) ? title.GetString() ?? "Unknown" : "Unknown",
+                    Artist = root.TryGetProperty("uploader", out var uploader) ? uploader.GetString() ?? "Unknown" : "Unknown",
+                    Album = root.TryGetProperty("album", out var album) ? album.GetString() ?? "" : "",
+                    Duration = FormatDuration(root.TryGetProperty("duration", out var duration) ? duration.GetDouble() : 0),
+                    Url = root.TryGetProperty("webpage_url", out var webUrl) ? webUrl.GetString() ?? url : url
+                };
+
+                string? thumbnailUrl = null;
+
+                if (root.TryGetProperty("thumbnail", out var thumbnailProp))
+                {
+                    if (thumbnailProp.ValueKind == JsonValueKind.String)
+                    {
+                        thumbnailUrl = thumbnailProp.GetString();
+                    }
+                }
+                else if (root.TryGetProperty("thumbnails", out var thumbnailsProp))
+                {
+                    if (thumbnailsProp.ValueKind == JsonValueKind.Array)
+                    {
+                        var thumbnails = thumbnailsProp.EnumerateArray().ToList();
+                        if (thumbnails.Count > 0)
+                        {
+                            var bestThumbnail = thumbnails.LastOrDefault();
+                            if (bestThumbnail.TryGetProperty("url", out var urlProp))
+                            {
+                                thumbnailUrl = urlProp.GetString();
+                            }
+                        }
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(thumbnailUrl))
+                {
+                    trackInfo.Thumbnail = await LoadThumbnailAsync(thumbnailUrl);
+                }
+
+                LogToCli($"Metadata extracted: {trackInfo.Title} by {trackInfo.Artist}");
+                return trackInfo;
+            }
+            catch (Exception ex)
+            {
+                LogToCli($"Error extracting metadata: {ex.Message}");
+                return null;
+            }
+        }
+
+        private async Task<Bitmap?> LoadThumbnailAsync(string url)
+        {
+            try
+            {
+                LogToCli("Loading thumbnail...");
+                var response = await httpClient.GetAsync(url);
+                response.EnsureSuccessStatusCode();
+
+                var imageBytes = await response.Content.ReadAsByteArrayAsync();
+                using var stream = new MemoryStream(imageBytes);
+
+                return new Bitmap(stream);
+            }
+            catch (Exception ex)
+            {
+                LogToCli($"Failed to load thumbnail: {ex.Message}");
+                return null;
+            }
+        }
+
+        private string FormatDuration(double seconds)
+        {
+            if (seconds <= 0) return "Unknown";
+
+            var timeSpan = TimeSpan.FromSeconds(seconds);
+            if (timeSpan.TotalHours >= 1)
+            {
+                return $"{(int)timeSpan.TotalHours}:{timeSpan:mm\\:ss}";
+            }
+            return $"{timeSpan:mm\\:ss}";
+        }
+
         [RelayCommand]
         private async Task Download()
         {
@@ -175,12 +330,26 @@ namespace Symphex.ViewModels
 
             IsDownloading = true;
             DownloadProgress = 0;
+            ShowMetadata = false;
+            CurrentTrack = null;
+
             StatusText = $"🚀 Starting download for: {DownloadUrl}";
             LogToCli($"Starting download: {DownloadUrl}");
 
             try
             {
+                DownloadProgress = 5;
+                CurrentTrack = await ExtractMetadata(DownloadUrl);
+
+                if (CurrentTrack != null)
+                {
+                    ShowMetadata = true;
+                    StatusText = $"📝 Found: {CurrentTrack.Title} by {CurrentTrack.Artist}";
+                }
+
+                DownloadProgress = 15;
                 await RealDownload();
+
                 StatusText = $"✅ Download completed! Check your music folder.";
                 LogToCli("Download completed successfully");
             }
@@ -188,6 +357,7 @@ namespace Symphex.ViewModels
             {
                 StatusText = $"❌ Error: {ex.Message}";
                 LogToCli($"ERROR: {ex.Message}");
+                ShowMetadata = false;
             }
             finally
             {
@@ -200,7 +370,7 @@ namespace Symphex.ViewModels
         {
             try
             {
-                DownloadProgress = 10;
+                DownloadProgress = 20;
                 LogToCli($"Using yt-dlp at: {YtDlpPath}");
 
                 bool isUrl = DownloadUrl.StartsWith("http://") || DownloadUrl.StartsWith("https://");
@@ -214,16 +384,16 @@ namespace Symphex.ViewModels
                 string args;
                 if (isUrl)
                 {
-                    args = $"\"{DownloadUrl}\" --extract-audio --audio-format mp3 --audio-quality 0 -o \"{Path.Combine(DownloadFolder, "%(title)s.%(ext)s")}\" --no-playlist";
+                    args = $"\"{DownloadUrl}\" --extract-audio --audio-format mp3 --audio-quality 0 -o \"{Path.Combine(DownloadFolder, "%(title)s.%(ext)s")}\" --no-playlist --embed-metadata --add-metadata";
                 }
                 else
                 {
-                    args = $"\"{searchPrefix}{DownloadUrl}\" --extract-audio --audio-format mp3 --audio-quality 0 -o \"{Path.Combine(DownloadFolder, "%(title)s.%(ext)s")}\"";
+                    args = $"\"{searchPrefix}{DownloadUrl}\" --extract-audio --audio-format mp3 --audio-quality 0 -o \"{Path.Combine(DownloadFolder, "%(title)s.%(ext)s")}\" --embed-metadata --add-metadata";
                 }
 
                 LogToCli($"Command: yt-dlp {args}");
                 StatusText = isUrl ? "🎵 Downloading from URL..." : "🔍 Searching and downloading...";
-                DownloadProgress = 25;
+                DownloadProgress = 30;
 
                 var result = await Cli.Wrap(YtDlpPath)
                     .WithArguments(args)
@@ -241,8 +411,20 @@ namespace Symphex.ViewModels
 
                 if (result.ExitCode == 0)
                 {
-                    LogToCli("SUCCESS: Download completed");
+                    LogToCli("SUCCESS: Download completed with metadata");
                     DownloadProgress = 100;
+
+                    if (CurrentTrack != null)
+                    {
+                        var outputText = output.ToString();
+                        var lines = outputText.Split('\n');
+                        var destinationLine = lines.FirstOrDefault(l => l.Contains("[ExtractAudio] Destination:"));
+                        if (destinationLine != null)
+                        {
+                            var filename = Path.GetFileName(destinationLine.Split(':').LastOrDefault()?.Trim());
+                            CurrentTrack.FileName = filename ?? "";
+                        }
+                    }
                 }
                 else
                 {
@@ -285,10 +467,10 @@ namespace Symphex.ViewModels
                 LogToCli($"Download URL: {downloadUrl}");
                 LogToCli($"Saving to: {ytDlpPath}");
 
-                using (var httpClient = new System.Net.Http.HttpClient())
+                using (var localHttpClient = new HttpClient())
                 {
                     DownloadProgress = 30;
-                    var response = await httpClient.GetAsync(downloadUrl);
+                    var response = await localHttpClient.GetAsync(downloadUrl);
                     response.EnsureSuccessStatusCode();
 
                     DownloadProgress = 60;
@@ -325,6 +507,8 @@ namespace Symphex.ViewModels
             DownloadUrl = "";
             StatusText = "🎵 Ready to download music...";
             DownloadProgress = 0;
+            ShowMetadata = false;
+            CurrentTrack = null;
             LogToCli("Input cleared");
         }
 

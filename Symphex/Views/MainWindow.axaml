@@ -4,12 +4,12 @@
         xmlns:converters="using:Symphex.Converters"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+        mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="900"
         x:Class="Symphex.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Icon="/Assets/avalonia-logo.ico"
         Title="Symphex - Music Downloader"
-        MinWidth="1100" MinHeight="700"
+        MinWidth="1300" MinHeight="800"
         Background="#0F0F0F">
 
 	<Design.DataContext>
@@ -43,7 +43,7 @@
 									   FontSize="24"
 									   FontWeight="SemiBold"
 									   Foreground="#FFFFFF"/>
-							<TextBlock Text="Professional Music Downloader"
+							<TextBlock Text="Professional Music Downloader with Metadata"
 									   FontSize="13"
 									   Foreground="#999999"/>
 						</StackPanel>
@@ -88,6 +88,7 @@
 			<Grid Background="#0F0F0F">
 				<Grid.RowDefinitions>
 					<RowDefinition Height="Auto" MinHeight="120"/>
+					<RowDefinition Height="Auto"/>
 					<RowDefinition Height="*" MinHeight="300"/>
 				</Grid.RowDefinitions>
 
@@ -161,7 +162,91 @@
 					</Grid>
 				</Border>
 
-				<Grid Grid.Row="1" Margin="30,20,30,20">
+				<Border Grid.Row="1"
+						Background="#1A1A1A"
+						Margin="30,20,30,0"
+						CornerRadius="8"
+						BorderBrush="#333333"
+						BorderThickness="1"
+						IsVisible="{Binding ShowMetadata}">
+					<Grid Margin="25,20">
+						<Grid.ColumnDefinitions>
+							<ColumnDefinition Width="Auto"/>
+							<ColumnDefinition Width="*"/>
+						</Grid.ColumnDefinitions>
+
+						<Border Grid.Column="0"
+								Width="120"
+								Height="120"
+								CornerRadius="8"
+								Background="#262626"
+								Margin="0,0,20,0">
+							<Border CornerRadius="8"
+									ClipToBounds="True">
+								<Grid>
+									<Border Background="#333333"
+											IsVisible="{Binding CurrentTrack.Thumbnail, Converter={x:Static ObjectConverters.IsNull}}">
+										<TextBlock Text="♫"
+												   FontSize="40"
+												   FontWeight="Bold"
+												   Foreground="#666666"
+												   HorizontalAlignment="Center"
+												   VerticalAlignment="Center"/>
+									</Border>
+
+									<Image Source="{Binding CurrentTrack.Thumbnail}"
+										   Stretch="UniformToFill"
+										   IsVisible="{Binding CurrentTrack.Thumbnail, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+								</Grid>
+							</Border>
+						</Border>
+
+						<StackPanel Grid.Column="1"
+									VerticalAlignment="Center"
+									Spacing="8">
+							<TextBlock Text="{Binding CurrentTrack.Title}"
+									   FontSize="18"
+									   FontWeight="SemiBold"
+									   Foreground="#FFFFFF"
+									   TextWrapping="Wrap"
+									   MaxLines="2"/>
+
+							<TextBlock Text="{Binding CurrentTrack.Artist}"
+									   FontSize="14"
+									   Foreground="#CCCCCC"
+									   TextWrapping="Wrap"/>
+
+							<TextBlock Text="{Binding CurrentTrack.Album}"
+									   FontSize="12"
+									   Foreground="#999999"
+									   TextWrapping="Wrap"
+									   IsVisible="{Binding CurrentTrack.Album, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+							<StackPanel Orientation="Horizontal" Spacing="20" Margin="0,8,0,0">
+								<StackPanel Orientation="Horizontal" Spacing="6"
+											IsVisible="{Binding CurrentTrack.Duration, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+									<TextBlock Text="⏱️" FontSize="12" VerticalAlignment="Center"/>
+									<TextBlock Text="{Binding CurrentTrack.Duration}"
+											   FontSize="12"
+											   Foreground="#999999"
+											   VerticalAlignment="Center"/>
+								</StackPanel>
+
+								<StackPanel Orientation="Horizontal" Spacing="6"
+											IsVisible="{Binding CurrentTrack.FileName, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+									<TextBlock Text="📁" FontSize="12" VerticalAlignment="Center"/>
+									<TextBlock Text="{Binding CurrentTrack.FileName}"
+											   FontSize="12"
+											   Foreground="#999999"
+											   VerticalAlignment="Center"
+											   TextWrapping="Wrap"/>
+								</StackPanel>
+							</StackPanel>
+						</StackPanel>
+					</Grid>
+				</Border>
+
+				<Grid Grid.Row="2" Margin="30,20,30,20">
 					<Grid.ColumnDefinitions>
 						<ColumnDefinition Width="*" MinWidth="300"/>
 						<ColumnDefinition Width="20"/>
