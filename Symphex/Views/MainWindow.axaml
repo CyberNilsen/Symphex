@@ -1,0 +1,293 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Symphex.ViewModels"
+        xmlns:converters="using:Symphex.Converters"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
+        x:Class="Symphex.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Icon="/Assets/avalonia-logo.ico"
+        Title="Symphex - Music Downloader"
+        MinWidth="1100" MinHeight="700"
+        Background="#0F0F0F">
+
+	<Design.DataContext>
+		<vm:MainWindowViewModel/>
+	</Design.DataContext>
+
+	<Grid>
+		<DockPanel Margin="0">
+			<Border DockPanel.Dock="Top"
+					Background="#1A1A1A"
+					BorderBrush="#333333"
+					BorderThickness="0,0,0,1">
+				<Grid Height="80">
+					<StackPanel Orientation="Horizontal"
+								VerticalAlignment="Center"
+								HorizontalAlignment="Left"
+								Margin="30,0">
+						<Border Width="40" Height="40"
+								CornerRadius="8"
+								Background="#007ACC"
+								VerticalAlignment="Center">
+							<TextBlock Text="♫"
+									   FontSize="22"
+									   FontWeight="Bold"
+									   Foreground="White"
+									   HorizontalAlignment="Center"
+									   VerticalAlignment="Center"/>
+						</Border>
+						<StackPanel Margin="15,0,0,0" VerticalAlignment="Center">
+							<TextBlock Text="Symphex"
+									   FontSize="24"
+									   FontWeight="SemiBold"
+									   Foreground="#FFFFFF"/>
+							<TextBlock Text="Professional Music Downloader"
+									   FontSize="13"
+									   Foreground="#999999"/>
+						</StackPanel>
+					</StackPanel>
+				</Grid>
+			</Border>
+
+			<Border DockPanel.Dock="Bottom"
+					Background="#1A1A1A"
+					BorderBrush="#333333"
+					BorderThickness="0,1,0,0"
+					Height="50">
+				<Grid>
+					<StackPanel Orientation="Horizontal"
+								VerticalAlignment="Center"
+								HorizontalAlignment="Left"
+								Margin="30,0">
+						<TextBlock Text="Downloads:"
+								   FontSize="12"
+								   Foreground="#999999"
+								   VerticalAlignment="Center"/>
+						<TextBlock Text="{Binding DownloadFolder}"
+								   FontSize="12"
+								   FontWeight="Medium"
+								   Foreground="#007ACC"
+								   Margin="8,0,0,0"
+								   VerticalAlignment="Center"/>
+						<Button Content="Open Folder"
+								Command="{Binding OpenFolderCommand}"
+								Background="Transparent"
+								Foreground="#007ACC"
+								BorderBrush="#007ACC"
+								BorderThickness="1"
+								CornerRadius="4"
+								Padding="12,6"
+								FontSize="11"
+								Margin="15,0,0,0"/>
+					</StackPanel>
+				</Grid>
+			</Border>
+
+			<Grid Background="#0F0F0F">
+				<Grid.RowDefinitions>
+					<RowDefinition Height="Auto" MinHeight="120"/>
+					<RowDefinition Height="*" MinHeight="300"/>
+				</Grid.RowDefinitions>
+
+				<Border Grid.Row="0"
+						Background="#1A1A1A"
+						Margin="30,20,30,0"
+						CornerRadius="8"
+						BorderBrush="#333333"
+						BorderThickness="1">
+					<Grid Margin="30,25">
+						<Grid.RowDefinitions>
+							<RowDefinition Height="Auto"/>
+							<RowDefinition Height="Auto"/>
+							<RowDefinition Height="Auto"/>
+						</Grid.RowDefinitions>
+
+						<TextBlock Grid.Row="0"
+								   Text="Enter URL or Search Query"
+								   FontSize="14"
+								   FontWeight="Medium"
+								   Foreground="#FFFFFF"
+								   Margin="0,0,0,12"/>
+
+						<TextBox Grid.Row="1"
+								 Name="UrlTextBox"
+								 Text="{Binding DownloadUrl}"
+								 Watermark="https://youtube.com/watch?v=... or search for any song"
+								 FontSize="14"
+								 Height="44"
+								 Background="#262626"
+								 Foreground="#FFFFFF"
+								 BorderBrush="#404040"
+								 BorderThickness="1"
+								 CornerRadius="6"
+								 Padding="16,10"
+								 Margin="0,0,0,20"/>
+
+						<StackPanel Grid.Row="2"
+									Orientation="Horizontal"
+									Spacing="12">
+							<Button Content="Download"
+									Command="{Binding DownloadCommand}"
+									Background="#007ACC"
+									Foreground="White"
+									BorderThickness="0"
+									CornerRadius="6"
+									Padding="24,12"
+									FontSize="14"
+									FontWeight="Medium"
+									MinWidth="100"/>
+
+							<Button Content="Get yt-dlp"
+									Command="{Binding DownloadYtDlpCommand}"
+									Background="#404040"
+									Foreground="White"
+									BorderThickness="0"
+									CornerRadius="6"
+									Padding="20,12"
+									FontSize="14"/>
+
+							<Button Content="Clear"
+									Command="{Binding ClearCommand}"
+									Background="Transparent"
+									Foreground="#999999"
+									BorderBrush="#404040"
+									BorderThickness="1"
+									CornerRadius="6"
+									Padding="20,12"
+									FontSize="14"/>
+						</StackPanel>
+					</Grid>
+				</Border>
+
+				<Grid Grid.Row="1" Margin="30,20,30,20">
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="*" MinWidth="300"/>
+						<ColumnDefinition Width="20"/>
+						<ColumnDefinition Width="*" MinWidth="300"/>
+					</Grid.ColumnDefinitions>
+
+					<Border Grid.Column="0"
+							Background="#1A1A1A"
+							CornerRadius="8"
+							BorderBrush="#333333"
+							BorderThickness="1">
+						<Grid Margin="25">
+							<Grid.RowDefinitions>
+								<RowDefinition Height="Auto"/>
+								<RowDefinition Height="*" MinHeight="200"/>
+								<RowDefinition Height="Auto"/>
+							</Grid.RowDefinitions>
+
+							<TextBlock Grid.Row="0"
+									   Text="Status"
+									   FontSize="16"
+									   FontWeight="SemiBold"
+									   Foreground="#FFFFFF"
+									   Margin="0,0,0,15"/>
+
+							<Border Grid.Row="1"
+									Background="#0F0F0F"
+									CornerRadius="6"
+									BorderBrush="#333333"
+									BorderThickness="1">
+								<ScrollViewer Padding="20"
+											  VerticalScrollBarVisibility="Auto">
+									<TextBlock Text="{Binding StatusText}"
+											   TextWrapping="Wrap"
+											   FontFamily="Segoe UI"
+											   FontSize="13"
+											   Foreground="#E0E0E0"
+											   LineHeight="20"/>
+								</ScrollViewer>
+							</Border>
+
+							<StackPanel Grid.Row="2"
+										Margin="0,20,0,0"
+										IsVisible="{Binding IsDownloading}">
+								<Grid>
+									<Grid.ColumnDefinitions>
+										<ColumnDefinition Width="*"/>
+										<ColumnDefinition Width="Auto"/>
+									</Grid.ColumnDefinitions>
+									<TextBlock Grid.Column="0"
+											   Text="Progress"
+											   FontSize="12"
+											   Foreground="#999999"/>
+									<TextBlock Grid.Column="1"
+											   Text="{Binding DownloadProgress, StringFormat='{}{0:0}%'}"
+											   FontSize="12"
+											   FontWeight="Medium"
+											   Foreground="#007ACC"/>
+								</Grid>
+								<Border Background="#262626"
+										Height="6"
+										CornerRadius="3"
+										Margin="0,8,0,0">
+									<Border CornerRadius="3"
+											HorizontalAlignment="Left"
+											Background="#007ACC"
+											Width="{Binding DownloadProgress, Converter={x:Static converters:PercentageToWidthConverter.Instance}}"/>
+								</Border>
+							</StackPanel>
+						</Grid>
+					</Border>
+
+					<Border Grid.Column="2"
+							Background="#1A1A1A"
+							CornerRadius="8"
+							BorderBrush="#333333"
+							BorderThickness="1">
+						<Grid Margin="25">
+							<Grid.RowDefinitions>
+								<RowDefinition Height="Auto"/>
+								<RowDefinition Height="*" MinHeight="200"/>
+								<RowDefinition Height="Auto"/>
+							</Grid.RowDefinitions>
+
+							<Grid Grid.Row="0" Margin="0,0,0,15">
+								<Grid.ColumnDefinitions>
+									<ColumnDefinition Width="*"/>
+									<ColumnDefinition Width="Auto"/>
+								</Grid.ColumnDefinitions>
+								<TextBlock Grid.Column="0"
+										   Text="Console Output"
+										   FontSize="16"
+										   FontWeight="SemiBold"
+										   Foreground="#FFFFFF"/>
+								<Button Grid.Column="1"
+										Content="Clear"
+										Command="{Binding ClearLogCommand}"
+										Background="Transparent"
+										Foreground="#999999"
+										BorderBrush="#404040"
+										BorderThickness="1"
+										CornerRadius="4"
+										Padding="10,6"
+										FontSize="11"/>
+							</Grid>
+
+							<Border Grid.Row="1"
+									Background="#0F0F0F"
+									CornerRadius="6"
+									BorderBrush="#333333"
+									BorderThickness="1">
+								<ScrollViewer Name="CliOutput"
+											  Padding="16"
+											  VerticalScrollBarVisibility="Auto">
+									<TextBlock Text="{Binding CliOutput}"
+											   TextWrapping="Wrap"
+											   FontFamily="Consolas, Courier New, monospace"
+											   FontSize="12"
+											   Foreground="#00D4AA"
+											   LineHeight="18"/>
+								</ScrollViewer>
+							</Border>
+						</Grid>
+					</Border>
+				</Grid>
+			</Grid>
+		</DockPanel>
+	</Grid>
+</Window>
