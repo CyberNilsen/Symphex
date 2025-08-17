@@ -89,7 +89,7 @@
 				<Grid.RowDefinitions>
 					<RowDefinition Height="Auto" MinHeight="120"/>
 					<RowDefinition Height="Auto"/>
-					<RowDefinition Height="*" MinHeight="300"/>
+					<RowDefinition Height="*" MinHeight="400"/>
 				</Grid.RowDefinitions>
 
 				<Border Grid.Row="0"
@@ -349,9 +349,9 @@
 
 				<Grid Grid.Row="2" Margin="30,20,30,20">
 					<Grid.ColumnDefinitions>
-						<ColumnDefinition Width="*" MinWidth="300"/>
+						<ColumnDefinition Width="*" MinWidth="350" MaxWidth="600"/>
 						<ColumnDefinition Width="20"/>
-						<ColumnDefinition Width="*" MinWidth="300"/>
+						<ColumnDefinition Width="*" MinWidth="350" MaxWidth="600"/>
 					</Grid.ColumnDefinitions>
 
 					<Border Grid.Column="0"
@@ -359,37 +359,15 @@
 							CornerRadius="8"
 							BorderBrush="#333333"
 							BorderThickness="1">
-						<Grid Margin="25">
-							<Grid.RowDefinitions>
-								<RowDefinition Height="Auto"/>
-								<RowDefinition Height="*" MinHeight="200"/>
-								<RowDefinition Height="Auto"/>
-							</Grid.RowDefinitions>
-
-							<TextBlock Grid.Row="0"
+						<DockPanel Margin="25">
+							<TextBlock DockPanel.Dock="Top"
 									   Text="Status"
 									   FontSize="16"
 									   FontWeight="SemiBold"
 									   Foreground="#FFFFFF"
 									   Margin="0,0,0,15"/>
 
-							<Border Grid.Row="1"
-									Background="#0F0F0F"
-									CornerRadius="6"
-									BorderBrush="#333333"
-									BorderThickness="1">
-								<ScrollViewer Padding="20"
-											  VerticalScrollBarVisibility="Auto">
-									<TextBlock Text="{Binding StatusText}"
-											   TextWrapping="Wrap"
-											   FontFamily="Segoe UI"
-											   FontSize="13"
-											   Foreground="#E0E0E0"
-											   LineHeight="20"/>
-								</ScrollViewer>
-							</Border>
-
-							<StackPanel Grid.Row="2"
+							<StackPanel DockPanel.Dock="Bottom"
 										Margin="0,20,0,0"
 										IsVisible="{Binding IsDownloading}">
 								<Grid>
@@ -417,7 +395,24 @@
 											Width="{Binding DownloadProgress, Converter={x:Static converters:PercentageToWidthConverter.Instance}}"/>
 								</Border>
 							</StackPanel>
-						</Grid>
+
+							<Border Background="#0F0F0F"
+									CornerRadius="6"
+									BorderBrush="#333333"
+									BorderThickness="1">
+								<ScrollViewer Name="StatusOutput"
+											  Padding="20"
+											  VerticalScrollBarVisibility="Auto"
+											  HorizontalScrollBarVisibility="Disabled">
+									<TextBlock Text="{Binding StatusText}"
+											   TextWrapping="Wrap"
+											   FontFamily="Segoe UI"
+											   FontSize="13"
+											   Foreground="#E0E0E0"
+											   LineHeight="20"/>
+								</ScrollViewer>
+							</Border>
+						</DockPanel>
 					</Border>
 
 					<Border Grid.Column="2"
@@ -425,16 +420,11 @@
 							CornerRadius="8"
 							BorderBrush="#333333"
 							BorderThickness="1">
-						<Grid Margin="25">
-							<Grid.RowDefinitions>
-								<RowDefinition Height="Auto"/>
-								<RowDefinition Height="*" MinHeight="200"/>
-								<RowDefinition Height="Auto"/>
-							</Grid.RowDefinitions>
-
-							<Grid Grid.Row="0" Margin="0,0,0,15">
+						<DockPanel Margin="25">
+							<Grid DockPanel.Dock="Top" Margin="0,0,0,15">
 								<Grid.ColumnDefinitions>
 									<ColumnDefinition Width="*"/>
+									<ColumnDefinition Width="Auto"/>
 									<ColumnDefinition Width="Auto"/>
 								</Grid.ColumnDefinitions>
 								<TextBlock Grid.Column="0"
@@ -450,8 +440,9 @@
 										BorderThickness="0"
 										CornerRadius="4"
 										Padding="10,6"
-										FontSize="11"/>
-								<Button Grid.Column="1"
+										FontSize="11"
+										Margin="0,0,8,0"/>
+								<Button Grid.Column="2"
 										Content="Clear"
 										Command="{Binding ClearLogCommand}"
 										Background="Transparent"
@@ -460,27 +451,32 @@
 										BorderThickness="1"
 										CornerRadius="4"
 										Padding="10,6"
-										FontSize="11"
-										Margin="55,0,0,0"/>
+										FontSize="11"/>
 							</Grid>
 
-							<Border Grid.Row="1"
-									Background="#0F0F0F"
+							<Border Background="#0F0F0F"
 									CornerRadius="6"
 									BorderBrush="#333333"
 									BorderThickness="1">
 								<ScrollViewer Name="CliOutput"
-											  Padding="16"
-											  VerticalScrollBarVisibility="Auto">
-									<TextBlock Text="{Binding CliOutput}"
-											   TextWrapping="Wrap"
-											   FontFamily="Consolas, Courier New, monospace"
-											   FontSize="12"
-											   Foreground="#00D4AA"
-											   LineHeight="18"/>
+											  Padding="5"
+											  VerticalScrollBarVisibility="Auto"
+											  HorizontalScrollBarVisibility="Auto"
+											  VerticalAlignment="Stretch"
+											  HorizontalAlignment="Stretch"
+											  ScrollChanged="CliOutput_ScrollChanged">
+									<StackPanel Margin="0,0,0,30">
+										<TextBlock Text="{Binding CliOutput}"
+												   TextWrapping="Wrap"
+												   FontFamily="Consolas, Courier New, monospace"
+												   FontSize="12"
+												   Foreground="#00D4AA"
+												   LineHeight="18"
+												   VerticalAlignment="Top"/>
+									</StackPanel>
 								</ScrollViewer>
 							</Border>
-						</Grid>
+						</DockPanel>
 					</Border>
 				</Grid>
 			</Grid>

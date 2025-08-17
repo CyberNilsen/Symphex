@@ -17,6 +17,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Avalonia.Threading;
 
 namespace Symphex.ViewModels
 {
@@ -61,6 +62,14 @@ namespace Symphex.ViewModels
 
     public partial class MainWindowViewModel : ViewModelBase
     {
+        private ScrollViewer? _cliScrollViewer;
+
+        public ScrollViewer? CliScrollViewer
+        {
+            get => _cliScrollViewer;
+            set => SetProperty(ref _cliScrollViewer, value);
+        }
+
         [ObservableProperty]
         private string downloadUrl = "";
 
@@ -157,7 +166,35 @@ namespace Symphex.ViewModels
         private void LogToCli(string message)
         {
             var timestamp = DateTime.Now.ToString("HH:mm:ss");
-            CliOutput += $"[{timestamp}] {message}\n";
+
+            string cleanMessage = message.Trim();
+
+            string logEntry = $"[{timestamp}] {cleanMessage}\n";
+
+            if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    CliOutput += logEntry;
+                    ScrollToBottom();
+                });
+            }
+            else
+            {
+                CliOutput += logEntry;
+                ScrollToBottom();
+            }
+        }
+
+        private void ScrollToBottom()
+        {
+            if (CliScrollViewer != null)
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    CliScrollViewer.ScrollToEnd();
+                }, Avalonia.Threading.DispatcherPriority.Background);
+            }
         }
 
         private void SetupPortableYtDlp()
@@ -403,7 +440,18 @@ namespace Symphex.ViewModels
                     System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             }
 
-            return cleaned.Trim();
+            cleaned = cleaned
+                .Replace("\"", "")
+                .Replace("'", "")
+                .Replace("\u201C", "")
+                .Replace("\u201D", "")
+                .Replace("\u2018", "")
+                .Replace("\u2019", "")
+                .Replace("_", " ")
+                .Replace("  ", " ")
+                .Trim();
+
+            return cleaned;
         }
 
         private string CleanArtistName(string artist)
@@ -418,9 +466,18 @@ namespace Symphex.ViewModels
                 .Replace("VEVO", "", StringComparison.OrdinalIgnoreCase)
                 .Replace(" Records", "", StringComparison.OrdinalIgnoreCase)
                 .Replace(" Music", "", StringComparison.OrdinalIgnoreCase)
-                .Replace("Official", "", StringComparison.OrdinalIgnoreCase);
+                .Replace("Official", "", StringComparison.OrdinalIgnoreCase)
+                .Replace("\"", "")  
+                .Replace("'", "")   
+                .Replace("\u201C", "")   
+                .Replace("\u201D", "")   
+                .Replace("\u2018", "")   
+                .Replace("\u2019", "")   
+                .Replace("_", " ")  
+                .Replace("  ", " ") 
+                .Trim();
 
-            return cleaned.Trim();
+            return cleaned;
         }
 
         private string GetBestThumbnailUrl(JsonElement root)
@@ -456,7 +513,26 @@ namespace Symphex.ViewModels
 
                 if (albumArt == null)
                 {
+                    LogToCli("iTunes search failed, trying Deezer...");
                     albumArt = await SearchDeezerAlbumArt(trackInfo.Title, trackInfo.Artist);
+                }
+
+                if (albumArt == null && trackInfo.Title.Contains(" - "))
+                {
+                    LogToCli("Trying alternative search without separators...");
+                    string altTitle = trackInfo.Title.Replace(" - ", " ");
+                    albumArt = await SearchITunesAlbumArt(altTitle, trackInfo.Artist);
+
+                    if (albumArt == null)
+                    {
+                        albumArt = await SearchDeezerAlbumArt(altTitle, trackInfo.Artist);
+                    }
+                }
+
+                if (albumArt == null)
+                {
+                    LogToCli("Trying artist-focused search...");
+                    albumArt = await SearchITunesAlbumArt("", trackInfo.Artist);
                 }
 
                 if (albumArt != null)
@@ -467,16 +543,160 @@ namespace Symphex.ViewModels
                 }
                 else
                 {
-                    LogToCli("⚠️ No album artwork found, using video thumbnail");
-                    trackInfo.AlbumArt = trackInfo.Thumbnail;
+                    LogToCli("⚠️ No album artwork found in databases, using video thumbnail");
+                    trackInfo.AlbumArt = trackInfo.Thumbnail; 
                     trackInfo.HasRealAlbumArt = false;
                 }
             }
             catch (Exception ex)
             {
                 LogToCli($"Error finding album art: {ex.Message}");
-                trackInfo.AlbumArt = trackInfo.Thumbnail;
+                trackInfo.AlbumArt = trackInfo.Thumbnail; 
                 trackInfo.HasRealAlbumArt = false;
+            }
+        }
+
+        private async Task ApplyProperMetadata()
+        {
+            try
+            {
+                if (CurrentTrack == null || string.IsNullOrEmpty(CurrentTrack.FileName) || string.IsNullOrEmpty(FfmpegPath))
+                {
+                    LogToCli("Skipping metadata application - missing requirements");
+                    return;
+                }
+
+                string audioFilePath = Path.Combine(DownloadFolder, CurrentTrack.FileName);
+                if (!File.Exists(audioFilePath))
+                {
+                    LogToCli($"Audio file not found: {audioFilePath}");
+                    return;
+                }
+
+                LogToCli("Applying proper metadata and artwork...");
+
+                string tempOutput = Path.Combine(DownloadFolder, $"temp_{Guid.NewGuid():N}.mp3");
+
+                var argsList = new List<string>();
+
+                argsList.AddRange(new[] { "-i", audioFilePath });
+
+                Bitmap? artworkToUse = CurrentTrack.AlbumArt ?? CurrentTrack.Thumbnail;
+                string artworkSource = CurrentTrack.HasRealAlbumArt ? "album art" : "thumbnail";
+
+                LogToCli($"Using {artworkSource} for metadata");
+
+                string? tempArtwork = null;
+                if (artworkToUse != null)
+                {
+                    tempArtwork = Path.Combine(Path.GetTempPath(), $"temp_artwork_{Guid.NewGuid():N}.jpg");
+
+                    try
+                    {
+                        using (var fileStream = new FileStream(tempArtwork, FileMode.Create))
+                        {
+                            artworkToUse.Save(fileStream);
+                        }
+                        LogToCli($"Saved {artworkSource} to: {tempArtwork}");
+
+                        argsList.AddRange(new[] { "-i", tempArtwork });
+
+                        argsList.AddRange(new[] { "-map", "0:a", "-map", "1:0" });
+
+                        argsList.AddRange(new[] { "-c:a", "copy", "-c:v", "mjpeg" });
+
+                        argsList.AddRange(new[] { "-disposition:v", "attached_pic" });
+                    }
+                    catch (Exception ex)
+                    {
+                        LogToCli($"Error preparing artwork: {ex.Message}");
+                        tempArtwork = null;
+                        argsList.AddRange(new[] { "-c", "copy" });
+                    }
+                }
+                else
+                {
+                    LogToCli("No artwork available to embed");
+                    argsList.AddRange(new[] { "-c", "copy" });
+                }
+
+                argsList.AddRange(new[] { "-id3v2_version", "3" });
+
+                if (!string.IsNullOrEmpty(CurrentTrack.Title) && CurrentTrack.Title != "Unknown")
+                {
+                    argsList.AddRange(new[] { "-metadata", $"title={CurrentTrack.Title}" });
+                }
+
+                if (!string.IsNullOrEmpty(CurrentTrack.Artist) && CurrentTrack.Artist != "Unknown")
+                {
+                    argsList.AddRange(new[] { "-metadata", $"artist={CurrentTrack.Artist}" });
+                }
+
+                if (!string.IsNullOrEmpty(CurrentTrack.Album))
+                {
+                    argsList.AddRange(new[] { "-metadata", $"album={CurrentTrack.Album}" });
+                }
+
+                if (!string.IsNullOrEmpty(CurrentTrack.UploadDate))
+                {
+                    argsList.AddRange(new[] { "-metadata", $"date={CurrentTrack.UploadDate}" });
+                }
+
+                argsList.Add(tempOutput);
+
+                LogToCli($"Applying metadata: '{CurrentTrack.Title}' by '{CurrentTrack.Artist}' with {artworkSource}");
+
+                var output = new StringBuilder();
+                var error = new StringBuilder();
+
+                var result = await Cli.Wrap(FfmpegPath)
+                    .WithArguments(argsList)
+                    .WithStandardOutputPipe(PipeTarget.ToStringBuilder(output))
+                    .WithStandardErrorPipe(PipeTarget.ToStringBuilder(error))
+                    .WithValidation(CommandResultValidation.None)
+                    .ExecuteAsync();
+
+                var outputText = output.ToString();
+                var errorText = error.ToString();
+
+                if (!string.IsNullOrEmpty(outputText))
+                {
+                    LogToCli($"FFmpeg output: {outputText}");
+                }
+
+                if (!string.IsNullOrEmpty(errorText))
+                {
+                    LogToCli($"FFmpeg error: {errorText}");
+                }
+
+                try
+                {
+                    if (result.ExitCode == 0 && File.Exists(tempOutput))
+                    {
+                        if (File.Exists(audioFilePath))
+                            File.Delete(audioFilePath);
+                        File.Move(tempOutput, audioFilePath);
+                        LogToCli($"✅ Metadata and {artworkSource} applied successfully");
+                    }
+                    else
+                    {
+                        LogToCli($"⚠️ Failed to apply metadata (exit code: {result.ExitCode})");
+                        if (File.Exists(tempOutput))
+                            File.Delete(tempOutput);
+                    }
+                }
+                finally
+                {
+                    if (tempArtwork != null && File.Exists(tempArtwork))
+                    {
+                        File.Delete(tempArtwork);
+                        LogToCli("Cleaned up temporary artwork file");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogToCli($"Error applying metadata: {ex.Message}");
             }
         }
 
@@ -484,33 +704,92 @@ namespace Symphex.ViewModels
         {
             try
             {
-                string searchTerm = $"{artist} {title}".Trim();
-                string searchUrl = $"https://itunes.apple.com/search?term={Uri.EscapeDataString(searchTerm)}&media=music&entity=song&limit=5";
+                var searchStrategies = new List<string>();
 
-                LogToCli($"iTunes search: {searchTerm}");
-
-                var response = await httpClient.GetStringAsync(searchUrl);
-                using var doc = JsonDocument.Parse(response);
-
-                if (doc.RootElement.TryGetProperty("results", out var results))
+                if (!string.IsNullOrEmpty(artist) && !string.IsNullOrEmpty(title))
                 {
-                    foreach (var result in results.EnumerateArray())
-                    {
-                        if (result.TryGetProperty("artworkUrl100", out var artworkUrl))
-                        {
-                            string imageUrl = artworkUrl.GetString();
-                            if (!string.IsNullOrEmpty(imageUrl))
-                            {
-                                imageUrl = imageUrl.Replace("100x100", "600x600");
+                    searchStrategies.Add($"{CleanForSearch(artist)} {CleanForSearch(title)}");
+                    searchStrategies.Add($"{CleanForSearch(title)} {CleanForSearch(artist)}");
 
-                                var albumArt = await LoadImageAsync(imageUrl);
-                                if (albumArt != null)
+                    string cleanTitle = RemoveCommonWords(CleanForSearch(title));
+                    string cleanArtist = RemoveCommonWords(CleanForSearch(artist));
+                    if (!string.IsNullOrEmpty(cleanTitle) && !string.IsNullOrEmpty(cleanArtist))
+                    {
+                        searchStrategies.Add($"{cleanArtist} {cleanTitle}");
+                    }
+                }
+                else if (!string.IsNullOrEmpty(artist))
+                {
+                    searchStrategies.Add(CleanForSearch(artist));
+                }
+                else if (!string.IsNullOrEmpty(title))
+                {
+                    searchStrategies.Add(CleanForSearch(title));
+                }
+
+                foreach (var searchTerm in searchStrategies)
+                {
+                    if (string.IsNullOrEmpty(searchTerm.Trim()))
+                        continue;
+
+                    LogToCli($"iTunes search strategy: {searchTerm}");
+
+                    string searchUrl = $"https://itunes.apple.com/search?term={Uri.EscapeDataString(searchTerm)}&media=music&entity=song&limit=15";
+
+                    try
+                    {
+                        var response = await httpClient.GetStringAsync(searchUrl);
+                        using var doc = JsonDocument.Parse(response);
+
+                        if (doc.RootElement.TryGetProperty("results", out var results))
+                        {
+                            var scoredResults = new List<(JsonElement result, double score)>();
+
+                            foreach (var result in results.EnumerateArray())
+                            {
+                                if (result.TryGetProperty("trackName", out var trackName) &&
+                                    result.TryGetProperty("artistName", out var artistName) &&
+                                    result.TryGetProperty("artworkUrl100", out var artworkUrl))
                                 {
-                                    LogToCli("Found artwork via iTunes");
-                                    return albumArt;
+                                    string resultTitle = trackName.GetString() ?? "";
+                                    string resultArtist = artistName.GetString() ?? "";
+
+                                    double titleScore = string.IsNullOrEmpty(title) ? 1.0 : CalculateSimilarity(CleanForSearch(title), CleanForSearch(resultTitle));
+                                    double artistScore = string.IsNullOrEmpty(artist) ? 1.0 : CalculateSimilarity(CleanForSearch(artist), CleanForSearch(resultArtist));
+                                    double totalScore = (titleScore * 0.7) + (artistScore * 0.3);
+
+                                    if (totalScore > 0.4) 
+                                    {
+                                        scoredResults.Add((result, totalScore));
+                                    }
+                                }
+                            }
+
+                            scoredResults.Sort((a, b) => b.score.CompareTo(a.score));
+
+                            foreach (var (result, score) in scoredResults.Take(3))
+                            {
+                                if (result.TryGetProperty("artworkUrl100", out var artworkUrl))
+                                {
+                                    string imageUrl = artworkUrl.GetString();
+                                    if (!string.IsNullOrEmpty(imageUrl))
+                                    {
+                                        imageUrl = imageUrl.Replace("100x100", "600x600");
+                                        var albumArt = await LoadImageAsync(imageUrl);
+                                        if (albumArt != null)
+                                        {
+                                            LogToCli($"Found artwork via iTunes (score: {score:F2})");
+                                            return albumArt;
+                                        }
+                                    }
                                 }
                             }
                         }
+                    }
+                    catch (Exception ex)
+                    {
+                        LogToCli($"iTunes search failed for '{searchTerm}': {ex.Message}");
+                        continue; 
                     }
                 }
             }
@@ -522,12 +801,28 @@ namespace Symphex.ViewModels
             return null;
         }
 
+        private string RemoveCommonWords(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return text;
+
+            var commonWords = new[] { "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", "official", "video", "audio", "lyrics", "hd", "4k", "1080", "1080p", "720", "720p" };
+
+            var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var filteredWords = words.Where(word => !commonWords.Contains(word.ToLowerInvariant())).ToArray();
+
+            return string.Join(" ", filteredWords);
+        }
+
         private async Task<Bitmap?> SearchDeezerAlbumArt(string title, string artist)
         {
             try
             {
-                string searchTerm = $"{artist} {title}".Trim();
-                string searchUrl = $"https://api.deezer.com/search/track?q={Uri.EscapeDataString(searchTerm)}&limit=5";
+                string cleanTitle = CleanForSearch(title);
+                string cleanArtist = CleanForSearch(artist);
+
+                string searchTerm = $"{cleanArtist} {cleanTitle}".Trim();
+                string searchUrl = $"https://api.deezer.com/search/track?q={Uri.EscapeDataString(searchTerm)}&limit=10";
 
                 LogToCli($"Deezer search: {searchTerm}");
 
@@ -536,7 +831,33 @@ namespace Symphex.ViewModels
 
                 if (doc.RootElement.TryGetProperty("data", out var data))
                 {
+                    var scoredResults = new List<(JsonElement track, double score)>();
+
                     foreach (var track in data.EnumerateArray())
+                    {
+                        if (track.TryGetProperty("title", out var trackTitle) &&
+                            track.TryGetProperty("artist", out var artistObj) &&
+                            artistObj.TryGetProperty("name", out var artistName) &&
+                            track.TryGetProperty("album", out var album) &&
+                            album.TryGetProperty("cover_xl", out var coverUrl))
+                        {
+                            string resultTitle = trackTitle.GetString() ?? "";
+                            string resultArtist = artistName.GetString() ?? "";
+
+                            double titleScore = CalculateSimilarity(cleanTitle, CleanForSearch(resultTitle));
+                            double artistScore = CalculateSimilarity(cleanArtist, CleanForSearch(resultArtist));
+                            double totalScore = (titleScore * 0.7) + (artistScore * 0.3);
+
+                            if (totalScore > 0.6)
+                            {
+                                scoredResults.Add((track, totalScore));
+                            }
+                        }
+                    }
+
+                    scoredResults.Sort((a, b) => b.score.CompareTo(a.score));
+
+                    foreach (var (track, score) in scoredResults.Take(3))
                     {
                         if (track.TryGetProperty("album", out var album) &&
                             album.TryGetProperty("cover_xl", out var coverUrl))
@@ -547,7 +868,7 @@ namespace Symphex.ViewModels
                                 var albumArt = await LoadImageAsync(imageUrl);
                                 if (albumArt != null)
                                 {
-                                    LogToCli("Found artwork via Deezer");
+                                    LogToCli($"Found artwork via Deezer (score: {score:F2})");
                                     return albumArt;
                                 }
                             }
@@ -561,6 +882,50 @@ namespace Symphex.ViewModels
             }
 
             return null;
+        }
+
+        private string CleanForSearch(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return "";
+
+            return text
+                .ToLowerInvariant()
+                .Replace("_", " ")
+                .Replace("-", " ")
+                .Replace("feat.", "")
+                .Replace("ft.", "")
+                .Replace("featuring", "")
+                .Trim();
+        }
+
+        private double CalculateSimilarity(string text1, string text2)
+        {
+            if (string.IsNullOrEmpty(text1) || string.IsNullOrEmpty(text2))
+                return 0;
+
+            text1 = text1.ToLowerInvariant().Trim();
+            text2 = text2.ToLowerInvariant().Trim();
+
+            if (text1 == text2)
+                return 1.0;
+
+            if (text1.Contains(text2) || text2.Contains(text1))
+                return 0.9;
+
+            var words1 = text1.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var words2 = text2.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+            int commonWords = words1.Intersect(words2).Count();
+            int totalWords = Math.Max(words1.Length, words2.Length);
+
+            double wordSimilarity = totalWords > 0 ? (double)commonWords / totalWords : 0;
+
+            int maxLength = Math.Max(text1.Length, text2.Length);
+            int minLength = Math.Min(text1.Length, text2.Length);
+            double lengthSimilarity = (double)minLength / maxLength;
+
+            return Math.Max(wordSimilarity, lengthSimilarity * 0.6);
         }
 
         private async Task<Bitmap?> LoadImageAsync(string url)
@@ -662,9 +1027,6 @@ namespace Symphex.ViewModels
 
                 StatusText = $"✅ Download completed! Check your music folder.";
                 LogToCli("Download completed successfully");
-
-               
-
             }
             catch (Exception ex)
             {
@@ -815,163 +1177,26 @@ namespace Symphex.ViewModels
             char[] invalidChars = Path.GetInvalidFileNameChars();
             foreach (char c in invalidChars)
             {
-                filename = filename.Replace(c, '_');
+                filename = filename.Replace(c.ToString(), "");
             }
 
-            filename = filename.Replace(":", "").Replace("\"", "").Replace("*", "").Replace("?", "");
+            filename = filename
+                .Replace(":", "")
+                .Replace("\"", "")
+                .Replace("*", "")
+                .Replace("?", "")
+                .Replace("|", "")
+                .Replace("<", "")
+                .Replace(">", "")
+                .Replace("_", " ") 
+                .Trim();
+
+            while (filename.Contains("  "))
+            {
+                filename = filename.Replace("  ", " ");
+            }
 
             return filename.Trim();
-        }
-
-        private async Task ApplyProperMetadata()
-        {
-            try
-            {
-                if (CurrentTrack == null || string.IsNullOrEmpty(CurrentTrack.FileName) || string.IsNullOrEmpty(FfmpegPath))
-                {
-                    LogToCli("Skipping metadata application - missing requirements");
-                    return;
-                }
-
-                string audioFilePath = Path.Combine(DownloadFolder, CurrentTrack.FileName);
-                if (!File.Exists(audioFilePath))
-                {
-                    LogToCli($"Audio file not found: {audioFilePath}");
-                    return;
-                }
-
-                LogToCli("Applying proper metadata...");
-
-                string tempOutput = Path.Combine(DownloadFolder, $"temp_{Guid.NewGuid():N}.mp3");
-
-                var argsList = new List<string>();
-
-                argsList.AddRange(new[] { "-i", audioFilePath });
-
-                string? tempAlbumArt = null;
-                if (CurrentTrack.HasRealAlbumArt && CurrentTrack.AlbumArt != null)
-                {
-                    tempAlbumArt = Path.Combine(Path.GetTempPath(), $"temp_album_art_{Guid.NewGuid():N}.jpg");
-
-                    try
-                    {
-                        using (var fileStream = new FileStream(tempAlbumArt, FileMode.Create))
-                        {
-                            CurrentTrack.AlbumArt.Save(fileStream);
-                        }
-                        LogToCli($"Saved album art to: {tempAlbumArt}");
-
-                        argsList.AddRange(new[] { "-i", tempAlbumArt });
-
-                        argsList.AddRange(new[] { "-map", "0:a", "-map", "1:0" });
-
-                        argsList.AddRange(new[] { "-c:a", "copy", "-c:v", "mjpeg" });
-
-                        argsList.AddRange(new[] { "-disposition:v", "attached_pic" });
-                    }
-                    catch (Exception ex)
-                    {
-                        LogToCli($"Error preparing album art: {ex.Message}");
-                        tempAlbumArt = null;
-                        argsList.AddRange(new[] { "-c", "copy" });
-                    }
-                }
-                else
-                {
-                    argsList.AddRange(new[] { "-c", "copy" });
-                }
-
-                argsList.AddRange(new[] { "-id3v2_version", "3" });
-
-                if (!string.IsNullOrEmpty(CurrentTrack.Title) && CurrentTrack.Title != "Unknown")
-                {
-                    argsList.AddRange(new[] { "-metadata", $"title={CurrentTrack.Title}" });
-                }
-
-                if (!string.IsNullOrEmpty(CurrentTrack.Artist) && CurrentTrack.Artist != "Unknown")
-                {
-                    argsList.AddRange(new[] { "-metadata", $"artist={CurrentTrack.Artist}" });
-                }
-
-                if (!string.IsNullOrEmpty(CurrentTrack.Album))
-                {
-                    argsList.AddRange(new[] { "-metadata", $"album={CurrentTrack.Album}" });
-                }
-
-                if (!string.IsNullOrEmpty(CurrentTrack.UploadDate))
-                {
-                    argsList.AddRange(new[] { "-metadata", $"date={CurrentTrack.UploadDate}" });
-                }
-
-                argsList.Add(tempOutput);
-
-                LogToCli($"Applying metadata: '{CurrentTrack.Title}' by '{CurrentTrack.Artist}'");
-
-                if (CurrentTrack.HasRealAlbumArt)
-                {
-                    LogToCli("Including album artwork in metadata");
-                }
-
-                var output = new StringBuilder();
-                var error = new StringBuilder();
-
-                var result = await Cli.Wrap(FfmpegPath)
-                    .WithArguments(argsList)
-                    .WithStandardOutputPipe(PipeTarget.ToStringBuilder(output))
-                    .WithStandardErrorPipe(PipeTarget.ToStringBuilder(error))
-                    .WithValidation(CommandResultValidation.None)
-                    .ExecuteAsync();
-
-                var outputText = output.ToString();
-                var errorText = error.ToString();
-
-                if (!string.IsNullOrEmpty(outputText))
-                {
-                    LogToCli($"FFmpeg output: {outputText}");
-                }
-
-                if (!string.IsNullOrEmpty(errorText))
-                {
-                    LogToCli($"FFmpeg error: {errorText}");
-                }
-
-                try
-                {
-                    if (result.ExitCode == 0 && File.Exists(tempOutput))
-                    {
-                        if (File.Exists(audioFilePath))
-                            File.Delete(audioFilePath);
-                        File.Move(tempOutput, audioFilePath);
-                        LogToCli("✅ Metadata and album art applied successfully");
-                    }
-                    else
-                    {
-                        LogToCli($"⚠️ Failed to apply metadata (exit code: {result.ExitCode})");
-                        if (File.Exists(tempOutput))
-                            File.Delete(tempOutput);
-                    }
-                }
-                finally
-                {
-                    if (tempAlbumArt != null && File.Exists(tempAlbumArt))
-                    {
-                        File.Delete(tempAlbumArt);
-                        LogToCli("Cleaned up temporary album art file");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                LogToCli($"Error applying metadata: {ex.Message}");
-            }
-        }
-
-        private string EscapeMetadata(string metadata)
-        {
-            if (string.IsNullOrEmpty(metadata))
-                return "";
-
-            return metadata.Replace("\"", "\\\"").Replace("'", "\\'");
         }
 
         [RelayCommand]
