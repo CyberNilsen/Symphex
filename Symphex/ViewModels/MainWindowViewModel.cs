@@ -17,7 +17,6 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Avalonia.Threading;
 
 namespace Symphex.ViewModels
 {
@@ -468,14 +467,14 @@ namespace Symphex.ViewModels
                 .Replace(" Records", "", StringComparison.OrdinalIgnoreCase)
                 .Replace(" Music", "", StringComparison.OrdinalIgnoreCase)
                 .Replace("Official", "", StringComparison.OrdinalIgnoreCase)
-                .Replace("\"", "")  
-                .Replace("'", "")   
-                .Replace("\u201C", "")   
-                .Replace("\u201D", "")   
-                .Replace("\u2018", "")   
-                .Replace("\u2019", "")   
-                .Replace("_", " ")  
-                .Replace("  ", " ") 
+                .Replace("\"", "")
+                .Replace("'", "")
+                .Replace("\u201C", "")
+                .Replace("\u201D", "")
+                .Replace("\u2018", "")
+                .Replace("\u2019", "")
+                .Replace("_", " ")
+                .Replace("  ", " ")
                 .Trim();
 
             return cleaned;
@@ -545,14 +544,14 @@ namespace Symphex.ViewModels
                 else
                 {
                     LogToCli("⚠️ No album artwork found in databases, using video thumbnail");
-                    trackInfo.AlbumArt = trackInfo.Thumbnail; 
+                    trackInfo.AlbumArt = trackInfo.Thumbnail;
                     trackInfo.HasRealAlbumArt = false;
                 }
             }
             catch (Exception ex)
             {
                 LogToCli($"Error finding album art: {ex.Message}");
-                trackInfo.AlbumArt = trackInfo.Thumbnail; 
+                trackInfo.AlbumArt = trackInfo.Thumbnail;
                 trackInfo.HasRealAlbumArt = false;
             }
         }
@@ -759,7 +758,7 @@ namespace Symphex.ViewModels
                                     double artistScore = string.IsNullOrEmpty(artist) ? 1.0 : CalculateSimilarity(CleanForSearch(artist), CleanForSearch(resultArtist));
                                     double totalScore = (titleScore * 0.7) + (artistScore * 0.3);
 
-                                    if (totalScore > 0.4) 
+                                    if (totalScore > 0.4)
                                     {
                                         scoredResults.Add((result, totalScore));
                                     }
@@ -790,7 +789,7 @@ namespace Symphex.ViewModels
                     catch (Exception ex)
                     {
                         LogToCli($"iTunes search failed for '{searchTerm}': {ex.Message}");
-                        continue; 
+                        continue;
                     }
                 }
             }
@@ -1189,7 +1188,7 @@ namespace Symphex.ViewModels
                 .Replace("|", "")
                 .Replace("<", "")
                 .Replace(">", "")
-                .Replace("_", " ") 
+                .Replace("_", " ")
                 .Trim();
 
             while (filename.Contains("  "))
