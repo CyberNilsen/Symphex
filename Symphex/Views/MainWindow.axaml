@@ -1,485 +1,258 @@
-<Window xmlns="https://github.com/avaloniaui"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vm="using:Symphex.ViewModels"
-        xmlns:converters="using:Symphex.Converters"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="900"
-        x:Class="Symphex.Views.MainWindow"
-        x:DataType="vm:MainWindowViewModel"
-        Icon="/Assets/avalonia-logo.ico"
-        Title="Symphex - Music Downloader"
-        MinWidth="1300" MinHeight="800"
-        Background="#0F0F0F">
+	<Window xmlns="https://github.com/avaloniaui"
+			xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+			xmlns:vm="using:Symphex.ViewModels"
+			xmlns:converters="using:Symphex.Converters"
+			xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+			xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+			mc:Ignorable="d" d:DesignWidth="1400" d:DesignHeight="900"
+			x:Class="Symphex.Views.MainWindow"
+			x:DataType="vm:MainWindowViewModel"
+			Icon="/Assets/avalonia-logo.ico"
+			Title="Symphex - Music Downloader"
+			MinWidth="1200" MinHeight="800"
+			Background="#e8eaed">
 
-	<Design.DataContext>
-		<vm:MainWindowViewModel/>
-	</Design.DataContext>
+		<Design.DataContext>
+			<vm:MainWindowViewModel/>
+		</Design.DataContext>
 
-	<Grid>
-		<DockPanel Margin="0">
-			<Border DockPanel.Dock="Top"
-					Background="#1A1A1A"
-					BorderBrush="#333333"
-					BorderThickness="0,0,0,1">
-				<Grid Height="80">
-					<StackPanel Orientation="Horizontal"
-								VerticalAlignment="Center"
-								HorizontalAlignment="Left"
-								Margin="30,0">
-						<Border Width="40" Height="40"
-								CornerRadius="8"
-								Background="#007ACC"
-								VerticalAlignment="Center">
-							<TextBlock Text="♫"
-									   FontSize="22"
-									   FontWeight="Bold"
-									   Foreground="White"
-									   HorizontalAlignment="Center"
-									   VerticalAlignment="Center"/>
-						</Border>
-						<StackPanel Margin="15,0,0,0" VerticalAlignment="Center">
-							<TextBlock Text="Symphex"
-									   FontSize="24"
-									   FontWeight="SemiBold"
-									   Foreground="#FFFFFF"/>
-							<TextBlock Text="Professional Music Downloader with Real Album Art"
-									   FontSize="13"
-									   Foreground="#999999"/>
-						</StackPanel>
-					</StackPanel>
-				</Grid>
-			</Border>
+		<Window.Styles>
+			<Style Selector="Button.primary">
+				<Setter Property="Background" Value="#4285f4"/>
+				<Setter Property="Foreground" Value="White"/>
+				<Setter Property="BorderThickness" Value="0"/>
+				<Setter Property="CornerRadius" Value="8"/>
+				<Setter Property="Padding" Value="16,12"/>
+				<Setter Property="FontWeight" Value="Medium"/>
+				<Setter Property="FontSize" Value="14"/>
+				<Setter Property="Transitions">
+					<Transitions>
+						<BrushTransition Property="Background" Duration="0:0:0.15"/>
+						<TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15"/>
+					</Transitions>
+				</Setter>
+			</Style>
+			<Style Selector="Button.primary:pointerover">
+				<Setter Property="Background" Value="#3367d6"/>
+				<Setter Property="RenderTransform" Value="scale(1.02)"/>
+			</Style>
+			<Style Selector="Button.primary:pressed">
+				<Setter Property="Background" Value="#2a56c6"/>
+				<Setter Property="RenderTransform" Value="scale(0.98)"/>
+			</Style>
 
-			<Border DockPanel.Dock="Bottom"
-					Background="#1A1A1A"
-					BorderBrush="#333333"
-					BorderThickness="0,1,0,0"
-					Height="50">
-				<Grid>
-					<StackPanel Orientation="Horizontal"
-								VerticalAlignment="Center"
-								HorizontalAlignment="Left"
-								Margin="30,0">
-						<TextBlock Text="Downloads:"
-								   FontSize="12"
-								   Foreground="#999999"
-								   VerticalAlignment="Center"/>
-						<TextBlock Text="{Binding DownloadFolder}"
-								   FontSize="12"
-								   FontWeight="Medium"
-								   Foreground="#007ACC"
-								   Margin="8,0,0,0"
-								   VerticalAlignment="Center"/>
-						<Button Content="Open Folder"
-								Command="{Binding OpenFolderCommand}"
-								Background="Transparent"
-								Foreground="#007ACC"
-								BorderBrush="#007ACC"
-								BorderThickness="1"
-								CornerRadius="4"
-								Padding="12,6"
-								FontSize="11"
-								Margin="15,0,0,0"/>
-					</StackPanel>
-				</Grid>
-			</Border>
+			<Style Selector="Button.secondary">
+				<Setter Property="Background" Value="#4285f4"/>
+				<Setter Property="Foreground" Value="White"/>
+				<Setter Property="BorderThickness" Value="0"/>
+				<Setter Property="CornerRadius" Value="8"/>
+				<Setter Property="Padding" Value="16,12"/>
+				<Setter Property="FontSize" Value="14"/>
+				<Setter Property="FontWeight" Value="Medium"/>
+				<Setter Property="Transitions">
+					<Transitions>
+						<BrushTransition Property="Background" Duration="0:0:0.15"/>
+						<TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15"/>
+					</Transitions>
+				</Setter>
+			</Style>
+			<Style Selector="Button.secondary:pointerover">
+				<Setter Property="Background" Value="#3367d6"/>
+				<Setter Property="RenderTransform" Value="scale(1.02)"/>
+			</Style>
+			<Style Selector="Button.secondary:pressed">
+				<Setter Property="Background" Value="#2a56c6"/>
+				<Setter Property="RenderTransform" Value="scale(0.98)"/>
+			</Style>
 
-			<Grid Background="#0F0F0F">
-				<Grid.RowDefinitions>
-					<RowDefinition Height="Auto" MinHeight="120"/>
-					<RowDefinition Height="Auto"/>
-					<RowDefinition Height="*" MinHeight="400"/>
-				</Grid.RowDefinitions>
+			<Style Selector="Border.card">
+				<Setter Property="Background" Value="#ffffff"/>
+				<Setter Property="BorderBrush" Value="#e0e0e0"/>
+				<Setter Property="BorderThickness" Value="1"/>
+				<Setter Property="CornerRadius" Value="12"/>
+			</Style>
 
-				<Border Grid.Row="0"
-						Background="#1A1A1A"
-						Margin="30,20,30,0"
-						CornerRadius="8"
-						BorderBrush="#333333"
-						BorderThickness="1">
-					<Grid Margin="30,25">
-						<Grid.RowDefinitions>
-							<RowDefinition Height="Auto"/>
-							<RowDefinition Height="Auto"/>
-							<RowDefinition Height="Auto"/>
-						</Grid.RowDefinitions>
+			<Style Selector="TextBox.modern">
+				<Setter Property="Background" Value="#ffffff"/>
+				<Setter Property="BorderBrush" Value="#dadce0"/>
+				<Setter Property="BorderThickness" Value="1"/>
+				<Setter Property="CornerRadius" Value="8"/>
+				<Setter Property="Padding" Value="14,12"/>
+				<Setter Property="FontSize" Value="14"/>
+				<Setter Property="Foreground" Value="#3c4043"/>
+				<Setter Property="Transitions">
+					<Transitions>
+						<BrushTransition Property="BorderBrush" Duration="0:0:0.15"/>
+						<BrushTransition Property="Background" Duration="0:0:0.15"/>
+					</Transitions>
+				</Setter>
+			</Style>
+			<Style Selector="TextBox.modern:focus /template/ Border#PART_BorderElement">
+				<Setter Property="BorderBrush" Value="#4285f4"/>
+			</Style>
+			<Style Selector="TextBox.modern:pointerover /template/ Border#PART_BorderElement">
+				<Setter Property="BorderBrush" Value="#5f6368"/>
+			</Style>
+		</Window.Styles>
 
-						<TextBlock Grid.Row="0"
-								   Text="Enter URL or Search Query"
-								   FontSize="14"
-								   FontWeight="Medium"
-								   Foreground="#FFFFFF"
-								   Margin="0,0,0,12"/>
+		<Grid Margin="24">
+			<Grid.RowDefinitions>
+				<RowDefinition Height="Auto"/>
+				<RowDefinition Height="24"/>
+				<RowDefinition Height="Auto"/>
+				<RowDefinition Height="24"/>
+				<RowDefinition Height="*"/>
+				<RowDefinition Height="Auto"/>
+			</Grid.RowDefinitions>
 
-						<TextBox Grid.Row="1"
-								 Name="UrlTextBox"
-								 Text="{Binding DownloadUrl}"
-								 Watermark="https://youtube.com/watch?v=... or search for any song"
-								 FontSize="14"
-								 Height="44"
-								 Background="#262626"
-								 Foreground="#FFFFFF"
-								 BorderBrush="#404040"
-								 BorderThickness="1"
-								 CornerRadius="6"
-								 Padding="16,10"
-								 Margin="0,0,0,20"/>
-
-						<StackPanel Grid.Row="2"
-									Orientation="Horizontal"
-									Spacing="12">
-							<Button Content="Download"
-									Command="{Binding DownloadCommand}"
-									Background="#007ACC"
-									Foreground="White"
-									BorderThickness="0"
-									CornerRadius="6"
-									Padding="24,12"
-									FontSize="14"
-									FontWeight="Medium"
-									MinWidth="100"/>
-
-							<Button Content="Get yt-dlp"
-									Command="{Binding DownloadYtDlpCommand}"
-									Background="#404040"
-									Foreground="White"
-									BorderThickness="0"
-									CornerRadius="6"
-									Padding="20,12"
-									FontSize="14"/>
-
-							<Button Content="Get FFmpeg"
-									Command="{Binding DownloadFfmpegCommand}"
-									Background="#8B5A2B"
-									Foreground="White"
-									BorderThickness="0"
-									CornerRadius="6"
-									Padding="20,12"
-									FontSize="14"/>
-
-							<Button Content="Check Dependencies"
-									Command="{Binding CheckDependenciesCommand}"
-									Background="#404040"
-									Foreground="White"
-									BorderThickness="0"
-									CornerRadius="6"
-									Padding="20,12"
-									FontSize="14"/>
-
-							<Button Content="Clear"
-									Command="{Binding ClearCommand}"
-									Background="Transparent"
-									Foreground="#999999"
-									BorderBrush="#404040"
-									BorderThickness="1"
-									CornerRadius="6"
-									Padding="20,12"
-									FontSize="14"/>
-						</StackPanel>
-					</Grid>
-				</Border>
-
-				<Border Grid.Row="1"
-						Background="#1A1A1A"
-						Margin="30,20,30,0"
-						CornerRadius="8"
-						BorderBrush="#333333"
-						BorderThickness="1"
-						IsVisible="{Binding ShowMetadata}">
-					<Grid Margin="25,20">
-						<Grid.ColumnDefinitions>
-							<ColumnDefinition Width="Auto"/>
-							<ColumnDefinition Width="Auto"/>
-							<ColumnDefinition Width="*"/>
-						</Grid.ColumnDefinitions>
-
-						<Border Grid.Column="0"
-								Width="120"
-								Height="120"
-								CornerRadius="8"
-								Background="#262626"
-								Margin="0,0,15,0">
-							<Border CornerRadius="8"
-									ClipToBounds="True">
-								<Grid>
-									<Border Background="#333333"
-											IsVisible="{Binding CurrentTrack.Thumbnail, Converter={x:Static ObjectConverters.IsNull}}">
-										<TextBlock Text="📹"
-												   FontSize="40"
-												   Foreground="#666666"
-												   HorizontalAlignment="Center"
-												   VerticalAlignment="Center"/>
-									</Border>
-
-									<Image Source="{Binding CurrentTrack.Thumbnail}"
-										   Stretch="UniformToFill"
-										   IsVisible="{Binding CurrentTrack.Thumbnail, Converter={x:Static ObjectConverters.IsNotNull}}"/>
-
-									<Border Background="#00000080"
-											Height="20"
-											VerticalAlignment="Bottom">
-										<TextBlock Text="VIDEO"
-												   FontSize="10"
-												   FontWeight="Bold"
-												   Foreground="White"
-												   HorizontalAlignment="Center"
-												   VerticalAlignment="Center"/>
-									</Border>
-								</Grid>
-							</Border>
-						</Border>
-
-						<Border Grid.Column="1"
-								Width="120"
-								Height="120"
-								CornerRadius="8"
-								Background="#262626"
-								Margin="0,0,20,0">
-							<Border CornerRadius="8"
-									ClipToBounds="True">
-								<Grid>
-									<Border Background="#333333"
-											IsVisible="{Binding CurrentTrack.AlbumArt, Converter={x:Static ObjectConverters.IsNull}}">
-										<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-											<TextBlock Text="🎵"
-													   FontSize="30"
-													   Foreground="#666666"
-													   HorizontalAlignment="Center"/>
-											<TextBlock Text="Searching..."
-													   FontSize="10"
-													   Foreground="#666666"
-													   HorizontalAlignment="Center"
-													   Margin="0,5,0,0"/>
-										</StackPanel>
-									</Border>
-
-									<Image Source="{Binding CurrentTrack.AlbumArt}"
-										   Stretch="UniformToFill"
-										   IsVisible="{Binding CurrentTrack.AlbumArt, Converter={x:Static ObjectConverters.IsNotNull}}"/>
-
-									<Border Background="#00000080"
-											Height="20"
-											VerticalAlignment="Bottom">
-										<TextBlock Text="{Binding CurrentTrack.HasRealAlbumArt, Converter={x:Static converters:BoolToAlbumArtLabelConverter.Instance}}"
-												   FontSize="10"
-												   FontWeight="Bold"
-												   Foreground="White"
-												   HorizontalAlignment="Center"
-												   VerticalAlignment="Center"/>
-									</Border>
-								</Grid>
-							</Border>
-						</Border>
-
-						<StackPanel Grid.Column="2"
-									VerticalAlignment="Center"
-									Spacing="8">
-							<TextBlock Text="{Binding CurrentTrack.Title}"
-									   FontSize="18"
-									   FontWeight="SemiBold"
-									   Foreground="#FFFFFF"
-									   TextWrapping="Wrap"
-									   MaxLines="2"/>
-
-							<TextBlock Text="{Binding CurrentTrack.Artist}"
-									   FontSize="14"
-									   Foreground="#CCCCCC"
-									   TextWrapping="Wrap"/>
-
-							<TextBlock Text="{Binding CurrentTrack.Album}"
-									   FontSize="12"
-									   Foreground="#999999"
-									   TextWrapping="Wrap"
-									   IsVisible="{Binding CurrentTrack.Album, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-
-							<Border Background="{Binding CurrentTrack.HasRealAlbumArt, Converter={x:Static converters:BoolToAlbumArtStatusColorConverter.Instance}}"
-									CornerRadius="12"
-									Padding="8,4"
-									HorizontalAlignment="Left"
-									IsVisible="{Binding CurrentTrack.AlbumArt, Converter={x:Static ObjectConverters.IsNotNull}}">
-								<TextBlock Text="{Binding CurrentTrack.HasRealAlbumArt, Converter={x:Static converters:BoolToAlbumArtStatusConverter.Instance}}"
-										   FontSize="11"
-										   FontWeight="Medium"
-										   Foreground="White"/>
-							</Border>
-
-							<StackPanel Orientation="Horizontal" Spacing="20" Margin="0,8,0,0">
-								<StackPanel Orientation="Horizontal" Spacing="6"
-											IsVisible="{Binding CurrentTrack.Duration, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-									<TextBlock Text="⏱️" FontSize="12" VerticalAlignment="Center"/>
-									<TextBlock Text="{Binding CurrentTrack.Duration}"
-											   FontSize="12"
-											   Foreground="#999999"
-											   VerticalAlignment="Center"/>
-								</StackPanel>
-
-								<StackPanel Orientation="Horizontal" Spacing="6"
-											IsVisible="{Binding CurrentTrack.UploadDate, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-									<TextBlock Text="📅" FontSize="12" VerticalAlignment="Center"/>
-									<TextBlock Text="{Binding CurrentTrack.UploadDate}"
-											   FontSize="12"
-											   Foreground="#999999"
-											   VerticalAlignment="Center"/>
-								</StackPanel>
-
-								<StackPanel Orientation="Horizontal" Spacing="6">
-									<TextBlock Text="👁️" FontSize="12" VerticalAlignment="Center"
-											   IsVisible="{Binding CurrentTrack.ViewCount, Converter={x:Static converters:NumberToVisibilityConverter.Instance}}"/>
-									<TextBlock Text="{Binding CurrentTrack.ViewCount, StringFormat='{}{0:N0} views'}"
-											   FontSize="12"
-											   Foreground="#999999"
-											   VerticalAlignment="Center"
-											   IsVisible="{Binding CurrentTrack.ViewCount, Converter={x:Static converters:NumberToVisibilityConverter.Instance}}"/>
-								</StackPanel>
-							</StackPanel>
-
-							<StackPanel Orientation="Horizontal" Spacing="6" Margin="0,8,0,0"
-										IsVisible="{Binding CurrentTrack.FileName, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-								<TextBlock Text="📁" FontSize="12" VerticalAlignment="Center"/>
-								<TextBlock Text="{Binding CurrentTrack.FileName}"
-										   FontSize="12"
-										   Foreground="#007ACC"
-										   VerticalAlignment="Center"
-										   TextWrapping="Wrap"/>
-							</StackPanel>
-						</StackPanel>
-					</Grid>
-				</Border>
-
-				<Grid Grid.Row="2" Margin="30,20,30,20">
-					<Grid.ColumnDefinitions>
-						<ColumnDefinition Width="*" MinWidth="350" MaxWidth="600"/>
-						<ColumnDefinition Width="20"/>
-						<ColumnDefinition Width="*" MinWidth="350" MaxWidth="600"/>
-					</Grid.ColumnDefinitions>
-
-					<Border Grid.Column="0"
-							Background="#1A1A1A"
-							CornerRadius="8"
-							BorderBrush="#333333"
-							BorderThickness="1">
-						<DockPanel Margin="25">
-							<TextBlock DockPanel.Dock="Top"
-									   Text="Status"
-									   FontSize="16"
-									   FontWeight="SemiBold"
-									   Foreground="#FFFFFF"
-									   Margin="0,0,0,15"/>
-
-							<StackPanel DockPanel.Dock="Bottom"
-										Margin="0,20,0,0"
-										IsVisible="{Binding IsDownloading}">
-								<Grid>
-									<Grid.ColumnDefinitions>
-										<ColumnDefinition Width="*"/>
-										<ColumnDefinition Width="Auto"/>
-									</Grid.ColumnDefinitions>
-									<TextBlock Grid.Column="0"
-											   Text="Progress"
-											   FontSize="12"
-											   Foreground="#999999"/>
-									<TextBlock Grid.Column="1"
-											   Text="{Binding DownloadProgress, StringFormat='{}{0:0}%'}"
-											   FontSize="12"
-											   FontWeight="Medium"
-											   Foreground="#007ACC"/>
-								</Grid>
-								<Border Background="#262626"
-										Height="6"
-										CornerRadius="3"
-										Margin="0,8,0,0">
-									<Border CornerRadius="3"
-											HorizontalAlignment="Left"
-											Background="#007ACC"
-											Width="{Binding DownloadProgress, Converter={x:Static converters:PercentageToWidthConverter.Instance}}"/>
-								</Border>
-							</StackPanel>
-
-							<Border Background="#0F0F0F"
-									CornerRadius="6"
-									BorderBrush="#333333"
-									BorderThickness="1">
-								<ScrollViewer Name="StatusOutput"
-											  Padding="20"
-											  VerticalScrollBarVisibility="Auto"
-											  HorizontalScrollBarVisibility="Disabled">
-									<TextBlock Text="{Binding StatusText}"
-											   TextWrapping="Wrap"
-											   FontFamily="Segoe UI"
-											   FontSize="13"
-											   Foreground="#E0E0E0"
-											   LineHeight="20"/>
-								</ScrollViewer>
-							</Border>
-						</DockPanel>
+			<Grid Grid.Row="0">
+				<StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+					<Border Width="52" Height="52" CornerRadius="12" Background="#4285f4" Margin="0,0,18,0">
+						<TextBlock Text="♫" FontSize="26" FontWeight="Bold" Foreground="White"
+								   HorizontalAlignment="Center" VerticalAlignment="Center"/>
 					</Border>
-
-					<Border Grid.Column="2"
-							Background="#1A1A1A"
-							CornerRadius="8"
-							BorderBrush="#333333"
-							BorderThickness="1">
-						<DockPanel Margin="25">
-							<Grid DockPanel.Dock="Top" Margin="0,0,0,15">
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="*"/>
-									<ColumnDefinition Width="Auto"/>
-									<ColumnDefinition Width="Auto"/>
-								</Grid.ColumnDefinitions>
-								<TextBlock Grid.Column="0"
-										   Text="Console Output"
-										   FontSize="16"
-										   FontWeight="SemiBold"
-										   Foreground="#FFFFFF"/>
-								<Button Grid.Column="1"
-										Content="Copy"
-										Command="{Binding CopyOutputCommand}"
-										Background="#007ACC"
-										Foreground="White"
-										BorderThickness="0"
-										CornerRadius="4"
-										Padding="10,6"
-										FontSize="11"
-										Margin="0,0,8,0"/>
-								<Button Grid.Column="2"
-										Content="Clear"
-										Command="{Binding ClearLogCommand}"
-										Background="Transparent"
-										Foreground="#999999"
-										BorderBrush="#404040"
-										BorderThickness="1"
-										CornerRadius="4"
-										Padding="10,6"
-										FontSize="11"/>
-							</Grid>
-
-							<Border Background="#0F0F0F"
-									CornerRadius="6"
-									BorderBrush="#333333"
-									BorderThickness="1">
-								<ScrollViewer Name="CliOutput"
-											  Padding="5"
-											  VerticalScrollBarVisibility="Auto"
-											  HorizontalScrollBarVisibility="Auto"
-											  VerticalAlignment="Stretch"
-											  HorizontalAlignment="Stretch"
-											  ScrollChanged="CliOutput_ScrollChanged">
-									<StackPanel Margin="0,0,0,30">
-										<TextBlock Text="{Binding CliOutput}"
-												   TextWrapping="Wrap"
-												   FontFamily="Consolas, Courier New, monospace"
-												   FontSize="12"
-												   Foreground="#00D4AA"
-												   LineHeight="18"
-												   VerticalAlignment="Top"/>
-									</StackPanel>
-								</ScrollViewer>
-							</Border>
-						</DockPanel>
-					</Border>
-				</Grid>
+					<StackPanel VerticalAlignment="Center">
+						<TextBlock Text="Symphex" FontSize="28" FontWeight="Bold" Foreground="#202124"/>
+						<TextBlock Text="Music Downloader with Album Art" FontSize="15" Foreground="#5f6368"/>
+					</StackPanel>
+				</StackPanel>
 			</Grid>
-		</DockPanel>
-	</Grid>
-</Window>
+
+			<Border Grid.Row="2" Classes="card" Padding="28">
+				<StackPanel Spacing="20">
+					<TextBlock Text="Enter URL or Search Query" FontSize="17" FontWeight="SemiBold" Foreground="#202124"/>
+
+					<TextBox Name="UrlTextBox"
+							 Text="{Binding DownloadUrl}"
+							 Classes="modern"
+							 Watermark="https://youtube.com/watch?v=... or search for any song"
+							 Height="48"/>
+
+					<StackPanel Orientation="Horizontal" Spacing="14">
+						<Button Content="Download" Command="{Binding DownloadCommand}" Classes="primary"/>
+						<Button Content="Get yt-dlp" Command="{Binding DownloadYtDlpCommand}" Classes="secondary"/>
+						<Button Content="Get FFmpeg" Command="{Binding DownloadFfmpegCommand}" Classes="secondary"/>
+						<Button Content="Check Dependencies" Command="{Binding CheckDependenciesCommand}" Classes="secondary"/>
+						<Button Content="Clear" Command="{Binding ClearCommand}" Classes="secondary"/>
+					</StackPanel>
+				</StackPanel>
+			</Border>
+
+			<Grid Grid.Row="4">
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="1*"/>
+					<ColumnDefinition Width="20"/>
+					<ColumnDefinition Width="1*"/>
+					<ColumnDefinition Width="20"/>
+					<ColumnDefinition Width="1*"/>
+				</Grid.ColumnDefinitions>
+
+				<Border Grid.Column="0" Classes="card" Padding="20">
+					<StackPanel Spacing="16">
+						<TextBlock Text="Preview" FontSize="17" FontWeight="SemiBold" Foreground="#202124"/>
+
+						<Border Width="160" Height="160" CornerRadius="12" Background="#f8f9fa"
+								BorderBrush="#e0e0e0" BorderThickness="1" HorizontalAlignment="Center">
+							<Grid>
+								<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+									<TextBlock Text="🎵" FontSize="42" Foreground="#bdc1c6"/>
+									<TextBlock Text="Album Art" FontSize="12" Foreground="#bdc1c6" FontWeight="Medium"/>
+								</StackPanel>
+								<Image Source="{Binding CurrentTrack.AlbumArt}" Stretch="UniformToFill"/>
+							</Grid>
+						</Border>
+
+						<StackPanel Spacing="6" HorizontalAlignment="Center">
+							<TextBlock Text="{Binding CurrentTrack.Title, FallbackValue='Ready to download...'}"
+									   FontSize="14" FontWeight="SemiBold" Foreground="#202124"
+									   TextWrapping="Wrap" MaxWidth="180" TextAlignment="Center"/>
+
+							<TextBlock Text="{Binding CurrentTrack.Artist, FallbackValue='Enter a URL above'}"
+									   FontSize="13" Foreground="#5f6368"
+									   TextWrapping="Wrap" MaxWidth="180" TextAlignment="Center"/>
+
+							<TextBlock Text="{Binding CurrentTrack.Album}" FontSize="12" Foreground="#80868b"
+									   IsVisible="{Binding CurrentTrack.Album, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+									   TextWrapping="Wrap" MaxWidth="180" TextAlignment="Center"/>
+						</StackPanel>
+
+						<Border Background="#f8f9fa" CornerRadius="6" Padding="8" HorizontalAlignment="Center">
+							<StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+								<Border Width="40" Height="30" CornerRadius="3" Background="#ffffff"
+										BorderBrush="#e0e0e0" BorderThickness="1">
+									<Grid>
+										<TextBlock Text="📹" FontSize="12" Foreground="#bdc1c6"
+												   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+										<Image Source="{Binding CurrentTrack.Thumbnail}" Stretch="UniformToFill"/>
+									</Grid>
+								</Border>
+								<TextBlock Text="Thumbnail" FontSize="11" Foreground="#80868b"/>
+							</StackPanel>
+						</Border>
+
+						<Border Background="#e8f0fe" CornerRadius="20" Padding="12,6" HorizontalAlignment="Center" Margin="0,8,0,0"
+								IsVisible="{Binding CurrentTrack.AlbumArt, Converter={x:Static ObjectConverters.IsNotNull}}">
+							<TextBlock Text="{Binding CurrentTrack.HasRealAlbumArt, Converter={x:Static converters:BoolToAlbumArtStatusConverter.Instance}}"
+									   FontSize="11" FontWeight="Medium" Foreground="#1a73e8"/>
+						</Border>
+
+						<StackPanel IsVisible="{Binding IsDownloading}" Spacing="10">
+							<Grid>
+								<TextBlock Text="Downloading..." FontSize="13" Foreground="#5f6368"/>
+								<TextBlock Text="{Binding DownloadProgress, StringFormat='{}{0:0}%'}"
+										   FontSize="13" FontWeight="Medium" Foreground="#4285f4" HorizontalAlignment="Right"/>
+							</Grid>
+							<Border Background="#f1f3f4" Height="8" CornerRadius="4">
+								<Border CornerRadius="4" HorizontalAlignment="Left" Background="#4285f4"
+										Width="{Binding DownloadProgress, Converter={x:Static converters:PercentageToWidthConverter.Instance}}"/>
+							</Border>
+						</StackPanel>
+					</StackPanel>
+				</Border>
+
+				<Border Grid.Column="2" Classes="card" Padding="20">
+					<StackPanel Spacing="16">
+						<TextBlock Text="Status" FontSize="17" FontWeight="SemiBold" Foreground="#202124"/>
+
+						<Border Background="#f8f9fa" CornerRadius="8" BorderBrush="#e0e0e0" BorderThickness="1" MinHeight="200">
+							<ScrollViewer Padding="16" VerticalScrollBarVisibility="Auto">
+								<TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" FontSize="13"
+										   Foreground="#3c4043" LineHeight="20"/>
+							</ScrollViewer>
+						</Border>
+					</StackPanel>
+				</Border>
+
+				<Border Grid.Column="4" Classes="card" Padding="20">
+					<StackPanel Spacing="16">
+						<Grid>
+							<TextBlock Text="Console" FontSize="17" FontWeight="SemiBold" Foreground="#202124"/>
+							<StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+								<Button Content="Copy" Command="{Binding CopyOutputCommand}" Classes="secondary" Padding="8,6" FontSize="12"/>
+								<Button Content="Clear" Command="{Binding ClearLogCommand}" Classes="secondary" Padding="8,6" FontSize="12"/>
+							</StackPanel>
+						</Grid>
+
+						<Border Background="#1a1a1a" CornerRadius="8" MinHeight="200">
+							<ScrollViewer Name="CliOutput" Padding="16" VerticalScrollBarVisibility="Auto"
+										  ScrollChanged="CliOutput_ScrollChanged">
+								<SelectableTextBlock Text="{Binding CliOutput}" TextWrapping="Wrap"
+												   FontFamily="JetBrains Mono, Consolas, monospace" FontSize="12"
+												   Foreground="#34d399" LineHeight="18"/>
+							</ScrollViewer>
+						</Border>
+					</StackPanel>
+				</Border>
+			</Grid>
+
+			<Border Grid.Row="5" Background="#f1f3f4" CornerRadius="8" Padding="18" Margin="0,24,0,0">
+				<StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="14">
+					<TextBlock Text="📁 Downloads:" FontSize="13" Foreground="#5f6368"/>
+					<TextBlock Text="{Binding DownloadFolder}" FontSize="13" FontWeight="Medium"
+							   Foreground="#4285f4" TextTrimming="CharacterEllipsis" MaxWidth="320"/>
+					<Button Content="Open Folder" Command="{Binding OpenFolderCommand}"
+							Classes="secondary" Padding="14,10" FontSize="12"/>
+				</StackPanel>
+			</Border>
+		</Grid>
+	</Window>

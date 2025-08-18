@@ -17,6 +17,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Avalonia.Input;
 
 namespace Symphex.ViewModels
 {
@@ -112,8 +113,11 @@ namespace Symphex.ViewModels
                 Directory.CreateDirectory(DownloadFolder);
             }
 
-            SetupPortableYtDlp();
-            SetupPortableFfmpeg();
+            _ = Task.Run(async () =>
+            {
+                await Task.Run(() => SetupPortableYtDlp());
+                await Task.Run(() => SetupPortableFfmpeg());
+            });
         }
 
         private void SetupDownloadFolder()
@@ -196,33 +200,40 @@ namespace Symphex.ViewModels
             }
         }
 
-        private void SetupPortableYtDlp()
+        private async void SetupPortableYtDlp()
         {
             try
             {
                 string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
 
                 string[] possiblePaths = {
-                    Path.Combine(appDirectory, "tools", YtDlpExecutableName),
-                    Path.Combine(appDirectory, YtDlpExecutableName),
-                    YtDlpExecutableName
-                };
+            Path.Combine(appDirectory, "tools", YtDlpExecutableName),
+            Path.Combine(appDirectory, YtDlpExecutableName)
+        };
 
+                // First check local paths
                 foreach (string path in possiblePaths)
                 {
-                    if (File.Exists(path) || path == YtDlpExecutableName)
+                    if (File.Exists(path))
                     {
                         YtDlpPath = path;
 
-                        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && File.Exists(path))
+                        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                         {
                             MakeExecutable(path);
                         }
 
-                        string location = path == YtDlpExecutableName ? "System PATH" : path;
-                        LogToCli($"yt-dlp found at: {location}");
+                        LogToCli($"yt-dlp found at: {path}");
                         return;
                     }
+                }
+
+                // Then check system PATH
+                if (await IsExecutableInPath(YtDlpExecutableName))
+                {
+                    YtDlpPath = YtDlpExecutableName;
+                    LogToCli($"yt-dlp found in system PATH");
+                    return;
                 }
 
                 string os = GetCurrentOS();
@@ -235,36 +246,58 @@ namespace Symphex.ViewModels
                 YtDlpPath = "";
             }
         }
+        private async Task<bool> IsExecutableInPath(string executableName)
+        {
+            try
+            {
+                var result = await Cli.Wrap(executableName)
+                    .WithArguments("--version")
+                    .WithValidation(CommandResultValidation.None)
+                    .ExecuteAsync();
 
-        private void SetupPortableFfmpeg()
+                return result.ExitCode == 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private async void SetupPortableFfmpeg()
         {
             try
             {
                 string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
 
                 string[] possiblePaths = {
-                    Path.Combine(appDirectory, "tools", FfmpegExecutableName),
-                    Path.Combine(appDirectory, "tools", "ffmpeg", "bin", FfmpegExecutableName),
-                    Path.Combine(appDirectory, "tools", "bin", FfmpegExecutableName),
-                    Path.Combine(appDirectory, FfmpegExecutableName),
-                    FfmpegExecutableName
-                };
+            Path.Combine(appDirectory, "tools", FfmpegExecutableName),
+            Path.Combine(appDirectory, "tools", "ffmpeg", "bin", FfmpegExecutableName),
+            Path.Combine(appDirectory, "tools", "bin", FfmpegExecutableName),
+            Path.Combine(appDirectory, FfmpegExecutableName)
+        };
 
+                // First check local paths
                 foreach (string path in possiblePaths)
                 {
-                    if (File.Exists(path) || path == FfmpegExecutableName)
+                    if (File.Exists(path))
                     {
                         FfmpegPath = path;
 
-                        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows) && File.Exists(path))
+                        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                         {
                             MakeExecutable(path);
                         }
 
-                        string location = path == FfmpegExecutableName ? "System PATH" : path;
-                        LogToCli($"FFmpeg found at: {location}");
+                        LogToCli($"FFmpeg found at: {path}");
                         return;
                     }
+                }
+
+                if (await IsExecutableInPath(FfmpegExecutableName))
+                {
+                    FfmpegPath = FfmpegExecutableName;
+                    LogToCli($"FFmpeg found in system PATH");
+                    return;
                 }
 
                 string os = GetCurrentOS();
