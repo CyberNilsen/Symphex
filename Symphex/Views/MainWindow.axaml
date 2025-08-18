@@ -19,7 +19,7 @@
 	<Window.Styles>
 		<!-- Primary Button Style -->
 		<Style Selector="Button.primary">
-			<Setter Property="Background" Value="#238636"/>
+			<Setter Property="Background" Value="#117df7"/>
 			<Setter Property="Foreground" Value="#ffffff"/>
 			<Setter Property="BorderThickness" Value="0"/>
 			<Setter Property="CornerRadius" Value="8"/>
@@ -30,22 +30,17 @@
 			<Setter Property="Effect">
 				<DropShadowEffect Color="Black" Opacity="0.25" BlurRadius="8" OffsetX="0" OffsetY="2"/>
 			</Setter>
-			<Setter Property="Transitions">
-				<Transitions>
-					<BrushTransition Property="Background" Duration="0:0:0.2"/>
-					<TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15"/>
-				</Transitions>
-			</Setter>
+			
 		</Style>
 		<Style Selector="Button.primary:pointerover">
-			<Setter Property="Background" Value="#2ea043"/>
+			<Setter Property="Background" Value="#0d7dfc"/>
 			<Setter Property="RenderTransform" Value="scale(1.03) translateY(-1px)"/>
 			<Setter Property="Effect">
 				<DropShadowEffect Color="Black" Opacity="0.35" BlurRadius="16" OffsetX="0" OffsetY="4"/>
 			</Setter>
 		</Style>
 		<Style Selector="Button.primary:pressed">
-			<Setter Property="Background" Value="#1f7a32"/>
+			<Setter Property="Background" Value="#489bfa"/>
 			<Setter Property="RenderTransform" Value="scale(0.98)"/>
 			<Setter Property="Effect">
 				<DropShadowEffect Color="Black" Opacity="0.25" BlurRadius="4" OffsetX="0" OffsetY="1"/>
@@ -66,13 +61,7 @@
 			<Setter Property="Effect">
 				<DropShadowEffect Color="Black" Opacity="0.2" BlurRadius="3" OffsetX="0" OffsetY="1"/>
 			</Setter>
-			<Setter Property="Transitions">
-				<Transitions>
-					<BrushTransition Property="Background" Duration="0:0:0.2"/>
-					<BrushTransition Property="BorderBrush" Duration="0:0:0.2"/>
-					<TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15"/>
-				</Transitions>
-			</Setter>
+			
 		</Style>
 		<Style Selector="Button.secondary:pointerover">
 			<Setter Property="Background" Value="#30363d"/>
@@ -106,7 +95,7 @@
 			</Setter>
 		</Style>
 		<Style Selector="Border.card:pointerover">
-			<Setter Property="BorderBrush" Value="#58a6ff30"/>
+			<Setter Property="BorderBrush" Value="#0d7dfc"/>
 			<Setter Property="Effect">
 				<DropShadowEffect Color="Black" Opacity="0.2" BlurRadius="24" OffsetX="0" OffsetY="6"/>
 			</Setter>
@@ -134,7 +123,7 @@
 			<Setter Property="BorderBrush" Value="#58a6ff"/>
 		</Style>
 		<Style Selector="TextBox.modern:pointerover /template/ Border#PART_BorderElement">
-			<Setter Property="BorderBrush" Value="#58a6ff80"/>
+			<Setter Property="BorderBrush" Value="#58a6ff"/>
 		</Style>
 
 		<!-- Scrollbar Styling -->
@@ -166,8 +155,8 @@
 				<Border Width="56" Height="56" CornerRadius="16" Margin="0,0,20,0">
 					<Border.Background>
 						<LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-							<GradientStop Color="#238636" Offset="0"/>
-							<GradientStop Color="#2ea043" Offset="1"/>
+							<GradientStop Color="#58a6ff" Offset="0"/>
+							<GradientStop Color="#489bfa" Offset="1"/>
 						</LinearGradientBrush>
 					</Border.Background>
 					<Border.Effect>
@@ -262,10 +251,10 @@
 						</StackPanel>
 					</Border>
 
-					<Border Background="#238636" CornerRadius="20" Padding="12,8" HorizontalAlignment="Center" Margin="0,12,0,0"
+					<Border Background="#489bfa" CornerRadius="20" Padding="12,8" HorizontalAlignment="Center" Margin="0,12,0,0"
 							IsVisible="{Binding CurrentTrack.AlbumArt, Converter={x:Static ObjectConverters.IsNotNull}}">
 						<Border.Effect>
-							<DropShadowEffect Color="#238636" Opacity="0.25" BlurRadius="8" OffsetX="0" OffsetY="2"/>
+							<DropShadowEffect Color="#489bfa" Opacity="0.25" BlurRadius="8" OffsetX="0" OffsetY="2"/>
 						</Border.Effect>
 						<TextBlock Text="{Binding CurrentTrack.HasRealAlbumArt, Converter={x:Static converters:BoolToAlbumArtStatusConverter.Instance}}"
 								   FontSize="12" FontWeight="SemiBold" Foreground="#ffffff"/>
@@ -275,10 +264,10 @@
 						<Grid>
 							<TextBlock Text="Downloading..." FontSize="14" Foreground="#8b949e"/>
 							<TextBlock Text="{Binding DownloadProgress, StringFormat='{}{0:0}%'}"
-									   FontSize="14" FontWeight="SemiBold" Foreground="#238636" HorizontalAlignment="Right"/>
+									   FontSize="14" FontWeight="SemiBold" Foreground="#489bfa" HorizontalAlignment="Right"/>
 						</Grid>
 						<Border Background="#21262d" Height="10" CornerRadius="5" BorderBrush="#30363d" BorderThickness="1">
-							<Border CornerRadius="4" HorizontalAlignment="Left" Background="#238636"
+							<Border CornerRadius="4" HorizontalAlignment="Left" Background="#489bfa"
 									Width="{Binding DownloadProgress, Converter={x:Static converters:PercentageToWidthConverter.Instance}}">
 								<Border.Effect>
 									<DropShadowEffect Color="#238636" Opacity="0.4" BlurRadius="8" OffsetX="0" OffsetY="0"/>
@@ -322,7 +311,7 @@
 									  ScrollChanged="CliOutput_ScrollChanged">
 							<SelectableTextBlock Text="{Binding CliOutput}" TextWrapping="Wrap"
 											   FontFamily="JetBrains Mono, Consolas, Courier New, monospace" FontSize="13"
-											   Foreground="#7ee787" LineHeight="20"/>
+											   Foreground="#489bfa" LineHeight="20"/>
 						</ScrollViewer>
 					</Border>
 				</StackPanel>
