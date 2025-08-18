@@ -30,7 +30,6 @@
 			<Setter Property="Effect">
 				<DropShadowEffect Color="Black" Opacity="0.25" BlurRadius="8" OffsetX="0" OffsetY="2"/>
 			</Setter>
-			
 		</Style>
 		<Style Selector="Button.primary:pointerover">
 			<Setter Property="Background" Value="#0d7dfc"/>
@@ -61,7 +60,6 @@
 			<Setter Property="Effect">
 				<DropShadowEffect Color="Black" Opacity="0.2" BlurRadius="3" OffsetX="0" OffsetY="1"/>
 			</Setter>
-			
 		</Style>
 		<Style Selector="Button.secondary:pointerover">
 			<Setter Property="Background" Value="#30363d"/>
@@ -302,16 +300,26 @@
 							<Button Content="Clear" Command="{Binding ClearLogCommand}" Classes="secondary" Padding="10,8" FontSize="12"/>
 						</StackPanel>
 					</Grid>
-
-					<Border Background="#0d0d0d" CornerRadius="8" MinHeight="220" BorderBrush="#21262d" BorderThickness="1">
+					<Border Background="#0d0d0d" CornerRadius="8" Height="220" BorderBrush="#21262d" BorderThickness="1">
 						<Border.Effect>
 							<DropShadowEffect Color="Black" Opacity="0.25" BlurRadius="8" OffsetX="0" OffsetY="2" />
 						</Border.Effect>
-						<ScrollViewer Name="CliOutput" Padding="20" VerticalScrollBarVisibility="Auto"
+						<ScrollViewer Name="CliOutput"
+									  Padding="10"
+									  VerticalScrollBarVisibility="Auto"
+									  HorizontalScrollBarVisibility="Disabled"
+									  VerticalAlignment="Stretch"
 									  ScrollChanged="CliOutput_ScrollChanged">
-							<SelectableTextBlock Text="{Binding CliOutput}" TextWrapping="Wrap"
-											   FontFamily="JetBrains Mono, Consolas, Courier New, monospace" FontSize="13"
-											   Foreground="#489bfa" LineHeight="20"/>
+							<DockPanel LastChildFill="True" VerticalAlignment="Stretch">
+								<SelectableTextBlock Text="{Binding CliOutput}"
+													TextWrapping="Wrap"
+													FontFamily="JetBrains Mono, Consolas, Courier New, monospace"
+													FontSize="13"
+													Foreground="#489bfa"
+													LineHeight="20"
+													DockPanel.Dock="Bottom"
+													VerticalAlignment="Bottom"/>
+							</DockPanel>
 						</ScrollViewer>
 					</Border>
 				</StackPanel>
@@ -322,9 +330,9 @@
 		<Border Grid.Row="5" Background="#21262d" CornerRadius="12" Padding="20" Margin="0,24,0,0"
 				BorderBrush="#30363d" BorderThickness="1">
 			<StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="16">
-				<TextBlock Text="📁 Downloads:" FontSize="14" Foreground="#8b949e"/>
+				<TextBlock Text="📁 Downloads:" FontSize="14" Foreground="#8b949e" Padding="10"/>
 				<TextBlock Text="{Binding DownloadFolder}" FontSize="14" FontWeight="Medium"
-						   Foreground="#58a6ff" TextTrimming="CharacterEllipsis" MaxWidth="360"/>
+						   Foreground="#58a6ff" TextTrimming="CharacterEllipsis" MaxWidth="360" Padding="10"/>
 				<Button Content="Open Folder" Command="{Binding OpenFolderCommand}"
 						Classes="secondary" Padding="16,12" FontSize="13"/>
 			</StackPanel>
