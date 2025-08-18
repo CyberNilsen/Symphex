@@ -330,9 +330,9 @@
 		<Border Grid.Row="5" Background="#21262d" CornerRadius="12" Padding="20" Margin="0,24,0,0"
 				BorderBrush="#30363d" BorderThickness="1">
 			<StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="16">
-				<TextBlock Text="📁 Downloads:" FontSize="14" Foreground="#8b949e"/>
+				<TextBlock Text="📁 Downloads:" FontSize="14" Foreground="#8b949e" Padding="10"/>
 				<TextBlock Text="{Binding DownloadFolder}" FontSize="14" FontWeight="Medium"
-						   Foreground="#58a6ff" TextTrimming="CharacterEllipsis" MaxWidth="360"/>
+						   Foreground="#58a6ff" TextTrimming="CharacterEllipsis" MaxWidth="360" Padding="10"/>
 				<Button Content="Open Folder" Command="{Binding OpenFolderCommand}"
 						Classes="secondary" Padding="16,12" FontSize="13"/>
 			</StackPanel>
