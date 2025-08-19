@@ -1,4 +1,4 @@
-﻿using Avalonia;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Media.Imaging;
@@ -74,12 +74,12 @@ namespace Symphex.ViewModels
         private string downloadUrl = "";
 
         [ObservableProperty]
-        private string statusText = "🎵 Ready to download music...";
+        private string statusText = "🎵 Initializing Symphex...";
 
         [ObservableProperty]
         private string cliOutput = "Symphex Music Downloader v1.0\n" +
                                    "=============================\n" +
-                                   "Ready to process downloads...\n\n";
+                                   "Starting automatic dependency check...\n\n";
 
         [ObservableProperty]
         private double downloadProgress = 0;
@@ -113,10 +113,247 @@ namespace Symphex.ViewModels
                 Directory.CreateDirectory(DownloadFolder);
             }
 
+            // Start automatic dependency check and download
             _ = Task.Run(async () =>
             {
-                await Task.Run(() => SetupPortableYtDlp());
-                await Task.Run(() => SetupPortableFfmpeg());
+                await AutoSetupDependencies();
+            });
+        }
+
+        private async Task AutoSetupDependencies()
+        {
+            try
+            {
+                LogToCli("Starting automatic dependency check...");
+
+                // Check and setup yt-dlp
+                await SetupPortableYtDlp();
+                bool ytDlpAvailable = !string.IsNullOrEmpty(YtDlpPath) &&
+                    (File.Exists(YtDlpPath) || await IsExecutableInPath(YtDlpExecutableName));
+
+                if (!ytDlpAvailable)
+                {
+                    LogToCli("yt-dlp not found. Downloading automatically...");
+                    await AutoDownloadYtDlp();
+                }
+
+                // Check and setup FFmpeg
+                await SetupPortableFfmpeg();
+                bool ffmpegAvailable = !string.IsNullOrEmpty(FfmpegPath) &&
+                    (File.Exists(FfmpegPath) || await IsExecutableInPath(FfmpegExecutableName));
+
+                if (!ffmpegAvailable)
+                {
+                    LogToCli("FFmpeg not found. Downloading automatically...");
+                    await AutoDownloadFfmpeg();
+                }
+
+                // Final status update
+                await UpdateFinalStatus();
+            }
+            catch (Exception ex)
+            {
+                LogToCli($"Error during automatic dependency setup: {ex.Message}");
+            }
+        }
+
+        private async Task AutoDownloadYtDlp()
+        {
+            try
+            {
+                string os = GetCurrentOS();
+                LogToCli($"Auto-downloading yt-dlp for {os}...");
+
+                // Update UI on main thread
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    StatusText = $"⬇️ Auto-downloading yt-dlp for {os}...";
+                    IsDownloading = true;
+                    DownloadProgress = 0;
+                });
+
+                string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
+                string toolsDir = Path.Combine(appDirectory, "tools");
+
+                if (!Directory.Exists(toolsDir))
+                {
+                    Directory.CreateDirectory(toolsDir);
+                }
+
+                string ytDlpPath = Path.Combine(toolsDir, YtDlpExecutableName);
+                string downloadUrl = GetYtDlpDownloadUrl();
+
+                LogToCli($"Download URL: {downloadUrl}");
+                LogToCli($"Saving to: {ytDlpPath}");
+
+                using (var localHttpClient = new HttpClient())
+                {
+                    // Update progress
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() => DownloadProgress = 30);
+
+                    var response = await localHttpClient.GetAsync(downloadUrl);
+                    response.EnsureSuccessStatusCode();
+
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() => DownloadProgress = 60);
+
+                    await File.WriteAllBytesAsync(ytDlpPath, await response.Content.ReadAsByteArrayAsync());
+
+                    if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        MakeExecutable(ytDlpPath);
+                        LogToCli("Made executable for Unix system");
+                    }
+
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() => DownloadProgress = 100);
+
+                    LogToCli("✅ yt-dlp downloaded successfully");
+                    YtDlpPath = ytDlpPath;
+                }
+            }
+            catch (Exception ex)
+            {
+                LogToCli($"ERROR auto-downloading yt-dlp: {ex.Message}");
+            }
+            finally
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    IsDownloading = false;
+                    DownloadProgress = 0;
+                });
+            }
+        }
+
+        private async Task AutoDownloadFfmpeg()
+        {
+            try
+            {
+                string os = GetCurrentOS();
+                string downloadUrl = GetFfmpegDownloadUrl();
+
+                if (string.IsNullOrEmpty(downloadUrl))
+                {
+                    LogToCli($"FFmpeg auto-download not available for {os}");
+                    LogToCli("Linux users should install FFmpeg via package manager (apt install ffmpeg)");
+
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    {
+                        StatusText = "ℹ️ Linux detected - please install FFmpeg via package manager";
+                    });
+                    return;
+                }
+
+                LogToCli($"Auto-downloading FFmpeg for {os}...");
+
+                // Update UI on main thread
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    StatusText = $"⬇️ Auto-downloading FFmpeg for {os}...";
+                    IsDownloading = true;
+                    DownloadProgress = 0;
+                });
+
+                string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
+                string toolsDir = Path.Combine(appDirectory, "tools");
+
+                if (!Directory.Exists(toolsDir))
+                {
+                    Directory.CreateDirectory(toolsDir);
+                }
+
+                LogToCli($"Download URL: {downloadUrl}");
+
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => DownloadProgress = 10);
+
+                using (var localHttpClient = new HttpClient())
+                {
+                    localHttpClient.Timeout = TimeSpan.FromMinutes(10);
+
+                    var response = await localHttpClient.GetAsync(downloadUrl);
+                    response.EnsureSuccessStatusCode();
+
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() => DownloadProgress = 40);
+
+                    var zipBytes = await response.Content.ReadAsByteArrayAsync();
+
+                    string zipPath = Path.Combine(toolsDir, "ffmpeg.zip");
+                    await File.WriteAllBytesAsync(zipPath, zipBytes);
+
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() => DownloadProgress = 60);
+
+                    LogToCli("Extracting FFmpeg...");
+
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        await ExtractFfmpegWindows(zipPath, toolsDir);
+                    }
+                    else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                    {
+                        await ExtractFfmpegMacOS(zipPath, toolsDir);
+                    }
+
+                    File.Delete(zipPath);
+
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() => DownloadProgress = 90);
+
+                    // Re-setup FFmpeg path after extraction
+                    await SetupPortableFfmpeg();
+
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() => DownloadProgress = 100);
+
+                    LogToCli("✅ FFmpeg downloaded and extracted successfully");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogToCli($"ERROR auto-downloading FFmpeg: {ex.Message}");
+                LogToCli("You can manually download FFmpeg from https://ffmpeg.org/download.html");
+                LogToCli("Extract and place the executable in the 'tools' folder");
+            }
+            finally
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    IsDownloading = false;
+                    DownloadProgress = 0;
+                });
+            }
+        }
+
+        private async Task UpdateFinalStatus()
+        {
+            // Re-check dependencies after potential downloads
+            await SetupPortableYtDlp();
+            await SetupPortableFfmpeg();
+
+            bool ytDlpFound = !string.IsNullOrEmpty(YtDlpPath) &&
+                (File.Exists(YtDlpPath) || await IsExecutableInPath(YtDlpExecutableName));
+            bool ffmpegFound = !string.IsNullOrEmpty(FfmpegPath) &&
+                (File.Exists(FfmpegPath) || await IsExecutableInPath(FfmpegExecutableName));
+
+            // Update UI on main thread
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                if (ytDlpFound && ffmpegFound)
+                {
+                    StatusText = "✅ All dependencies ready! You can now download music with full metadata support.";
+                    LogToCli("🎉 Setup complete! All dependencies are available.");
+                }
+                else if (ytDlpFound && !ffmpegFound)
+                {
+                    StatusText = "⚠️ yt-dlp ready, FFmpeg missing. Downloads will work but metadata may be limited.";
+                    LogToCli("yt-dlp is ready but FFmpeg is missing. Metadata features will be limited.");
+                }
+                else if (!ytDlpFound && ffmpegFound)
+                {
+                    StatusText = "⚠️ FFmpeg ready, yt-dlp missing. Cannot download without yt-dlp.";
+                    LogToCli("FFmpeg is ready but yt-dlp is missing. Downloads are not possible.");
+                }
+                else
+                {
+                    StatusText = "❌ Setup incomplete. Please check your internet connection and restart the app.";
+                    LogToCli("❌ Automatic setup failed. You may need to manually install dependencies.");
+                }
             });
         }
 
@@ -200,16 +437,16 @@ namespace Symphex.ViewModels
             }
         }
 
-        private async void SetupPortableYtDlp()
+        private async Task SetupPortableYtDlp()
         {
             try
             {
                 string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
 
                 string[] possiblePaths = {
-            Path.Combine(appDirectory, "tools", YtDlpExecutableName),
-            Path.Combine(appDirectory, YtDlpExecutableName)
-        };
+                    Path.Combine(appDirectory, "tools", YtDlpExecutableName),
+                    Path.Combine(appDirectory, YtDlpExecutableName)
+                };
 
                 // First check local paths
                 foreach (string path in possiblePaths)
@@ -246,6 +483,7 @@ namespace Symphex.ViewModels
                 YtDlpPath = "";
             }
         }
+
         private async Task<bool> IsExecutableInPath(string executableName)
         {
             try
@@ -263,18 +501,18 @@ namespace Symphex.ViewModels
             }
         }
 
-        private async void SetupPortableFfmpeg()
+        private async Task SetupPortableFfmpeg()
         {
             try
             {
                 string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
 
                 string[] possiblePaths = {
-            Path.Combine(appDirectory, "tools", FfmpegExecutableName),
-            Path.Combine(appDirectory, "tools", "ffmpeg", "bin", FfmpegExecutableName),
-            Path.Combine(appDirectory, "tools", "bin", FfmpegExecutableName),
-            Path.Combine(appDirectory, FfmpegExecutableName)
-        };
+                    Path.Combine(appDirectory, "tools", FfmpegExecutableName),
+                    Path.Combine(appDirectory, "tools", "ffmpeg", "bin", FfmpegExecutableName),
+                    Path.Combine(appDirectory, "tools", "bin", FfmpegExecutableName),
+                    Path.Combine(appDirectory, FfmpegExecutableName)
+                };
 
                 // First check local paths
                 foreach (string path in possiblePaths)
@@ -452,20 +690,20 @@ namespace Symphex.ViewModels
 
             var patterns = new[]
             {
-        @"\s*\(Official Video\)",
-        @"\s*\(Official Audio\)",
-        @"\s*\(Official Music Video\)",
-        @"\s*\(Official\)",
-        @"\s*\(Lyrics\)",
-        @"\s*\(Lyric Video\)",
-        @"\s*\(HD\)",
-        @"\s*\(4K\)",
-        @"\s*\[Official Video\]",
-        @"\s*\[Official Audio\]",
-        @"\s*\[Official Music Video\]",
-        @"\s*\[Lyrics\]",
-        @"\s*\[HD\]"
-    };
+                @"\s*\(Official Video\)",
+                @"\s*\(Official Audio\)",
+                @"\s*\(Official Music Video\)",
+                @"\s*\(Official\)",
+                @"\s*\(Lyrics\)",
+                @"\s*\(Lyric Video\)",
+                @"\s*\(HD\)",
+                @"\s*\(4K\)",
+                @"\s*\[Official Video\]",
+                @"\s*\[Official Audio\]",
+                @"\s*\[Official Music Video\]",
+                @"\s*\[Lyrics\]",
+                @"\s*\[HD\]"
+            };
 
             foreach (var pattern in patterns)
             {
@@ -1024,7 +1262,7 @@ namespace Symphex.ViewModels
 
             if (string.IsNullOrEmpty(YtDlpPath))
             {
-                StatusText = "❌ yt-dlp not available. Please download it first.";
+                StatusText = "❌ yt-dlp not available. Please restart the app to retry automatic setup.";
                 LogToCli("ERROR: yt-dlp not available");
                 return;
             }
@@ -1109,14 +1347,14 @@ namespace Symphex.ViewModels
                 }
 
                 List<string> argsList = new List<string>
-        {
-            $"\"{fullUrl}\"",
-            "--extract-audio",
-            "--audio-format", "mp3",
-            "--audio-quality", "0",
-            "--no-playlist",
-            "-o", $"\"{filenameTemplate}\""
-        };
+                {
+                    $"\"{fullUrl}\"",
+                    "--extract-audio",
+                    "--audio-format", "mp3",
+                    "--audio-quality", "0",
+                    "--no-playlist",
+                    "-o", $"\"{filenameTemplate}\""
+                };
 
                 if (!string.IsNullOrEmpty(FfmpegPath) && File.Exists(FfmpegPath))
                 {
@@ -1232,148 +1470,6 @@ namespace Symphex.ViewModels
             return filename.Trim();
         }
 
-        [RelayCommand]
-        private async Task DownloadYtDlp()
-        {
-            try
-            {
-                StatusText = $"⬇️ Downloading yt-dlp for {GetCurrentOS()}...";
-                LogToCli($"Downloading yt-dlp for {GetCurrentOS()}");
-                IsDownloading = true;
-                DownloadProgress = 0;
-
-                string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
-                string toolsDir = Path.Combine(appDirectory, "tools");
-
-                if (!Directory.Exists(toolsDir))
-                {
-                    Directory.CreateDirectory(toolsDir);
-                }
-
-                string ytDlpPath = Path.Combine(toolsDir, YtDlpExecutableName);
-                string downloadUrl = GetYtDlpDownloadUrl();
-
-                LogToCli($"Download URL: {downloadUrl}");
-                LogToCli($"Saving to: {ytDlpPath}");
-
-                using (var localHttpClient = new HttpClient())
-                {
-                    DownloadProgress = 30;
-                    var response = await localHttpClient.GetAsync(downloadUrl);
-                    response.EnsureSuccessStatusCode();
-
-                    DownloadProgress = 60;
-                    await File.WriteAllBytesAsync(ytDlpPath, await response.Content.ReadAsByteArrayAsync());
-
-                    if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                    {
-                        MakeExecutable(ytDlpPath);
-                        LogToCli("Made executable for Unix system");
-                    }
-
-                    DownloadProgress = 100;
-                    StatusText = $"✅ yt-dlp downloaded successfully for {GetCurrentOS()}!";
-                    LogToCli("yt-dlp download completed successfully");
-
-                    YtDlpPath = ytDlpPath;
-                }
-            }
-            catch (Exception ex)
-            {
-                StatusText = $"❌ Failed to download yt-dlp: {ex.Message}";
-                LogToCli($"ERROR downloading yt-dlp: {ex.Message}");
-            }
-            finally
-            {
-                IsDownloading = false;
-                DownloadProgress = 0;
-            }
-        }
-
-        [RelayCommand]
-        private async Task DownloadFfmpeg()
-        {
-            try
-            {
-                string os = GetCurrentOS();
-                string downloadUrl = GetFfmpegDownloadUrl();
-
-                if (string.IsNullOrEmpty(downloadUrl))
-                {
-                    StatusText = "ℹ️ Linux users should install FFmpeg via package manager (apt install ffmpeg)";
-                    LogToCli("Linux detected. Please install FFmpeg using your package manager:");
-                    LogToCli("Ubuntu/Debian: sudo apt install ffmpeg");
-                    LogToCli("Fedora: sudo dnf install ffmpeg");
-                    LogToCli("Arch: sudo pacman -S ffmpeg");
-                    return;
-                }
-
-                StatusText = $"⬇️ Downloading FFmpeg for {os}...";
-                LogToCli($"Downloading FFmpeg for {os}");
-                IsDownloading = true;
-                DownloadProgress = 0;
-
-                string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
-                string toolsDir = Path.Combine(appDirectory, "tools");
-
-                if (!Directory.Exists(toolsDir))
-                {
-                    Directory.CreateDirectory(toolsDir);
-                }
-
-                LogToCli($"Download URL: {downloadUrl}");
-                DownloadProgress = 10;
-
-                using (var localHttpClient = new HttpClient())
-                {
-                    localHttpClient.Timeout = TimeSpan.FromMinutes(10);
-
-                    var response = await localHttpClient.GetAsync(downloadUrl);
-                    response.EnsureSuccessStatusCode();
-
-                    DownloadProgress = 40;
-                    var zipBytes = await response.Content.ReadAsByteArrayAsync();
-
-                    string zipPath = Path.Combine(toolsDir, "ffmpeg.zip");
-                    await File.WriteAllBytesAsync(zipPath, zipBytes);
-
-                    DownloadProgress = 60;
-                    LogToCli("Extracting FFmpeg...");
-
-                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                    {
-                        await ExtractFfmpegWindows(zipPath, toolsDir);
-                    }
-                    else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                    {
-                        await ExtractFfmpegMacOS(zipPath, toolsDir);
-                    }
-
-                    File.Delete(zipPath);
-
-                    DownloadProgress = 90;
-
-                    SetupPortableFfmpeg();
-
-                    DownloadProgress = 100;
-                    StatusText = $"✅ FFmpeg downloaded and extracted for {os}!";
-                    LogToCli("FFmpeg download and extraction completed successfully");
-                }
-            }
-            catch (Exception ex)
-            {
-                StatusText = $"❌ Failed to download FFmpeg: {ex.Message}";
-                LogToCli($"ERROR downloading FFmpeg: {ex.Message}");
-                LogToCli("You can manually download FFmpeg from https://ffmpeg.org/download.html");
-                LogToCli("Extract and place the executable in the 'tools' folder");
-            }
-            finally
-            {
-                IsDownloading = false;
-                DownloadProgress = 0;
-            }
-        }
-
         private Task ExtractFfmpegWindows(string zipPath, string toolsDir)
         {
             using (var archive = ZipFile.OpenRead(zipPath))
@@ -1429,49 +1525,6 @@ namespace Symphex.ViewModels
                 }
             }
             return Task.CompletedTask;
-        }
-
-        [RelayCommand]
-        private void CheckDependencies()
-        {
-            try
-            {
-                LogToCli("Checking dependencies...");
-
-                bool ytDlpFound = !string.IsNullOrEmpty(YtDlpPath) && (File.Exists(YtDlpPath) || YtDlpPath == YtDlpExecutableName);
-                bool ffmpegFound = !string.IsNullOrEmpty(FfmpegPath) && (File.Exists(FfmpegPath) || FfmpegPath == FfmpegExecutableName);
-
-                LogToCli($"yt-dlp: {(ytDlpFound ? "✅ Found" : "❌ Not found")}");
-                LogToCli($"FFmpeg: {(ffmpegFound ? "✅ Found" : "❌ Not found")}");
-
-                if (ytDlpFound && ffmpegFound)
-                {
-                    StatusText = "✅ All dependencies found! Ready to download with full metadata support.";
-                    LogToCli("All dependencies are available. You can download music with full metadata and album art.");
-                }
-                else if (ytDlpFound && !ffmpegFound)
-                {
-                    StatusText = "⚠️ yt-dlp found, but FFmpeg missing. Downloads will work but metadata may be limited.";
-                    LogToCli("yt-dlp is available but FFmpeg is missing.");
-                    LogToCli("Click 'Get FFmpeg' to download it for full metadata support.");
-                }
-                else if (!ytDlpFound && ffmpegFound)
-                {
-                    StatusText = "⚠️ FFmpeg found, but yt-dlp missing. Cannot download without yt-dlp.";
-                    LogToCli("FFmpeg is available but yt-dlp is missing.");
-                    LogToCli("Click 'Get yt-dlp' to download it.");
-                }
-                else
-                {
-                    StatusText = "❌ Both yt-dlp and FFmpeg are missing. Please download them first.";
-                    LogToCli("Both yt-dlp and FFmpeg are missing.");
-                    LogToCli("Use the 'Get yt-dlp' and 'Get FFmpeg' buttons to download them.");
-                }
-            }
-            catch (Exception ex)
-            {
-                LogToCli($"Error checking dependencies: {ex.Message}");
-            }
         }
 
         [RelayCommand]
