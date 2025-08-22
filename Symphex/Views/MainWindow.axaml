@@ -346,107 +346,39 @@
 					</StackPanel>
 				</Border>
 
-				<!-- Main Content Area - left column -->
-				<Grid Grid.Row="4" Grid.Column="0">
-					<Grid.RowDefinitions>
-						<RowDefinition Height="*"/>
-						<RowDefinition Height="16"/>
-						<RowDefinition Height="Auto"/>
-					</Grid.RowDefinitions>
+				<!-- Status Panel - left column -->
+				<Border Grid.Row="4" Grid.Column="0" Classes="card" Padding="20">
+					<StackPanel Spacing="12">
+						<TextBlock Text="Status" FontSize="16" FontWeight="SemiBold" Foreground="#f0f6fc"/>
 
-					<!-- Fixed Preview Section -->
-					<Border Grid.Row="0" Classes="card" Padding="28">
-						<Grid>
-							<Grid.RowDefinitions>
-								<RowDefinition Height="Auto"/>
-								<RowDefinition Height="20"/>
-								<RowDefinition Height="140"/>
-								<RowDefinition Height="16"/>
-								<RowDefinition Height="Auto"/>
-								<RowDefinition Height="12"/>
-								<RowDefinition Height="Auto"/>
-								<RowDefinition Height="*"/>
-								<RowDefinition Height="Auto"/>
-							</Grid.RowDefinitions>
+						<Border Background="#0d1117" CornerRadius="8" BorderBrush="#30363d" BorderThickness="1" Height="200">
+							<ScrollViewer Name="CliOutput" Padding="12" VerticalScrollBarVisibility="Auto">
+								<TextBlock Text="{Binding CliOutput}" TextWrapping="Wrap" FontSize="12"
+										   Foreground="#e6edf3" LineHeight="16"/>
+							</ScrollViewer>
+						</Border>
 
-							<TextBlock Grid.Row="0" Text="Preview" FontSize="18" FontWeight="SemiBold" Foreground="#f0f6fc"/>
-
-							<!-- Album Art -->
-							<Border Grid.Row="2" Width="140" Height="140" CornerRadius="16" Background="#21262d"
-									BorderBrush="#30363d" BorderThickness="1" HorizontalAlignment="Center">
-								<Border.Effect>
-									<DropShadowEffect Color="Black" Opacity="0.3" BlurRadius="20" OffsetX="0" OffsetY="6"/>
-								</Border.Effect>
-								<Grid>
-									<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
-										<TextBlock Text="🎵" FontSize="40" Foreground="#489bfa"/>
-										<TextBlock Text="Album Art" FontSize="11" Foreground="#6e7681" FontWeight="Medium"/>
-									</StackPanel>
-									<Image Source="{Binding CurrentTrack.AlbumArt}" Stretch="UniformToFill"/>
-								</Grid>
-							</Border>
-
-							<!-- Track Info -->
-							<StackPanel Grid.Row="4" Spacing="4" HorizontalAlignment="Center">
-								<TextBlock Text="{Binding CurrentTrack.Title, FallbackValue='Ready to download...'}"
-										   FontSize="15" FontWeight="Bold" Foreground="#f0f6fc"
-										   TextWrapping="Wrap" MaxWidth="320" TextAlignment="Center" MaxLines="2"/>
-
-								<TextBlock Text="{Binding CurrentTrack.Artist, FallbackValue='Enter a URL above'}"
-										   FontSize="13" Foreground="#8b949e"
-										   TextWrapping="Wrap" MaxWidth="320" TextAlignment="Center" MaxLines="1"/>
-
-								<TextBlock Text="{Binding CurrentTrack.Album}" FontSize="11" Foreground="#6e7681"
-										   IsVisible="{Binding CurrentTrack.Album, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-										   TextWrapping="Wrap" MaxWidth="320" TextAlignment="Center" MaxLines="1"/>
-							</StackPanel>
-
-							<!-- Status badge -->
-							<Border Grid.Row="6" Background="#489bfa" CornerRadius="16" Padding="10,5" HorizontalAlignment="Center"
-									IsVisible="{Binding CurrentTrack.AlbumArt, Converter={x:Static ObjectConverters.IsNotNull}}">
-								<Border.Effect>
-									<DropShadowEffect Color="#489bfa" Opacity="0.3" BlurRadius="8" OffsetX="0" OffsetY="2"/>
-								</Border.Effect>
-								<TextBlock Text="{Binding CurrentTrack.HasRealAlbumArt, Converter={x:Static converters:BoolToAlbumArtStatusConverter.Instance}}"
-										   FontSize="10" FontWeight="SemiBold" Foreground="#ffffff"/>
-							</Border>
-
-							<!-- Download progress -->
-							<StackPanel Grid.Row="8" IsVisible="{Binding IsDownloading}" Spacing="6">
-								<Grid>
-									<TextBlock Text="Downloading..." FontSize="12" Foreground="#8b949e"/>
-									<TextBlock Text="{Binding DownloadProgress, StringFormat='{}{0:0}%'}"
-											   FontSize="12" FontWeight="Bold" Foreground="#489bfa" HorizontalAlignment="Right"/>
-								</Grid>
-								<Border Background="#21262d" Height="6" CornerRadius="3" BorderBrush="#30363d" BorderThickness="1">
-									<Border CornerRadius="2" HorizontalAlignment="Left" Background="#489bfa"
-											Width="{Binding DownloadProgress, Converter={x:Static converters:PercentageToWidthConverter.Instance}}">
-										<Border.Effect>
-											<DropShadowEffect Color="#489bfa" Opacity="0.5" BlurRadius="4" OffsetX="0" OffsetY="0"/>
-										</Border.Effect>
-									</Border>
+						<!-- Download progress -->
+						<StackPanel IsVisible="{Binding IsDownloading}" Spacing="6">
+							<Grid>
+								<TextBlock Text="Downloading..." FontSize="12" Foreground="#8b949e"/>
+								<TextBlock Text="{Binding DownloadProgress, StringFormat='{}{0:0}%'}"
+										   FontSize="12" FontWeight="Bold" Foreground="#489bfa" HorizontalAlignment="Right"/>
+							</Grid>
+							<Border Background="#21262d" Height="6" CornerRadius="3" BorderBrush="#30363d" BorderThickness="1">
+								<Border CornerRadius="2" HorizontalAlignment="Left" Background="#489bfa"
+										Width="{Binding DownloadProgress, Converter={x:Static converters:PercentageToWidthConverter.Instance}}">
+									<Border.Effect>
+										<DropShadowEffect Color="#489bfa" Opacity="0.5" BlurRadius="4" OffsetX="0" OffsetY="0"/>
+									</Border.Effect>
 								</Border>
-							</StackPanel>
-						</Grid>
-					</Border>
-
-					<!-- Status Panel -->
-					<Border Grid.Row="2" Classes="card" Padding="20">
-						<StackPanel Spacing="12">
-							<TextBlock Text="Status" FontSize="16" FontWeight="SemiBold" Foreground="#f0f6fc"/>
-
-							<Border Background="#0d1117" CornerRadius="8" BorderBrush="#30363d" BorderThickness="1" Height="80">
-								<ScrollViewer Name="CliOutput" Padding="12" VerticalScrollBarVisibility="Auto">
-									<TextBlock Text="{Binding CliOutput}" TextWrapping="Wrap" FontSize="12"
-											   Foreground="#e6edf3" LineHeight="16"/>
-								</ScrollViewer>
 							</Border>
 						</StackPanel>
-					</Border>
-				</Grid>
+					</StackPanel>
+				</Border>
 
 				<!-- Coming Soon Section -->
-				<Border Grid.Row="2" Grid.RowSpan="5" Grid.Column="2" Classes="feature-card" Padding="50">
+				<Border Grid.Row="2" Grid.RowSpan="3" Grid.Column="2" Classes="feature-card" Padding="50">
 					<Grid>
 						<Grid.RowDefinitions>
 							<RowDefinition Height="Auto"/>

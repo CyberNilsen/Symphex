@@ -115,7 +115,7 @@ namespace Symphex.ViewModels
         private TimeSpan currentTime = TimeSpan.Zero;
 
         [ObservableProperty]
-        private float volume = 0.75f;
+        private float volume = 75f; // Changed to start at 75 instead of 0.75
 
         [ObservableProperty]
         private bool isPlayingTrack = false;
@@ -175,7 +175,7 @@ namespace Symphex.ViewModels
                 _waveOut = new WaveOutEvent();
                 _audioFileReader = new AudioFileReader(filePath);
                 _waveOut.Init(_audioFileReader);
-                _waveOut.Volume = Volume;
+                _waveOut.Volume = Volume / 100f; // Convert percentage to 0-1 range
                 _playbackTimer.Start();
                 LogToCli($"Initialized audio: {Path.GetFileName(filePath)}");
             }
@@ -201,6 +201,7 @@ namespace Symphex.ViewModels
                 _waveOut = null;
             }
             IsPlaying = false;
+            IsPlayingTrack = false;
             ProgressPercentage = 0;
             CurrentTime = TimeSpan.Zero;
         }
@@ -213,6 +214,8 @@ namespace Symphex.ViewModels
                 {
                     CurrentTime = _audioFileReader.CurrentTime;
                     ProgressPercentage = (_audioFileReader.CurrentTime.TotalSeconds / _audioFileReader.TotalTime.TotalSeconds) * 100;
+
+                    // Check if song ended
                     if (_audioFileReader.CurrentTime >= _audioFileReader.TotalTime)
                     {
                         SkipForward();
@@ -260,13 +263,13 @@ namespace Symphex.ViewModels
                 if (_waveOut == null && _currentTrackIndex >= 0)
                 {
                     InitializeAudio(_playlist[_currentTrackIndex]);
+                    UpdateCurrentTrackInfo(); // Update track info when initializing
                 }
                 _waveOut?.Play();
                 IsPlaying = true;
                 IsPlayingTrack = true;
                 _playbackTimer.Start();
                 LogToCli($"Playing: {Path.GetFileName(_playlist[_currentTrackIndex])}");
-                UpdateCurrentTrackInfo();
             }
             catch (Exception ex)
             {
@@ -284,6 +287,7 @@ namespace Symphex.ViewModels
                 StopAudio();
                 _currentTrackIndex = (_currentTrackIndex + 1) % _playlist.Count;
                 LoadTrack(_playlist[_currentTrackIndex]);
+                UpdateCurrentTrackInfo(); // Update track info immediately
                 PlayTrack();
             }
         }
@@ -296,6 +300,7 @@ namespace Symphex.ViewModels
                 StopAudio();
                 _currentTrackIndex = (_currentTrackIndex - 1) < 0 ? _playlist.Count - 1 : _currentTrackIndex - 1;
                 LoadTrack(_playlist[_currentTrackIndex]);
+                UpdateCurrentTrackInfo(); // Update track info immediately
                 PlayTrack();
             }
         }
@@ -342,14 +347,19 @@ namespace Symphex.ViewModels
                 {
                     using var reader = new AudioFileReader(filePath);
                     CurrentTrack.Duration = reader.TotalTime.ToString(@"mm\:ss");
+
+                    // Try to read metadata from file
                     var tags = TagLib.File.Create(filePath);
                     CurrentTrack.Title = tags.Tag.Title ?? Path.GetFileNameWithoutExtension(filePath);
                     CurrentTrack.Artist = tags.Tag.FirstPerformer ?? "Unknown";
                     CurrentTrack.Album = tags.Tag.Album ?? "";
                     CurrentTrack.AlbumArt = LoadAlbumArt(filePath);
+
+                    LogToCli($"Updated track info: {CurrentTrack.Title} by {CurrentTrack.Artist}");
                 }
-                catch
+                catch (Exception ex)
                 {
+                    LogToCli($"Error reading metadata, using filename: {ex.Message}");
                     CurrentTrack.Title = Path.GetFileNameWithoutExtension(filePath);
                     CurrentTrack.Artist = "Unknown";
                     CurrentTrack.Album = "";
@@ -1391,21 +1401,48 @@ namespace Symphex.ViewModels
         {
             if (_audioFileReader == null || !IsPlayingTrack) return;
 
-            _isSeeking = true;
-            ProgressPercentage = value;
-            var newPosition = TimeSpan.FromSeconds(value * _audioFileReader.TotalTime.TotalSeconds / 100);
-            _audioFileReader.CurrentTime = newPosition;
-            CurrentTime = newPosition;
-            LogToCli($"Seeked to {CurrentTime:mm\\:ss}");
-            _isSeeking = false;
+            try
+            {
+                _isSeeking = true;
+                var newPosition = TimeSpan.FromSeconds(value * _audioFileReader.TotalTime.TotalSeconds / 100);
+
+                // Ensure position is within bounds
+                if (newPosition < TimeSpan.Zero) newPosition = TimeSpan.Zero;
+                if (newPosition > _audioFileReader.TotalTime) newPosition = _audioFileReader.TotalTime;
+
+                _audioFileReader.CurrentTime = newPosition;
+                CurrentTime = newPosition;
+                ProgressPercentage = value;
+
+                LogToCli($"Seeked to {CurrentTime:mm\\:ss}");
+            }
+            catch (Exception ex)
+            {
+                LogToCli($"Error seeking: {ex.Message}");
+            }
+            finally
+            {
+                _isSeeking = false;
+            }
         }
 
         partial void OnVolumeChanged(float value)
         {
-            if (_waveOut != null)
+            try
             {
-                _waveOut.Volume = value / 100f;
-                LogToCli($"Volume set to {value:0}%");
+                // Clamp volume between 0 and 100
+                if (value < 0) value = 0;
+                if (value > 100) value = 100;
+
+                if (_waveOut != null)
+                {
+                    _waveOut.Volume = value / 100f; // Convert percentage to 0-1 range
+                    LogToCli($"Volume set to {value:0}%");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogToCli($"Error setting volume: {ex.Message}");
             }
         }
     }
