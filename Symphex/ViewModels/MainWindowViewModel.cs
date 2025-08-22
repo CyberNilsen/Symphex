@@ -5,6 +5,7 @@ using Avalonia.Media.Imaging;
 using CliWrap;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using NAudio.Wave;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -17,7 +18,9 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Timers;
 using Avalonia.Input;
+using System.Globalization; // If needed for formatting
 
 namespace Symphex.ViewModels
 {
@@ -63,6 +66,12 @@ namespace Symphex.ViewModels
     public partial class MainWindowViewModel : ViewModelBase
     {
         private ScrollViewer? _cliScrollViewer;
+        private WaveOutEvent? _waveOut;
+        private AudioFileReader? _audioFileReader;
+        private readonly Timer _playbackTimer;
+        private List<string> _playlist = new List<string>();
+        private int _currentTrackIndex = -1;
+        private bool _isSeeking;
 
         public ScrollViewer? CliScrollViewer
         {
@@ -96,28 +105,276 @@ namespace Symphex.ViewModels
         [ObservableProperty]
         private bool showMetadata = false;
 
+        [ObservableProperty]
+        private bool isPlaying = false;
+
+        [ObservableProperty]
+        private double progressPercentage = 0;
+
+        [ObservableProperty]
+        private TimeSpan currentTime = TimeSpan.Zero;
+
+        [ObservableProperty]
+        private float volume = 0.75f;
+
+        [ObservableProperty]
+        private bool isPlayingTrack = false;
+
         private string YtDlpPath { get; set; } = "";
-        private string FfmpegPath { get; set; } = "";
+        private string FmpegPath { get; set; } = "";
         private string YtDlpExecutableName => GetYtDlpExecutableName();
-        private string FfmpegExecutableName => GetFfmpegExecutableName();
+        private string FmpegExecutableName => GetFmpegExecutableName();
         private readonly HttpClient httpClient = new();
 
         public MainWindowViewModel()
         {
             CurrentTrack = new TrackInfo();
-
             SetupDownloadFolder();
+            LoadPlaylist();
 
             if (!Directory.Exists(DownloadFolder))
             {
                 Directory.CreateDirectory(DownloadFolder);
             }
 
-            // Start automatic dependency check and download
+            _playbackTimer = new Timer(500);
+            _playbackTimer.Elapsed += UpdatePlaybackProgress;
+            _playbackTimer.AutoReset = true;
+
             _ = Task.Run(async () =>
             {
                 await AutoSetupDependencies();
             });
+        }
+
+        private void LoadPlaylist()
+        {
+            try
+            {
+                _playlist = Directory.GetFiles(DownloadFolder, "*.mp3").ToList();
+                if (_playlist.Any())
+                {
+                    LogToCli($"Loaded {_playlist.Count} tracks from download folder");
+                }
+                else
+                {
+                    LogToCli("No tracks found in download folder");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogToCli($"Error loading playlist: {ex.Message}");
+            }
+        }
+
+        private void InitializeAudio(string filePath)
+        {
+            try
+            {
+                StopAudio();
+                _waveOut = new WaveOutEvent();
+                _audioFileReader = new AudioFileReader(filePath);
+                _waveOut.Init(_audioFileReader);
+                _waveOut.Volume = Volume;
+                _playbackTimer.Start();
+                LogToCli($"Initialized audio: {Path.GetFileName(filePath)}");
+            }
+            catch (Exception ex)
+            {
+                LogToCli($"Error initializing audio: {ex.Message}");
+                StopAudio();
+            }
+        }
+
+        private void StopAudio()
+        {
+            _playbackTimer.Stop();
+            if (_audioFileReader != null)
+            {
+                _audioFileReader.Dispose();
+                _audioFileReader = null;
+            }
+            if (_waveOut != null)
+            {
+                _waveOut.Stop();
+                _waveOut.Dispose();
+                _waveOut = null;
+            }
+            IsPlaying = false;
+            ProgressPercentage = 0;
+            CurrentTime = TimeSpan.Zero;
+        }
+
+        private void UpdatePlaybackProgress(object? sender, ElapsedEventArgs e)
+        {
+            if (_audioFileReader != null && !_isSeeking)
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    CurrentTime = _audioFileReader.CurrentTime;
+                    ProgressPercentage = (_audioFileReader.CurrentTime.TotalSeconds / _audioFileReader.TotalTime.TotalSeconds) * 100;
+                    if (_audioFileReader.CurrentTime >= _audioFileReader.TotalTime)
+                    {
+                        SkipForward();
+                    }
+                });
+            }
+        }
+
+        [RelayCommand]
+        private void PlayPause()
+        {
+            if (_currentTrackIndex < 0 || !_playlist.Any())
+            {
+                if (_playlist.Any())
+                {
+                    _currentTrackIndex = 0;
+                    LoadTrack(_playlist[_currentTrackIndex]);
+                    PlayTrack();
+                }
+                else
+                {
+                    LogToCli("No tracks available to play");
+                    StatusText = "⚠️ No tracks available";
+                }
+                return;
+            }
+
+            if (IsPlaying)
+            {
+                _waveOut?.Pause();
+                IsPlaying = false;
+                _playbackTimer.Stop();
+                LogToCli("Paused playback");
+            }
+            else
+            {
+                PlayTrack();
+            }
+        }
+
+        private void PlayTrack()
+        {
+            try
+            {
+                if (_waveOut == null && _currentTrackIndex >= 0)
+                {
+                    InitializeAudio(_playlist[_currentTrackIndex]);
+                }
+                _waveOut?.Play();
+                IsPlaying = true;
+                IsPlayingTrack = true;
+                _playbackTimer.Start();
+                LogToCli($"Playing: {Path.GetFileName(_playlist[_currentTrackIndex])}");
+                UpdateCurrentTrackInfo();
+            }
+            catch (Exception ex)
+            {
+                LogToCli($"Error playing track: {ex.Message}");
+                StopAudio();
+                StatusText = "❌ Error playing track";
+            }
+        }
+
+        [RelayCommand]
+        private void SkipForward()
+        {
+            if (_playlist.Any())
+            {
+                StopAudio();
+                _currentTrackIndex = (_currentTrackIndex + 1) % _playlist.Count;
+                LoadTrack(_playlist[_currentTrackIndex]);
+                PlayTrack();
+            }
+        }
+
+        [RelayCommand]
+        private void SkipBack()
+        {
+            if (_playlist.Any())
+            {
+                StopAudio();
+                _currentTrackIndex = (_currentTrackIndex - 1) < 0 ? _playlist.Count - 1 : _currentTrackIndex - 1;
+                LoadTrack(_playlist[_currentTrackIndex]);
+                PlayTrack();
+            }
+        }
+
+        private void LoadTrack(string filePath)
+        {
+            try
+            {
+                var fileName = Path.GetFileName(filePath);
+                CurrentTrack = new TrackInfo
+                {
+                    FileName = fileName,
+                    Title = Path.GetFileNameWithoutExtension(fileName),
+                    Artist = "Unknown",
+                    Duration = GetTrackDuration(filePath)
+                };
+                LogToCli($"Loaded track: {fileName}");
+            }
+            catch (Exception ex)
+            {
+                LogToCli($"Error loading track: {ex.Message}");
+            }
+        }
+
+        private string GetTrackDuration(string filePath)
+        {
+            try
+            {
+                using var reader = new AudioFileReader(filePath);
+                return reader.TotalTime.ToString(@"mm\:ss");
+            }
+            catch
+            {
+                return "Unknown";
+            }
+        }
+
+        private void UpdateCurrentTrackInfo()
+        {
+            if (_currentTrackIndex >= 0 && _currentTrackIndex < _playlist.Count)
+            {
+                var filePath = _playlist[_currentTrackIndex];
+                try
+                {
+                    using var reader = new AudioFileReader(filePath);
+                    CurrentTrack.Duration = reader.TotalTime.ToString(@"mm\:ss");
+                    var tags = TagLib.File.Create(filePath);
+                    CurrentTrack.Title = tags.Tag.Title ?? Path.GetFileNameWithoutExtension(filePath);
+                    CurrentTrack.Artist = tags.Tag.FirstPerformer ?? "Unknown";
+                    CurrentTrack.Album = tags.Tag.Album ?? "";
+                    CurrentTrack.AlbumArt = LoadAlbumArt(filePath);
+                }
+                catch
+                {
+                    CurrentTrack.Title = Path.GetFileNameWithoutExtension(filePath);
+                    CurrentTrack.Artist = "Unknown";
+                    CurrentTrack.Album = "";
+                    CurrentTrack.AlbumArt = null;
+                }
+            }
+        }
+
+        private Bitmap? LoadAlbumArt(string filePath)
+        {
+            try
+            {
+                var tags = TagLib.File.Create(filePath);
+                var picture = tags.Tag.Pictures.FirstOrDefault();
+                if (picture != null)
+                {
+                    using var stream = new MemoryStream(picture.Data.Data);
+                    return new Bitmap(stream);
+                }
+            }
+            catch
+            {
+                return null;
+            }
+            return null;
         }
 
         private async Task AutoSetupDependencies()
@@ -126,7 +383,6 @@ namespace Symphex.ViewModels
             {
                 LogToCli("Starting automatic dependency check...");
 
-                // Check and setup yt-dlp
                 await SetupPortableYtDlp();
                 bool ytDlpAvailable = !string.IsNullOrEmpty(YtDlpPath) &&
                     (File.Exists(YtDlpPath) || await IsExecutableInPath(YtDlpExecutableName));
@@ -137,18 +393,16 @@ namespace Symphex.ViewModels
                     await AutoDownloadYtDlp();
                 }
 
-                // Check and setup FFmpeg
-                await SetupPortableFfmpeg();
-                bool ffmpegAvailable = !string.IsNullOrEmpty(FfmpegPath) &&
-                    (File.Exists(FfmpegPath) || await IsExecutableInPath(FfmpegExecutableName));
+                await SetupPortableFmpeg();
+                bool ffmpegAvailable = !string.IsNullOrEmpty(FmpegPath) &&
+                    (File.Exists(FmpegPath) || await IsExecutableInPath(FmpegExecutableName));
 
                 if (!ffmpegAvailable)
                 {
                     LogToCli("FFmpeg not found. Downloading automatically...");
-                    await AutoDownloadFfmpeg();
+                    await AutoDownloadFmpeg();
                 }
 
-                // Final status update
                 await UpdateFinalStatus();
             }
             catch (Exception ex)
@@ -164,7 +418,6 @@ namespace Symphex.ViewModels
                 string os = GetCurrentOS();
                 LogToCli($"Auto-downloading yt-dlp for {os}...");
 
-                // Update UI on main thread
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
                     StatusText = $"⬇️ Auto-downloading yt-dlp for {os}...";
@@ -188,14 +441,10 @@ namespace Symphex.ViewModels
 
                 using (var localHttpClient = new HttpClient())
                 {
-                    // Update progress
                     Avalonia.Threading.Dispatcher.UIThread.Post(() => DownloadProgress = 30);
-
                     var response = await localHttpClient.GetAsync(downloadUrl);
                     response.EnsureSuccessStatusCode();
-
                     Avalonia.Threading.Dispatcher.UIThread.Post(() => DownloadProgress = 60);
-
                     await File.WriteAllBytesAsync(ytDlpPath, await response.Content.ReadAsByteArrayAsync());
 
                     if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -205,7 +454,6 @@ namespace Symphex.ViewModels
                     }
 
                     Avalonia.Threading.Dispatcher.UIThread.Post(() => DownloadProgress = 100);
-
                     LogToCli("✅ yt-dlp downloaded successfully");
                     YtDlpPath = ytDlpPath;
                 }
@@ -224,18 +472,17 @@ namespace Symphex.ViewModels
             }
         }
 
-        private async Task AutoDownloadFfmpeg()
+        private async Task AutoDownloadFmpeg()
         {
             try
             {
                 string os = GetCurrentOS();
-                string downloadUrl = GetFfmpegDownloadUrl();
+                string downloadUrl = GetFmpegDownloadUrl();
 
                 if (string.IsNullOrEmpty(downloadUrl))
                 {
                     LogToCli($"FFmpeg auto-download not available for {os}");
                     LogToCli("Linux users should install FFmpeg via package manager (apt install ffmpeg)");
-
                     Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                     {
                         StatusText = "ℹ️ Linux detected - please install FFmpeg via package manager";
@@ -244,8 +491,6 @@ namespace Symphex.ViewModels
                 }
 
                 LogToCli($"Auto-downloading FFmpeg for {os}...");
-
-                // Update UI on main thread
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
                     StatusText = $"⬇️ Auto-downloading FFmpeg for {os}...";
@@ -262,45 +507,33 @@ namespace Symphex.ViewModels
                 }
 
                 LogToCli($"Download URL: {downloadUrl}");
-
                 Avalonia.Threading.Dispatcher.UIThread.Post(() => DownloadProgress = 10);
 
                 using (var localHttpClient = new HttpClient())
                 {
                     localHttpClient.Timeout = TimeSpan.FromMinutes(10);
-
                     var response = await localHttpClient.GetAsync(downloadUrl);
                     response.EnsureSuccessStatusCode();
-
                     Avalonia.Threading.Dispatcher.UIThread.Post(() => DownloadProgress = 40);
-
                     var zipBytes = await response.Content.ReadAsByteArrayAsync();
-
                     string zipPath = Path.Combine(toolsDir, "ffmpeg.zip");
                     await File.WriteAllBytesAsync(zipPath, zipBytes);
-
                     Avalonia.Threading.Dispatcher.UIThread.Post(() => DownloadProgress = 60);
 
                     LogToCli("Extracting FFmpeg...");
-
                     if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     {
-                        await ExtractFfmpegWindows(zipPath, toolsDir);
+                        await ExtractFmpegWindows(zipPath, toolsDir);
                     }
                     else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                     {
-                        await ExtractFfmpegMacOS(zipPath, toolsDir);
+                        await ExtractFmpegMacOS(zipPath, toolsDir);
                     }
 
                     File.Delete(zipPath);
-
                     Avalonia.Threading.Dispatcher.UIThread.Post(() => DownloadProgress = 90);
-
-                    // Re-setup FFmpeg path after extraction
-                    await SetupPortableFfmpeg();
-
+                    await SetupPortableFmpeg();
                     Avalonia.Threading.Dispatcher.UIThread.Post(() => DownloadProgress = 100);
-
                     LogToCli("✅ FFmpeg downloaded and extracted successfully");
                 }
             }
@@ -322,16 +555,14 @@ namespace Symphex.ViewModels
 
         private async Task UpdateFinalStatus()
         {
-            // Re-check dependencies after potential downloads
             await SetupPortableYtDlp();
-            await SetupPortableFfmpeg();
+            await SetupPortableFmpeg();
 
             bool ytDlpFound = !string.IsNullOrEmpty(YtDlpPath) &&
                 (File.Exists(YtDlpPath) || await IsExecutableInPath(YtDlpExecutableName));
-            bool ffmpegFound = !string.IsNullOrEmpty(FfmpegPath) &&
-                (File.Exists(FfmpegPath) || await IsExecutableInPath(FfmpegExecutableName));
+            bool ffmpegFound = !string.IsNullOrEmpty(FmpegPath) &&
+                (File.Exists(FmpegPath) || await IsExecutableInPath(FmpegExecutableName));
 
-            // Update UI on main thread
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
                 if (ytDlpFound && ffmpegFound)
@@ -378,7 +609,7 @@ namespace Symphex.ViewModels
             return RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "yt-dlp.exe" : "yt-dlp";
         }
 
-        private string GetFfmpegExecutableName()
+        private string GetFmpegExecutableName()
         {
             return RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "ffmpeg.exe" : "ffmpeg";
         }
@@ -393,7 +624,7 @@ namespace Symphex.ViewModels
                 return "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux";
         }
 
-        private string GetFfmpegDownloadUrl()
+        private string GetFmpegDownloadUrl()
         {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 return "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
@@ -406,12 +637,10 @@ namespace Symphex.ViewModels
         private void LogToCli(string message)
         {
             var timestamp = DateTime.Now.ToString("HH:mm:ss");
-
             string cleanMessage = message.Trim();
-
             string logEntry = $"[{timestamp}] {cleanMessage}\n";
 
-            if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime)
             {
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
@@ -442,30 +671,25 @@ namespace Symphex.ViewModels
             try
             {
                 string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
-
                 string[] possiblePaths = {
                     Path.Combine(appDirectory, "tools", YtDlpExecutableName),
                     Path.Combine(appDirectory, YtDlpExecutableName)
                 };
 
-                // First check local paths
                 foreach (string path in possiblePaths)
                 {
                     if (File.Exists(path))
                     {
                         YtDlpPath = path;
-
                         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                         {
                             MakeExecutable(path);
                         }
-
                         LogToCli($"yt-dlp found at: {path}");
                         return;
                     }
                 }
 
-                // Then check system PATH
                 if (await IsExecutableInPath(YtDlpExecutableName))
                 {
                     YtDlpPath = YtDlpExecutableName;
@@ -492,7 +716,6 @@ namespace Symphex.ViewModels
                     .WithArguments("--version")
                     .WithValidation(CommandResultValidation.None)
                     .ExecuteAsync();
-
                 return result.ExitCode == 0;
             }
             catch
@@ -501,51 +724,47 @@ namespace Symphex.ViewModels
             }
         }
 
-        private async Task SetupPortableFfmpeg()
+        private async Task SetupPortableFmpeg()
         {
             try
             {
                 string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
-
                 string[] possiblePaths = {
-                    Path.Combine(appDirectory, "tools", FfmpegExecutableName),
-                    Path.Combine(appDirectory, "tools", "ffmpeg", "bin", FfmpegExecutableName),
-                    Path.Combine(appDirectory, "tools", "bin", FfmpegExecutableName),
-                    Path.Combine(appDirectory, FfmpegExecutableName)
+                    Path.Combine(appDirectory, "tools", FmpegExecutableName),
+                    Path.Combine(appDirectory, "tools", "ffmpeg", "bin", FmpegExecutableName),
+                    Path.Combine(appDirectory, "tools", "bin", FmpegExecutableName),
+                    Path.Combine(appDirectory, FmpegExecutableName)
                 };
 
-                // First check local paths
                 foreach (string path in possiblePaths)
                 {
                     if (File.Exists(path))
                     {
-                        FfmpegPath = path;
-
+                        FmpegPath = path;
                         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                         {
                             MakeExecutable(path);
                         }
-
                         LogToCli($"FFmpeg found at: {path}");
                         return;
                     }
                 }
 
-                if (await IsExecutableInPath(FfmpegExecutableName))
+                if (await IsExecutableInPath(FmpegExecutableName))
                 {
-                    FfmpegPath = FfmpegExecutableName;
+                    FmpegPath = FmpegExecutableName;
                     LogToCli($"FFmpeg found in system PATH");
                     return;
                 }
 
                 string os = GetCurrentOS();
                 LogToCli($"FFmpeg not found for {os}. Metadata embedding may not work properly.");
-                FfmpegPath = "";
+                FmpegPath = "";
             }
             catch (Exception ex)
             {
                 LogToCli($"ERROR setting up FFmpeg: {ex.Message}");
-                FfmpegPath = "";
+                FmpegPath = "";
             }
         }
 
@@ -582,7 +801,6 @@ namespace Symphex.ViewModels
             try
             {
                 LogToCli("Extracting metadata...");
-
                 bool isUrl = url.StartsWith("http://") || url.StartsWith("https://");
                 string searchPrefix = isUrl ? "" : "ytsearch1:";
                 string fullUrl = $"{searchPrefix}{url}";
@@ -631,10 +849,8 @@ namespace Symphex.ViewModels
                     {
                         string potentialArtist = parts[0].Trim();
                         string potentialSong = parts[1].Trim();
-
                         finalArtist = CleanArtistName(potentialArtist);
                         finalTitle = CleanSongTitle(potentialSong);
-
                         LogToCli($"Parsed from title: Song='{finalTitle}' by Artist='{finalArtist}'");
                     }
                 }
@@ -669,9 +885,7 @@ namespace Symphex.ViewModels
                 }
 
                 LogToCli($"Final metadata: '{trackInfo.Title}' by '{trackInfo.Artist}'");
-
                 await FindRealAlbumArt(trackInfo);
-
                 return trackInfo;
             }
             catch (Exception ex)
@@ -687,7 +901,6 @@ namespace Symphex.ViewModels
                 return "Unknown";
 
             string cleaned = title;
-
             var patterns = new[]
             {
                 @"\s*\(Official Video\)",
@@ -731,7 +944,6 @@ namespace Symphex.ViewModels
                 return "Unknown";
 
             string cleaned = artist;
-
             cleaned = cleaned
                 .Replace(" - Topic", "", StringComparison.OrdinalIgnoreCase)
                 .Replace("VEVO", "", StringComparison.OrdinalIgnoreCase)
@@ -770,7 +982,6 @@ namespace Symphex.ViewModels
                     }
                 }
             }
-
             return "";
         }
 
@@ -779,7 +990,6 @@ namespace Symphex.ViewModels
             try
             {
                 LogToCli("Searching for album artwork...");
-
                 var albumArt = await SearchITunesAlbumArt(trackInfo.Title, trackInfo.Artist);
 
                 if (albumArt == null)
@@ -829,9 +1039,10 @@ namespace Symphex.ViewModels
 
         private async Task ApplyProperMetadata()
         {
+            string? tempOutput = null;
             try
             {
-                if (CurrentTrack == null || string.IsNullOrEmpty(CurrentTrack.FileName) || string.IsNullOrEmpty(FfmpegPath))
+                if (CurrentTrack == null || string.IsNullOrEmpty(CurrentTrack.FileName) || string.IsNullOrEmpty(FmpegPath))
                 {
                     LogToCli("Skipping metadata application - missing requirements");
                     return;
@@ -845,23 +1056,20 @@ namespace Symphex.ViewModels
                 }
 
                 LogToCli("Applying proper metadata and artwork...");
-
-                string tempOutput = Path.Combine(DownloadFolder, $"temp_{Guid.NewGuid():N}.mp3");
-
-                var argsList = new List<string>();
-
-                argsList.AddRange(new[] { "-i", audioFilePath });
+                tempOutput = Path.Combine(DownloadFolder, $"temp_{Guid.NewGuid():N}.mp3");
+                var argsList = new List<string>
+                {
+                    "-i", audioFilePath
+                };
 
                 Bitmap? artworkToUse = CurrentTrack.AlbumArt ?? CurrentTrack.Thumbnail;
                 string artworkSource = CurrentTrack.HasRealAlbumArt ? "album art" : "thumbnail";
-
                 LogToCli($"Using {artworkSource} for metadata");
 
                 string? tempArtwork = null;
                 if (artworkToUse != null)
                 {
                     tempArtwork = Path.Combine(Path.GetTempPath(), $"temp_artwork_{Guid.NewGuid():N}.jpg");
-
                     try
                     {
                         using (var fileStream = new FileStream(tempArtwork, FileMode.Create))
@@ -869,105 +1077,61 @@ namespace Symphex.ViewModels
                             artworkToUse.Save(fileStream);
                         }
                         LogToCli($"Saved {artworkSource} to: {tempArtwork}");
-
-                        argsList.AddRange(new[] { "-i", tempArtwork });
-
-                        argsList.AddRange(new[] { "-map", "0:a", "-map", "1:0" });
-
-                        argsList.AddRange(new[] { "-c:a", "copy", "-c:v", "mjpeg" });
-
-                        argsList.AddRange(new[] { "-disposition:v", "attached_pic" });
+                        argsList.AddRange(new[] { "-i", tempArtwork, "-map", "0:a", "-map", "1:0", "-c:a", "copy", "-c:v", "mjpeg" });
                     }
                     catch (Exception ex)
                     {
-                        LogToCli($"Error preparing artwork: {ex.Message}");
-                        tempArtwork = null;
-                        argsList.AddRange(new[] { "-c", "copy" });
+                        LogToCli($"Error saving artwork: {ex.Message}");
                     }
+                }
+
+                argsList.AddRange(new[]
+                {
+                    "-metadata", $"title={CurrentTrack.Title}",
+                    "-metadata", $"artist={CurrentTrack.Artist}",
+                    "-metadata", $"album={CurrentTrack.Album}",
+                    "-y", tempOutput
+                });
+
+                var args = string.Join(" ", argsList.Select(arg => arg.Contains(" ") ? $"\"{arg}\"" : arg));
+                var output = new StringBuilder();
+                var errorOutput = new StringBuilder();
+
+                var result = await Cli.Wrap(FmpegPath)
+                    .WithArguments(args)
+                    .WithStandardOutputPipe(PipeTarget.ToStringBuilder(output))
+                    .WithStandardErrorPipe(PipeTarget.ToStringBuilder(errorOutput))
+                    .ExecuteAsync();
+
+                if (result.ExitCode == 0)
+                {
+                    LogToCli("Metadata applied successfully");
+                    File.Delete(audioFilePath);
+                    File.Move(tempOutput, audioFilePath);
+                    LogToCli($"Updated file: {audioFilePath}");
+                    LoadPlaylist();
                 }
                 else
                 {
-                    LogToCli("No artwork available to embed");
-                    argsList.AddRange(new[] { "-c", "copy" });
-                }
-
-                argsList.AddRange(new[] { "-id3v2_version", "3" });
-
-                if (!string.IsNullOrEmpty(CurrentTrack.Title) && CurrentTrack.Title != "Unknown")
-                {
-                    argsList.AddRange(new[] { "-metadata", $"title={CurrentTrack.Title}" });
-                }
-
-                if (!string.IsNullOrEmpty(CurrentTrack.Artist) && CurrentTrack.Artist != "Unknown")
-                {
-                    argsList.AddRange(new[] { "-metadata", $"artist={CurrentTrack.Artist}" });
-                }
-
-                if (!string.IsNullOrEmpty(CurrentTrack.Album))
-                {
-                    argsList.AddRange(new[] { "-metadata", $"album={CurrentTrack.Album}" });
-                }
-
-                if (!string.IsNullOrEmpty(CurrentTrack.UploadDate))
-                {
-                    argsList.AddRange(new[] { "-metadata", $"date={CurrentTrack.UploadDate}" });
-                }
-
-                argsList.Add(tempOutput);
-
-                LogToCli($"Applying metadata: '{CurrentTrack.Title}' by '{CurrentTrack.Artist}' with {artworkSource}");
-
-                var output = new StringBuilder();
-                var error = new StringBuilder();
-
-                var result = await Cli.Wrap(FfmpegPath)
-                    .WithArguments(argsList)
-                    .WithStandardOutputPipe(PipeTarget.ToStringBuilder(output))
-                    .WithStandardErrorPipe(PipeTarget.ToStringBuilder(error))
-                    .WithValidation(CommandResultValidation.None)
-                    .ExecuteAsync();
-
-                var outputText = output.ToString();
-                var errorText = error.ToString();
-
-                if (!string.IsNullOrEmpty(outputText))
-                {
-                    LogToCli($"FFmpeg output: {outputText}");
-                }
-
-                if (!string.IsNullOrEmpty(errorText))
-                {
-                    LogToCli($"FFmpeg error: {errorText}");
-                }
-
-                try
-                {
-                    if (result.ExitCode == 0 && File.Exists(tempOutput))
+                    LogToCli($"FFmpeg error: {errorOutput}");
+                    if (File.Exists(tempOutput))
                     {
-                        if (File.Exists(audioFilePath))
-                            File.Delete(audioFilePath);
-                        File.Move(tempOutput, audioFilePath);
-                        LogToCli($"✅ Metadata and {artworkSource} applied successfully");
-                    }
-                    else
-                    {
-                        LogToCli($"⚠️ Failed to apply metadata (exit code: {result.ExitCode})");
-                        if (File.Exists(tempOutput))
-                            File.Delete(tempOutput);
+                        File.Delete(tempOutput);
                     }
                 }
-                finally
+
+                if (tempArtwork != null && File.Exists(tempArtwork))
                 {
-                    if (tempArtwork != null && File.Exists(tempArtwork))
-                    {
-                        File.Delete(tempArtwork);
-                        LogToCli("Cleaned up temporary artwork file");
-                    }
+                    File.Delete(tempArtwork);
                 }
             }
             catch (Exception ex)
             {
                 LogToCli($"Error applying metadata: {ex.Message}");
+                if (tempOutput != null && File.Exists(tempOutput))
+                {
+                    File.Delete(tempOutput);
+                }
             }
         }
 
@@ -975,335 +1139,209 @@ namespace Symphex.ViewModels
         {
             try
             {
-                var searchStrategies = new List<string>();
+                string query = $"{artist} {title}".Trim().Replace(" ", "+");
+                string url = $"https://itunes.apple.com/search?term={query}&entity=song&limit=1";
+                var response = await httpClient.GetStringAsync(url);
+                using var doc = JsonDocument.Parse(response);
+                var results = doc.RootElement.GetProperty("results").EnumerateArray();
 
-                if (!string.IsNullOrEmpty(artist) && !string.IsNullOrEmpty(title))
+                if (results.Any())
                 {
-                    searchStrategies.Add($"{CleanForSearch(artist)} {CleanForSearch(title)}");
-                    searchStrategies.Add($"{CleanForSearch(title)} {CleanForSearch(artist)}");
-
-                    string cleanTitle = RemoveCommonWords(CleanForSearch(title));
-                    string cleanArtist = RemoveCommonWords(CleanForSearch(artist));
-                    if (!string.IsNullOrEmpty(cleanTitle) && !string.IsNullOrEmpty(cleanArtist))
+                    var result = results.First();
+                    if (result.TryGetProperty("artworkUrl100", out var artworkUrl))
                     {
-                        searchStrategies.Add($"{cleanArtist} {cleanTitle}");
-                    }
-                }
-                else if (!string.IsNullOrEmpty(artist))
-                {
-                    searchStrategies.Add(CleanForSearch(artist));
-                }
-                else if (!string.IsNullOrEmpty(title))
-                {
-                    searchStrategies.Add(CleanForSearch(title));
-                }
-
-                foreach (var searchTerm in searchStrategies)
-                {
-                    if (string.IsNullOrEmpty(searchTerm.Trim()))
-                        continue;
-
-                    LogToCli($"iTunes search strategy: {searchTerm}");
-
-                    string searchUrl = $"https://itunes.apple.com/search?term={Uri.EscapeDataString(searchTerm)}&media=music&entity=song&limit=15";
-
-                    try
-                    {
-                        var response = await httpClient.GetStringAsync(searchUrl);
-                        using var doc = JsonDocument.Parse(response);
-
-                        if (doc.RootElement.TryGetProperty("results", out var results))
-                        {
-                            var scoredResults = new List<(JsonElement result, double score)>();
-
-                            foreach (var result in results.EnumerateArray())
-                            {
-                                if (result.TryGetProperty("trackName", out var trackName) &&
-                                    result.TryGetProperty("artistName", out var artistName) &&
-                                    result.TryGetProperty("artworkUrl100", out var artworkUrl))
-                                {
-                                    string resultTitle = trackName.GetString() ?? "";
-                                    string resultArtist = artistName.GetString() ?? "";
-
-                                    double titleScore = string.IsNullOrEmpty(title) ? 1.0 : CalculateSimilarity(CleanForSearch(title), CleanForSearch(resultTitle));
-                                    double artistScore = string.IsNullOrEmpty(artist) ? 1.0 : CalculateSimilarity(CleanForSearch(artist), CleanForSearch(resultArtist));
-                                    double totalScore = (titleScore * 0.7) + (artistScore * 0.3);
-
-                                    if (totalScore > 0.4)
-                                    {
-                                        scoredResults.Add((result, totalScore));
-                                    }
-                                }
-                            }
-
-                            scoredResults.Sort((a, b) => b.score.CompareTo(a.score));
-
-                            foreach (var (result, score) in scoredResults.Take(3))
-                            {
-                                if (result.TryGetProperty("artworkUrl100", out var artworkUrl))
-                                {
-                                    string imageUrl = artworkUrl.GetString();
-                                    if (!string.IsNullOrEmpty(imageUrl))
-                                    {
-                                        imageUrl = imageUrl.Replace("100x100", "600x600");
-                                        var albumArt = await LoadImageAsync(imageUrl);
-                                        if (albumArt != null)
-                                        {
-                                            LogToCli($"Found artwork via iTunes (score: {score:F2})");
-                                            return albumArt;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        LogToCli($"iTunes search failed for '{searchTerm}': {ex.Message}");
-                        continue;
+                        string highResUrl = artworkUrl.GetString()?.Replace("100x100bb", "600x600bb") ?? "";
+                        using var stream = await httpClient.GetStreamAsync(highResUrl);
+                        return new Bitmap(stream);
                     }
                 }
             }
             catch (Exception ex)
             {
-                LogToCli($"iTunes search failed: {ex.Message}");
+                LogToCli($"iTunes search error: {ex.Message}");
             }
-
             return null;
-        }
-
-        private string RemoveCommonWords(string text)
-        {
-            if (string.IsNullOrEmpty(text))
-                return text;
-
-            var commonWords = new[] { "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", "official", "video", "audio", "lyrics", "hd", "4k", "1080", "1080p", "720", "720p" };
-
-            var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            var filteredWords = words.Where(word => !commonWords.Contains(word.ToLowerInvariant())).ToArray();
-
-            return string.Join(" ", filteredWords);
         }
 
         private async Task<Bitmap?> SearchDeezerAlbumArt(string title, string artist)
         {
             try
             {
-                string cleanTitle = CleanForSearch(title);
-                string cleanArtist = CleanForSearch(artist);
-
-                string searchTerm = $"{cleanArtist} {cleanTitle}".Trim();
-                string searchUrl = $"https://api.deezer.com/search/track?q={Uri.EscapeDataString(searchTerm)}&limit=10";
-
-                LogToCli($"Deezer search: {searchTerm}");
-
-                var response = await httpClient.GetStringAsync(searchUrl);
+                string query = $"{artist} {title}".Trim().Replace(" ", "+");
+                string url = $"https://api.deezer.com/search?q={query}&limit=1";
+                var response = await httpClient.GetStringAsync(url);
                 using var doc = JsonDocument.Parse(response);
+                var data = doc.RootElement.GetProperty("data").EnumerateArray();
 
-                if (doc.RootElement.TryGetProperty("data", out var data))
+                if (data.Any())
                 {
-                    var scoredResults = new List<(JsonElement track, double score)>();
-
-                    foreach (var track in data.EnumerateArray())
+                    var result = data.First();
+                    if (result.TryGetProperty("album", out var album) && album.TryGetProperty("cover_big", out var coverUrl))
                     {
-                        if (track.TryGetProperty("title", out var trackTitle) &&
-                            track.TryGetProperty("artist", out var artistObj) &&
-                            artistObj.TryGetProperty("name", out var artistName) &&
-                            track.TryGetProperty("album", out var album) &&
-                            album.TryGetProperty("cover_xl", out var coverUrl))
-                        {
-                            string resultTitle = trackTitle.GetString() ?? "";
-                            string resultArtist = artistName.GetString() ?? "";
-
-                            double titleScore = CalculateSimilarity(cleanTitle, CleanForSearch(resultTitle));
-                            double artistScore = CalculateSimilarity(cleanArtist, CleanForSearch(resultArtist));
-                            double totalScore = (titleScore * 0.7) + (artistScore * 0.3);
-
-                            if (totalScore > 0.6)
-                            {
-                                scoredResults.Add((track, totalScore));
-                            }
-                        }
-                    }
-
-                    scoredResults.Sort((a, b) => b.score.CompareTo(a.score));
-
-                    foreach (var (track, score) in scoredResults.Take(3))
-                    {
-                        if (track.TryGetProperty("album", out var album) &&
-                            album.TryGetProperty("cover_xl", out var coverUrl))
-                        {
-                            string imageUrl = coverUrl.GetString();
-                            if (!string.IsNullOrEmpty(imageUrl))
-                            {
-                                var albumArt = await LoadImageAsync(imageUrl);
-                                if (albumArt != null)
-                                {
-                                    LogToCli($"Found artwork via Deezer (score: {score:F2})");
-                                    return albumArt;
-                                }
-                            }
-                        }
+                        using var stream = await httpClient.GetStreamAsync(coverUrl.GetString());
+                        return new Bitmap(stream);
                     }
                 }
             }
             catch (Exception ex)
             {
-                LogToCli($"Deezer search failed: {ex.Message}");
+                LogToCli($"Deezer search error: {ex.Message}");
             }
-
             return null;
         }
 
-        private string CleanForSearch(string text)
+        private async Task ExtractFmpegWindows(string zipPath, string toolsDir)
         {
-            if (string.IsNullOrEmpty(text))
-                return "";
-
-            return text
-                .ToLowerInvariant()
-                .Replace("_", " ")
-                .Replace("-", " ")
-                .Replace("feat.", "")
-                .Replace("ft.", "")
-                .Replace("featuring", "")
-                .Trim();
+            try
+            {
+                using var archive = ZipFile.OpenRead(zipPath);
+                var ffmpegEntry = archive.Entries.FirstOrDefault(e => e.Name == FmpegExecutableName);
+                if (ffmpegEntry != null)
+                {
+                    string ffmpegPath = Path.Combine(toolsDir, FmpegExecutableName);
+                    ffmpegEntry.ExtractToFile(ffmpegPath, true);
+                    LogToCli($"Extracted FFmpeg to: {ffmpegPath}");
+                }
+                else
+                {
+                    LogToCli("FFmpeg executable not found in archive");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogToCli($"Error extracting FFmpeg for Windows: {ex.Message}");
+            }
         }
 
-        private double CalculateSimilarity(string text1, string text2)
+        private async Task ExtractFmpegMacOS(string zipPath, string toolsDir)
         {
-            if (string.IsNullOrEmpty(text1) || string.IsNullOrEmpty(text2))
-                return 0;
+            try
+            {
+                using var archive = ZipFile.OpenRead(zipPath);
+                var ffmpegEntry = archive.Entries.FirstOrDefault(e => e.Name == FmpegExecutableName);
+                if (ffmpegEntry != null)
+                {
+                    string ffmpegPath = Path.Combine(toolsDir, FmpegExecutableName);
+                    ffmpegEntry.ExtractToFile(ffmpegPath, true);
+                    MakeExecutable(ffmpegPath);
+                    LogToCli($"Extracted FFmpeg to: {ffmpegPath}");
+                }
+                else
+                {
+                    LogToCli("FFmpeg executable not found in archive");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogToCli($"Error extracting FFmpeg for macOS: {ex.Message}");
+            }
+        }
 
-            text1 = text1.ToLowerInvariant().Trim();
-            text2 = text2.ToLowerInvariant().Trim();
+        private string FormatDuration(double seconds)
+        {
+            return TimeSpan.FromSeconds(seconds).ToString(@"mm\:ss");
+        }
 
-            if (text1 == text2)
-                return 1.0;
-
-            if (text1.Contains(text2) || text2.Contains(text1))
-                return 0.9;
-
-            var words1 = text1.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            var words2 = text2.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-
-            int commonWords = words1.Intersect(words2).Count();
-            int totalWords = Math.Max(words1.Length, words2.Length);
-
-            double wordSimilarity = totalWords > 0 ? (double)commonWords / totalWords : 0;
-
-            int maxLength = Math.Max(text1.Length, text2.Length);
-            int minLength = Math.Min(text1.Length, text2.Length);
-            double lengthSimilarity = (double)minLength / maxLength;
-
-            return Math.Max(wordSimilarity, lengthSimilarity * 0.6);
+        private string FormatUploadDate(string? date)
+        {
+            if (string.IsNullOrEmpty(date) || date.Length != 8)
+                return "";
+            try
+            {
+                return $"{date.Substring(0, 4)}-{date.Substring(4, 2)}-{date.Substring(6, 2)}";
+            }
+            catch
+            {
+                return "";
+            }
         }
 
         private async Task<Bitmap?> LoadImageAsync(string url)
         {
             try
             {
-                var response = await httpClient.GetAsync(url);
-                response.EnsureSuccessStatusCode();
-
-                var imageBytes = await response.Content.ReadAsByteArrayAsync();
-                if (imageBytes.Length < 100)
-                    return null;
-
-                using var stream = new MemoryStream(imageBytes);
+                using var stream = await httpClient.GetStreamAsync(url);
                 return new Bitmap(stream);
-            }
-            catch (Exception ex)
-            {
-                LogToCli($"Failed to load image: {ex.Message}");
-                return null;
-            }
-        }
-
-        private string FormatUploadDate(string? uploadDate)
-        {
-            if (string.IsNullOrEmpty(uploadDate) || uploadDate.Length != 8)
-                return "";
-
-            try
-            {
-                var year = uploadDate.Substring(0, 4);
-                var month = uploadDate.Substring(4, 2);
-                var day = uploadDate.Substring(6, 2);
-                return $"{year}-{month}-{day}";
             }
             catch
             {
-                return uploadDate;
+                return null;
             }
-        }
-
-        private string FormatDuration(double seconds)
-        {
-            if (seconds <= 0) return "Unknown";
-
-            var timeSpan = TimeSpan.FromSeconds(seconds);
-            if (timeSpan.TotalHours >= 1)
-            {
-                return $"{(int)timeSpan.TotalHours}:{timeSpan:mm\\:ss}";
-            }
-            return $"{timeSpan:mm\\:ss}";
         }
 
         [RelayCommand]
         private async Task Download()
         {
-            if (string.IsNullOrWhiteSpace(DownloadUrl))
+            if (string.IsNullOrEmpty(DownloadUrl))
             {
-                StatusText = "⚠️ Please enter a URL or search term.";
-                LogToCli("WARNING: No URL or search term provided");
+                LogToCli("Please enter a URL or search query");
+                StatusText = "⚠️ No URL provided";
                 return;
             }
 
             if (string.IsNullOrEmpty(YtDlpPath))
             {
-                StatusText = "❌ yt-dlp not available. Please restart the app to retry automatic setup.";
-                LogToCli("ERROR: yt-dlp not available");
+                LogToCli("yt-dlp is not available. Please ensure dependencies are set up.");
+                StatusText = "❌ yt-dlp not found";
                 return;
             }
 
-            IsDownloading = true;
-            DownloadProgress = 0;
-            ShowMetadata = false;
-            CurrentTrack = new TrackInfo();
-
-            StatusText = $"🚀 Starting download for: {DownloadUrl}";
-            LogToCli($"Starting download: {DownloadUrl}");
-
             try
             {
-                DownloadProgress = 5;
-                var extractedTrack = await ExtractMetadata(DownloadUrl);
+                IsDownloading = true;
+                DownloadProgress = 0;
+                StatusText = "⬇️ Extracting metadata...";
 
-                if (extractedTrack != null)
+                CurrentTrack = await ExtractMetadata(DownloadUrl);
+                if (CurrentTrack == null)
                 {
-                    CurrentTrack = extractedTrack;
-                    ShowMetadata = true;
-                    StatusText = $"📝 Found: {CurrentTrack.Title} by {CurrentTrack.Artist}";
-                    LogToCli($"Metadata: {CurrentTrack.Title} by {CurrentTrack.Artist}");
+                    LogToCli("Failed to extract metadata");
+                    StatusText = "❌ Failed to extract metadata";
+                    IsDownloading = false;
+                    return;
+                }
+
+                StatusText = "⬇️ Downloading audio...";
+                string safeFileName = $"{CurrentTrack.Artist} - {CurrentTrack.Title}".Replace("/", "_").Replace("\\", "_");
+                string outputPath = Path.Combine(DownloadFolder, $"{safeFileName}.mp3");
+
+                var args = $"\"{CurrentTrack.Url}\" -x --audio-format mp3 --audio-quality 0 -o \"{outputPath}\"";
+                if (!string.IsNullOrEmpty(FmpegPath))
+                {
+                    args += $" --ffmpeg-location \"{FmpegPath}\"";
+                }
+
+                var output = new StringBuilder();
+                var errorOutput = new StringBuilder();
+
+                var result = await Cli.Wrap(YtDlpPath)
+                    .WithArguments(args)
+                    .WithStandardOutputPipe(PipeTarget.ToStringBuilder(output))
+                    .WithStandardErrorPipe(PipeTarget.ToStringBuilder(errorOutput))
+                    .WithValidation(CommandResultValidation.None)
+                    .ExecuteAsync();
+
+                DownloadProgress = 50;
+
+                if (result.ExitCode == 0)
+                {
+                    LogToCli($"Downloaded: {safeFileName}.mp3");
+                    CurrentTrack.FileName = $"{safeFileName}.mp3";
+                    await ApplyProperMetadata();
+                    LoadPlaylist();
+                    DownloadProgress = 100;
+                    StatusText = "✅ Download complete!";
                 }
                 else
                 {
-                    LogToCli("Failed to extract metadata, continuing with download...");
+                    LogToCli($"Download failed: {errorOutput}");
+                    StatusText = "❌ Download failed";
                 }
-
-                DownloadProgress = 15;
-
-                await RealDownload();
-
-                StatusText = $"✅ Download completed! Check your music folder.";
-                LogToCli("Download completed successfully");
             }
             catch (Exception ex)
             {
-                StatusText = $"❌ Error: {ex.Message}";
-                LogToCli($"ERROR: {ex.Message}");
-                ShowMetadata = false;
+                LogToCli($"Error during download: {ex.Message}");
+                StatusText = "❌ Download error";
             }
             finally
             {
@@ -1312,266 +1350,13 @@ namespace Symphex.ViewModels
             }
         }
 
-        private async Task RealDownload()
-        {
-            try
-            {
-                DownloadProgress = 20;
-                LogToCli($"Using yt-dlp at: {YtDlpPath}");
-
-                if (!string.IsNullOrEmpty(FfmpegPath))
-                {
-                    LogToCli($"Using FFmpeg at: {FfmpegPath}");
-                }
-
-                bool isUrl = DownloadUrl.StartsWith("http://") || DownloadUrl.StartsWith("https://");
-                string searchPrefix = isUrl ? "" : "ytsearch1:";
-                string fullUrl = $"{searchPrefix}{DownloadUrl}";
-
-                LogToCli(isUrl ? "Direct URL detected" : "Search term detected - will search YouTube");
-
-                var output = new StringBuilder();
-                var error = new StringBuilder();
-
-                string filenameTemplate;
-                if (CurrentTrack != null && !string.IsNullOrEmpty(CurrentTrack.Title) && !string.IsNullOrEmpty(CurrentTrack.Artist))
-                {
-                    string cleanTitle = SanitizeFilename(CurrentTrack.Title);
-                    string cleanArtist = SanitizeFilename(CurrentTrack.Artist);
-                    filenameTemplate = Path.Combine(DownloadFolder, $"{cleanTitle} - {cleanArtist}.%(ext)s");
-                    LogToCli($"Using custom filename: {cleanTitle} - {cleanArtist}.mp3");
-                }
-                else
-                {
-                    filenameTemplate = Path.Combine(DownloadFolder, "%(title)s.%(ext)s");
-                }
-
-                List<string> argsList = new List<string>
-                {
-                    $"\"{fullUrl}\"",
-                    "--extract-audio",
-                    "--audio-format", "mp3",
-                    "--audio-quality", "0",
-                    "--no-playlist",
-                    "-o", $"\"{filenameTemplate}\""
-                };
-
-                if (!string.IsNullOrEmpty(FfmpegPath) && File.Exists(FfmpegPath))
-                {
-                    string ffmpegDir = Path.GetDirectoryName(FfmpegPath) ?? "";
-                    argsList.AddRange(new[] { "--ffmpeg-location", $"\"{ffmpegDir}\"" });
-                }
-
-                string args = string.Join(" ", argsList);
-
-                LogToCli($"Command: yt-dlp {args}");
-                StatusText = isUrl ? "🎵 Downloading audio..." : "🔍 Searching and downloading audio...";
-                DownloadProgress = 30;
-
-                var result = await Cli.Wrap(YtDlpPath)
-                    .WithArguments(args)
-                    .WithStandardOutputPipe(PipeTarget.ToStringBuilder(output))
-                    .WithStandardErrorPipe(PipeTarget.ToStringBuilder(error))
-                    .WithValidation(CommandResultValidation.None)
-                    .ExecuteAsync();
-
-                DownloadProgress = 90;
-
-                var outputText = output.ToString();
-                var errorText = error.ToString();
-
-                if (!string.IsNullOrEmpty(outputText))
-                {
-                    LogToCli($"yt-dlp output:\n{outputText}");
-                }
-
-                if (!string.IsNullOrEmpty(errorText))
-                {
-                    LogToCli($"yt-dlp stderr:\n{errorText}");
-                }
-
-                if (result.ExitCode == 0)
-                {
-                    LogToCli("SUCCESS: Audio download completed");
-                    DownloadProgress = 100;
-
-                    if (CurrentTrack != null)
-                    {
-                        var lines = outputText.Split('\n');
-                        var destinationLine = lines.FirstOrDefault(l =>
-                            l.Contains("[ExtractAudio] Destination:") ||
-                            l.Contains("has already been downloaded"));
-
-                        if (destinationLine != null)
-                        {
-                            int destinationIndex = destinationLine.IndexOf("Destination: ");
-                            if (destinationIndex >= 0)
-                            {
-                                string fullPath = destinationLine.Substring(destinationIndex + "Destination: ".Length).Trim();
-                                string filename = Path.GetFileName(fullPath);
-                                CurrentTrack.FileName = filename;
-                                LogToCli($"Downloaded file: {filename}");
-
-                                await ApplyProperMetadata();
-                            }
-                        }
-                        else
-                        {
-                            if (!string.IsNullOrEmpty(CurrentTrack.Title) && !string.IsNullOrEmpty(CurrentTrack.Artist))
-                            {
-                                string cleanTitle = SanitizeFilename(CurrentTrack.Title);
-                                string cleanArtist = SanitizeFilename(CurrentTrack.Artist);
-                                CurrentTrack.FileName = $"{cleanTitle} - {cleanArtist}.mp3";
-                                LogToCli($"Using constructed filename: {CurrentTrack.FileName}");
-                                await ApplyProperMetadata();
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    throw new Exception($"Download failed with exit code {result.ExitCode}");
-                }
-            }
-            catch (Exception ex)
-            {
-                LogToCli($"Download error: {ex.Message}");
-                throw;
-            }
-        }
-
-        private string SanitizeFilename(string filename)
-        {
-            if (string.IsNullOrEmpty(filename))
-                return "Unknown";
-
-            char[] invalidChars = Path.GetInvalidFileNameChars();
-            foreach (char c in invalidChars)
-            {
-                filename = filename.Replace(c.ToString(), "");
-            }
-
-            filename = filename
-                .Replace(":", "")
-                .Replace("\"", "")
-                .Replace("*", "")
-                .Replace("?", "")
-                .Replace("|", "")
-                .Replace("<", "")
-                .Replace(">", "")
-                .Replace("_", " ")
-                .Trim();
-
-            while (filename.Contains("  "))
-            {
-                filename = filename.Replace("  ", " ");
-            }
-
-            return filename.Trim();
-        }
-
-        private Task ExtractFfmpegWindows(string zipPath, string toolsDir)
-        {
-            using (var archive = ZipFile.OpenRead(zipPath))
-            {
-                var ffmpegEntry = archive.Entries.FirstOrDefault(e =>
-                    e.FullName.EndsWith("ffmpeg.exe", StringComparison.OrdinalIgnoreCase));
-
-                if (ffmpegEntry != null)
-                {
-                    string extractPath = Path.Combine(toolsDir, "ffmpeg.exe");
-                    ffmpegEntry.ExtractToFile(extractPath, true);
-                    LogToCli($"Extracted ffmpeg.exe to: {extractPath}");
-                }
-                else
-                {
-                    string extractDir = Path.Combine(toolsDir, "ffmpeg_temp");
-
-                    if (Directory.Exists(extractDir))
-                    {
-                        Directory.Delete(extractDir, true);
-                    }
-
-                    archive.ExtractToDirectory(extractDir);
-
-                    var ffmpegFiles = Directory.GetFiles(extractDir, "ffmpeg.exe", SearchOption.AllDirectories);
-                    if (ffmpegFiles.Length > 0)
-                    {
-                        string sourcePath = ffmpegFiles[0];
-                        string destPath = Path.Combine(toolsDir, "ffmpeg.exe");
-                        File.Copy(sourcePath, destPath, true);
-                        LogToCli($"Copied ffmpeg.exe to: {destPath}");
-                    }
-
-                    Directory.Delete(extractDir, true);
-                }
-            }
-            return Task.CompletedTask;
-        }
-
-        private Task ExtractFfmpegMacOS(string zipPath, string toolsDir)
-        {
-            using (var archive = ZipFile.OpenRead(zipPath))
-            {
-                var ffmpegEntry = archive.Entries.FirstOrDefault(e =>
-                    e.FullName.EndsWith("ffmpeg", StringComparison.OrdinalIgnoreCase) && !e.FullName.Contains("/"));
-
-                if (ffmpegEntry != null)
-                {
-                    string extractPath = Path.Combine(toolsDir, "ffmpeg");
-                    ffmpegEntry.ExtractToFile(extractPath, true);
-                    MakeExecutable(extractPath);
-                    LogToCli($"Extracted ffmpeg to: {extractPath}");
-                }
-            }
-            return Task.CompletedTask;
-        }
-
-        [RelayCommand]
-        private async Task CopyOutput()
-        {
-            try
-            {
-                if (!string.IsNullOrEmpty(CliOutput))
-                {
-                    var topLevel = TopLevel.GetTopLevel(Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
-                        ? desktop.MainWindow
-                        : null);
-
-                    if (topLevel?.Clipboard != null)
-                    {
-                        await topLevel.Clipboard.SetTextAsync(CliOutput);
-                        LogToCli("Console output copied to clipboard");
-                    }
-                    else
-                    {
-                        LogToCli("Clipboard not available");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                LogToCli($"Error copying to clipboard: {ex.Message}");
-            }
-        }
-
         [RelayCommand]
         private void Clear()
         {
             DownloadUrl = "";
-            StatusText = "🎵 Ready to download music...";
-            DownloadProgress = 0;
-            ShowMetadata = false;
             CurrentTrack = new TrackInfo();
-            LogToCli("Input cleared");
-        }
-
-        [RelayCommand]
-        private void ClearLog()
-        {
-            CliOutput = "Symphex Music Downloader v1.0\n" +
-                        "=============================\n" +
-                        "Log cleared...\n\n";
+            StatusText = "🎵 Ready to download...";
+            LogToCli("Cleared input and preview");
         }
 
         [RelayCommand]
@@ -1579,23 +1364,48 @@ namespace Symphex.ViewModels
         {
             try
             {
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                if (Directory.Exists(DownloadFolder))
                 {
-                    Process.Start("explorer.exe", DownloadFolder);
-                }
-                else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                {
-                    Process.Start("open", DownloadFolder);
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = DownloadFolder,
+                        UseShellExecute = true
+                    });
+                    LogToCli("Opened download folder");
                 }
                 else
                 {
-                    Process.Start("xdg-open", DownloadFolder);
+                    LogToCli("Download folder does not exist");
+                    StatusText = "⚠️ Download folder not found";
                 }
-                LogToCli("Opened download folder");
             }
             catch (Exception ex)
             {
-                LogToCli($"ERROR opening folder: {ex.Message}");
+                LogToCli($"Error opening folder: {ex.Message}");
+                StatusText = "❌ Error opening folder";
+            }
+        }
+
+        [RelayCommand]
+        private void ProgressSliderChanged(double value)
+        {
+            if (_audioFileReader == null || !IsPlayingTrack) return;
+
+            _isSeeking = true;
+            ProgressPercentage = value;
+            var newPosition = TimeSpan.FromSeconds(value * _audioFileReader.TotalTime.TotalSeconds / 100);
+            _audioFileReader.CurrentTime = newPosition;
+            CurrentTime = newPosition;
+            LogToCli($"Seeked to {CurrentTime:mm\\:ss}");
+            _isSeeking = false;
+        }
+
+        partial void OnVolumeChanged(float value)
+        {
+            if (_waveOut != null)
+            {
+                _waveOut.Volume = value / 100f;
+                LogToCli($"Volume set to {value:0}%");
             }
         }
     }
