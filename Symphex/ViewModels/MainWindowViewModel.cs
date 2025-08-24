@@ -120,6 +120,59 @@ namespace Symphex.ViewModels
         [ObservableProperty]
         private bool isPlayingTrack = false;
 
+
+        [RelayCommand]
+        private async Task DownloadYtDlp()
+        {
+            await AutoDownloadYtDlp();
+        }
+
+        [RelayCommand]
+        private async Task DownloadFfmpeg()
+        {
+            await AutoDownloadFmpeg();
+        }
+
+        [RelayCommand]
+        private async Task CheckDependencies()
+        {
+            LogToCli("Checking dependencies...");
+            await AutoSetupDependencies();
+        }
+
+        [RelayCommand]
+        private async Task CopyOutput()
+        {
+            try
+            {
+                if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                {
+                    var clipboard = desktop.MainWindow?.Clipboard;
+                    if (clipboard != null)
+                    {
+                        await clipboard.SetTextAsync(CliOutput);
+                        LogToCli("Console output copied to clipboard");
+                        StatusText = "✅ Output copied to clipboard";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                LogToCli($"Error copying to clipboard: {ex.Message}");
+                StatusText = "❌ Failed to copy to clipboard";
+            }
+        }
+
+        [RelayCommand]
+        private void ClearLog()
+        {
+            CliOutput = "Symphex Music Downloader v1.0\n" +
+                        "=============================\n" +
+                        "Console cleared.\n\n";
+            LogToCli("Console cleared");
+            StatusText = "🎵 Console cleared";
+        }
+
         private string YtDlpPath { get; set; } = "";
         private string FmpegPath { get; set; } = "";
         private string YtDlpExecutableName => GetYtDlpExecutableName();
