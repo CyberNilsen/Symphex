@@ -41,27 +41,6 @@ namespace Symphex.Converters
         }
     }
 
-    public class PercentageToWidthConverter : IValueConverter
-    {
-        public static readonly PercentageToWidthConverter Instance = new();
-
-        public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-        {
-            if (value is double percentage)
-            {
-                var slider = parameter as Avalonia.Controls.Slider;
-                var maxWidth = slider?.Bounds.Width ?? 100;
-                return maxWidth * (percentage / 100.0);
-            }
-            return 0.0;
-        }
-
-        public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
-        {
-            throw new NotImplementedException();
-        }
-    }
-
     public class BoolToAlbumArtStatusConverter : IValueConverter
     {
         public static readonly BoolToAlbumArtStatusConverter Instance = new();

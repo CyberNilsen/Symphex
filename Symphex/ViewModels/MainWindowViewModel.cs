@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Input;
 using Avalonia.Media.Imaging;
 using CliWrap;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -9,6 +10,7 @@ using NAudio.Wave;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization; // If needed for formatting
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
@@ -19,8 +21,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using System.Timers;
-using Avalonia.Input;
-using System.Globalization; // If needed for formatting
+using System.Windows.Input;
 
 namespace Symphex.ViewModels
 {
@@ -61,6 +62,12 @@ namespace Symphex.ViewModels
 
         [ObservableProperty]
         private bool hasRealAlbumArt = false;
+
+        public ICommand DismissStatusCommand { get; set; }
+        public ICommand ToggleAdvancedModeCommand { get; set; }
+        public ICommand ChangeDownloadFolderCommand { get; set; }
+
+
     }
 
     public partial class MainWindowViewModel : ViewModelBase
@@ -73,6 +80,15 @@ namespace Symphex.ViewModels
         private int _currentTrackIndex = -1;
         private bool _isSeeking;
 
+        public bool HasStatusMessage { get; set; }
+        public string StatusMessage { get; set; }
+        public bool CanDismissStatus { get; set; }
+
+        // UI state
+        public bool HasTrackInfo { get; set; }
+        public bool ShowAdvancedMode { get; set; }
+        public string TotalDownloadsText { get; set; }
+     
         public ScrollViewer? CliScrollViewer
         {
             get => _cliScrollViewer;
@@ -120,25 +136,14 @@ namespace Symphex.ViewModels
         [ObservableProperty]
         private bool isPlayingTrack = false;
 
+        [ObservableProperty]
+        private bool showDeveloperConsole = false;
 
-        [RelayCommand]
-        private async Task DownloadYtDlp()
-        {
-            await AutoDownloadYtDlp();
-        }
+        [ObservableProperty]
+        private string dependencyStatus = "Checking dependencies...";
 
-        [RelayCommand]
-        private async Task DownloadFfmpeg()
-        {
-            await AutoDownloadFmpeg();
-        }
-
-        [RelayCommand]
-        private async Task CheckDependencies()
-        {
-            LogToCli("Checking dependencies...");
-            await AutoSetupDependencies();
-        }
+        [ObservableProperty]
+        private bool allDependenciesReady = false;
 
         [RelayCommand]
         private async Task CopyOutput()
@@ -173,6 +178,32 @@ namespace Symphex.ViewModels
             StatusText = "🎵 Console cleared";
         }
 
+        [RelayCommand]
+        private void ToggleDeveloperConsole()
+        {
+            ShowDeveloperConsole = !ShowDeveloperConsole;
+            LogToCli($"Developer console {(ShowDeveloperConsole ? "shown" : "hidden")}");
+        }
+
+        [RelayCommand]
+        private void SaveLog()
+        {
+            try
+            {
+                string logFileName = $"symphex_log_{DateTime.Now:yyyyMMdd_HHmmss}.txt";
+                string logPath = Path.Combine(DownloadFolder, logFileName);
+                File.WriteAllText(logPath, CliOutput);
+                LogToCli($"Log saved to: {logPath}");
+                StatusText = "💾 Log saved successfully";
+            }
+            catch (Exception ex)
+            {
+                LogToCli($"Error saving log: {ex.Message}");
+                StatusText = "❌ Failed to save log";
+            }
+        }
+
+
         private string YtDlpPath { get; set; } = "";
         private string FmpegPath { get; set; } = "";
         private string YtDlpExecutableName => GetYtDlpExecutableName();
@@ -182,6 +213,12 @@ namespace Symphex.ViewModels
         public MainWindowViewModel()
         {
             CurrentTrack = new TrackInfo();
+
+            // Initialize commands
+            CurrentTrack.DismissStatusCommand = new RelayCommand(() => { /* Handle dismiss */ });
+            CurrentTrack.ToggleAdvancedModeCommand = new RelayCommand(() => { /* Handle toggle */ });
+            CurrentTrack.ChangeDownloadFolderCommand = new RelayCommand(async () => { /* Handle folder change */ });
+
             SetupDownloadFolder();
             LoadPlaylist();
 
@@ -198,6 +235,76 @@ namespace Symphex.ViewModels
             {
                 await AutoSetupDependencies();
             });
+        }
+
+        private void UpdateStatusWithBetterMessaging(string message)
+        {
+            var timestamp = DateTime.Now.ToString("HH:mm:ss");
+
+            // Enhanced status messages for better UX
+            var enhancedMessages = new Dictionary<string, string>
+    {
+        { "Extracting metadata", "🔍 Analyzing track information..." },
+        { "Downloading audio", "⬇️ Downloading high-quality audio..." },
+        { "Applying metadata", "🎨 Adding album artwork and metadata..." },
+        { "Download complete", "✅ Download completed successfully!" },
+        { "Download failed", "❌ Download failed - please try again" },
+        { "Ready to download", "🎵 Ready to download your music!" }
+    };
+
+            string enhancedMessage = message;
+            foreach (var pair in enhancedMessages)
+            {
+                if (message.ToLower().Contains(pair.Key.ToLower()))
+                {
+                    enhancedMessage = pair.Value;
+                    break;
+                }
+            }
+
+            StatusText = enhancedMessage;
+        }
+
+        private async Task UpdateDependencyStatus()
+        {
+            try
+            {
+                await SetupPortableYtDlp();
+                await SetupPortableFmpeg();
+
+                bool ytDlpReady = !string.IsNullOrEmpty(YtDlpPath) &&
+                                 (File.Exists(YtDlpPath) || await IsExecutableInPath(YtDlpExecutableName));
+                bool ffmpegReady = !string.IsNullOrEmpty(FmpegPath) &&
+                                  (File.Exists(FmpegPath) || await IsExecutableInPath(FmpegExecutableName));
+
+                AllDependenciesReady = ytDlpReady && ffmpegReady;
+
+                if (AllDependenciesReady)
+                {
+                    DependencyStatus = "All dependencies ready ✓";
+                    StatusText = "🎵 Ready to download music! Paste a URL or search above.";
+                }
+                else if (ytDlpReady && !ffmpegReady)
+                {
+                    DependencyStatus = "yt-dlp ready, FFmpeg missing ⚠️";
+                    StatusText = "⚠️ Limited functionality - FFmpeg missing";
+                }
+                else if (!ytDlpReady && ffmpegReady)
+                {
+                    DependencyStatus = "FFmpeg ready, yt-dlp missing ❌";
+                    StatusText = "❌ Cannot download - yt-dlp missing";
+                }
+                else
+                {
+                    DependencyStatus = "Dependencies missing ❌";
+                    StatusText = "❌ Setting up dependencies...";
+                }
+            }
+            catch (Exception ex)
+            {
+                LogToCli($"Error checking dependencies: {ex.Message}");
+                DependencyStatus = "Dependency check failed ❌";
+            }
         }
 
         private void LoadPlaylist()
@@ -699,9 +806,23 @@ namespace Symphex.ViewModels
 
         private void LogToCli(string message)
         {
-            var timestamp = DateTime.Now.ToString("HH:mm:ss");
+            var timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
             string cleanMessage = message.Trim();
-            string logEntry = $"[{timestamp}] {cleanMessage}\n";
+
+            // Add color-coded prefixes for different message types
+            string prefix = "";
+            if (cleanMessage.StartsWith("ERROR") || cleanMessage.Contains("failed"))
+                prefix = "❌ ";
+            else if (cleanMessage.StartsWith("✅") || cleanMessage.Contains("success"))
+                prefix = "✅ ";
+            else if (cleanMessage.StartsWith("⚠️") || cleanMessage.Contains("warning"))
+                prefix = "⚠️ ";
+            else if (cleanMessage.Contains("download") || cleanMessage.Contains("extract"))
+                prefix = "⬇️ ";
+            else
+                prefix = "ℹ️ ";
+
+            string logEntry = $"[{timestamp}] {prefix}{cleanMessage}\n";
 
             if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime)
             {
@@ -1053,30 +1174,60 @@ namespace Symphex.ViewModels
             try
             {
                 LogToCli("Searching for album artwork...");
-                var albumArt = await SearchITunesAlbumArt(trackInfo.Title, trackInfo.Artist);
 
+                // Clean the search terms
+                string cleanTitle = trackInfo.Title
+                    .Replace("(Classic Version)", "")
+                    .Replace("(Official Music Video)", "")
+                    .Replace("(Official Video)", "")
+                    .Replace("(Official Audio)", "")
+                    .Trim();
+
+                string cleanArtist = trackInfo.Artist
+                    .Split(',')[0] // Take first artist if multiple
+                    .Replace("VEVO", "")
+                    .Replace("Official", "")
+                    .Trim();
+
+                LogToCli($"Searching for: '{cleanTitle}' by '{cleanArtist}'");
+
+                // Try iTunes first with cleaned terms
+                var albumArt = await SearchITunesAlbumArt(cleanTitle, cleanArtist);
+
+                // Try Deezer if iTunes failed
                 if (albumArt == null)
                 {
                     LogToCli("iTunes search failed, trying Deezer...");
-                    albumArt = await SearchDeezerAlbumArt(trackInfo.Title, trackInfo.Artist);
+                    albumArt = await SearchDeezerAlbumArt(cleanTitle, cleanArtist);
                 }
 
-                if (albumArt == null && trackInfo.Title.Contains(" - "))
+                // Try with just artist name
+                if (albumArt == null && !string.IsNullOrEmpty(cleanArtist))
                 {
-                    LogToCli("Trying alternative search without separators...");
-                    string altTitle = trackInfo.Title.Replace(" - ", " ");
-                    albumArt = await SearchITunesAlbumArt(altTitle, trackInfo.Artist);
+                    LogToCli("Trying artist-only search...");
+                    albumArt = await SearchITunesAlbumArt("", cleanArtist);
 
                     if (albumArt == null)
                     {
-                        albumArt = await SearchDeezerAlbumArt(altTitle, trackInfo.Artist);
+                        albumArt = await SearchDeezerAlbumArt("", cleanArtist);
                     }
                 }
 
-                if (albumArt == null)
+                // Try alternative search patterns
+                if (albumArt == null && cleanTitle.Contains(" "))
                 {
-                    LogToCli("Trying artist-focused search...");
-                    albumArt = await SearchITunesAlbumArt("", trackInfo.Artist);
+                    LogToCli("Trying alternative search patterns...");
+                    string[] titleWords = cleanTitle.Split(' ');
+                    if (titleWords.Length >= 2)
+                    {
+                        string shortTitle = string.Join(" ", titleWords.Take(3)); // First 3 words
+                        albumArt = await SearchITunesAlbumArt(shortTitle, cleanArtist);
+
+                        if (albumArt == null)
+                        {
+                            albumArt = await SearchDeezerAlbumArt(shortTitle, cleanArtist);
+                        }
+                    }
                 }
 
                 if (albumArt != null)
@@ -1202,22 +1353,68 @@ namespace Symphex.ViewModels
         {
             try
             {
-                string query = $"{artist} {title}".Trim().Replace(" ", "+");
-                string url = $"https://itunes.apple.com/search?term={query}&entity=song&limit=1";
+                // Build better search query
+                string searchTerm = "";
+                if (!string.IsNullOrEmpty(artist) && !string.IsNullOrEmpty(title))
+                {
+                    searchTerm = $"{artist} {title}";
+                }
+                else if (!string.IsNullOrEmpty(artist))
+                {
+                    searchTerm = artist;
+                }
+                else if (!string.IsNullOrEmpty(title))
+                {
+                    searchTerm = title;
+                }
+                else
+                {
+                    return null;
+                }
+
+                // Clean and encode the search term
+                searchTerm = Uri.EscapeDataString(searchTerm.Trim());
+                string url = $"https://itunes.apple.com/search?term={searchTerm}&entity=song&limit=10&media=music";
+
+                LogToCli($"Searching iTunes: {searchTerm}");
+
                 var response = await httpClient.GetStringAsync(url);
                 using var doc = JsonDocument.Parse(response);
                 var results = doc.RootElement.GetProperty("results").EnumerateArray();
 
-                if (results.Any())
+                foreach (var result in results)
                 {
-                    var result = results.First();
-                    if (result.TryGetProperty("artworkUrl100", out var artworkUrl))
+                    try
                     {
-                        string highResUrl = artworkUrl.GetString()?.Replace("100x100bb", "600x600bb") ?? "";
-                        using var stream = await httpClient.GetStreamAsync(highResUrl);
-                        return new Bitmap(stream);
+                        if (result.TryGetProperty("artworkUrl100", out var artworkUrl))
+                        {
+                            string imageUrl = artworkUrl.GetString();
+                            if (!string.IsNullOrEmpty(imageUrl))
+                            {
+                                // Get highest quality version
+                                string highResUrl = imageUrl.Replace("100x100bb", "600x600bb");
+                                LogToCli($"Trying iTunes artwork: {highResUrl}");
+
+                                using var imageResponse = await httpClient.GetAsync(highResUrl);
+                                if (imageResponse.IsSuccessStatusCode)
+                                {
+                                    var imageBytes = await imageResponse.Content.ReadAsByteArrayAsync();
+                                    using var stream = new MemoryStream(imageBytes);
+                                    var bitmap = new Bitmap(stream);
+                                    LogToCli("✅ iTunes artwork loaded successfully");
+                                    return bitmap;
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        LogToCli($"Error loading iTunes result: {ex.Message}");
+                        continue; // Try next result
                     }
                 }
+
+                LogToCli("No valid iTunes artwork found");
             }
             catch (Exception ex)
             {
@@ -1226,25 +1423,72 @@ namespace Symphex.ViewModels
             return null;
         }
 
+
         private async Task<Bitmap?> SearchDeezerAlbumArt(string title, string artist)
         {
             try
             {
-                string query = $"{artist} {title}".Trim().Replace(" ", "+");
-                string url = $"https://api.deezer.com/search?q={query}&limit=1";
+                // Build better search query
+                string searchTerm = "";
+                if (!string.IsNullOrEmpty(artist) && !string.IsNullOrEmpty(title))
+                {
+                    searchTerm = $"{artist} {title}";
+                }
+                else if (!string.IsNullOrEmpty(artist))
+                {
+                    searchTerm = artist;
+                }
+                else if (!string.IsNullOrEmpty(title))
+                {
+                    searchTerm = title;
+                }
+                else
+                {
+                    return null;
+                }
+
+                // Clean and encode the search term
+                searchTerm = Uri.EscapeDataString(searchTerm.Trim());
+                string url = $"https://api.deezer.com/search?q={searchTerm}&limit=10";
+
+                LogToCli($"Searching Deezer: {searchTerm}");
+
                 var response = await httpClient.GetStringAsync(url);
                 using var doc = JsonDocument.Parse(response);
                 var data = doc.RootElement.GetProperty("data").EnumerateArray();
 
-                if (data.Any())
+                foreach (var result in data)
                 {
-                    var result = data.First();
-                    if (result.TryGetProperty("album", out var album) && album.TryGetProperty("cover_big", out var coverUrl))
+                    try
                     {
-                        using var stream = await httpClient.GetStreamAsync(coverUrl.GetString());
-                        return new Bitmap(stream);
+                        if (result.TryGetProperty("album", out var album) &&
+                            album.TryGetProperty("cover_big", out var coverUrl))
+                        {
+                            string imageUrl = coverUrl.GetString();
+                            if (!string.IsNullOrEmpty(imageUrl))
+                            {
+                                LogToCli($"Trying Deezer artwork: {imageUrl}");
+
+                                using var imageResponse = await httpClient.GetAsync(imageUrl);
+                                if (imageResponse.IsSuccessStatusCode)
+                                {
+                                    var imageBytes = await imageResponse.Content.ReadAsByteArrayAsync();
+                                    using var stream = new MemoryStream(imageBytes);
+                                    var bitmap = new Bitmap(stream);
+                                    LogToCli("✅ Deezer artwork loaded successfully");
+                                    return bitmap;
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        LogToCli($"Error loading Deezer result: {ex.Message}");
+                        continue; // Try next result
                     }
                 }
+
+                LogToCli("No valid Deezer artwork found");
             }
             catch (Exception ex)
             {
@@ -1341,20 +1585,17 @@ namespace Symphex.ViewModels
                 StatusText = "⚠️ No URL provided";
                 return;
             }
-
             if (string.IsNullOrEmpty(YtDlpPath))
             {
                 LogToCli("yt-dlp is not available. Please ensure dependencies are set up.");
                 StatusText = "❌ yt-dlp not found";
                 return;
             }
-
             try
             {
                 IsDownloading = true;
                 DownloadProgress = 0;
                 StatusText = "⬇️ Extracting metadata...";
-
                 CurrentTrack = await ExtractMetadata(DownloadUrl);
                 if (CurrentTrack == null)
                 {
@@ -1363,29 +1604,23 @@ namespace Symphex.ViewModels
                     IsDownloading = false;
                     return;
                 }
-
                 StatusText = "⬇️ Downloading audio...";
                 string safeFileName = $"{CurrentTrack.Artist} - {CurrentTrack.Title}".Replace("/", "_").Replace("\\", "_");
                 string outputPath = Path.Combine(DownloadFolder, $"{safeFileName}.mp3");
-
                 var args = $"\"{CurrentTrack.Url}\" -x --audio-format mp3 --audio-quality 0 -o \"{outputPath}\"";
                 if (!string.IsNullOrEmpty(FmpegPath))
                 {
                     args += $" --ffmpeg-location \"{FmpegPath}\"";
                 }
-
                 var output = new StringBuilder();
                 var errorOutput = new StringBuilder();
-
                 var result = await Cli.Wrap(YtDlpPath)
                     .WithArguments(args)
                     .WithStandardOutputPipe(PipeTarget.ToStringBuilder(output))
                     .WithStandardErrorPipe(PipeTarget.ToStringBuilder(errorOutput))
                     .WithValidation(CommandResultValidation.None)
                     .ExecuteAsync();
-
                 DownloadProgress = 50;
-
                 if (result.ExitCode == 0)
                 {
                     LogToCli($"Downloaded: {safeFileName}.mp3");
@@ -1393,7 +1628,7 @@ namespace Symphex.ViewModels
                     await ApplyProperMetadata();
                     LoadPlaylist();
                     DownloadProgress = 100;
-                    StatusText = "✅ Download complete!";
+                    StatusText = "✅ Download complete!"; // CHANGED: Use StatusText instead
                 }
                 else
                 {

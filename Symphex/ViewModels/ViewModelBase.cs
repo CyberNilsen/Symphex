@@ -4,5 +4,6 @@ namespace Symphex.ViewModels
 {
     public class ViewModelBase : ObservableObject
     {
+
     }
 }
