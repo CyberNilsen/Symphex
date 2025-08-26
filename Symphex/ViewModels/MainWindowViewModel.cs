@@ -27,6 +27,15 @@ namespace Symphex.ViewModels
         private string title = "";
 
         [ObservableProperty]
+        private bool isDownloading = false;
+
+        [ObservableProperty]
+        private bool isDownloadComplete = false;
+
+        [ObservableProperty]
+        private string downloadFolder = "";
+
+        [ObservableProperty]
         private string artist = "";
 
         [ObservableProperty]
@@ -58,6 +67,7 @@ namespace Symphex.ViewModels
 
         [ObservableProperty]
         private bool hasRealAlbumArt = false;
+
     }
 
     public partial class MainWindowViewModel : ViewModelBase
@@ -101,6 +111,8 @@ namespace Symphex.ViewModels
         private string YtDlpExecutableName => GetYtDlpExecutableName();
         private string FfmpegExecutableName => GetFfmpegExecutableName();
         private readonly HttpClient httpClient = new();
+
+
 
         public MainWindowViewModel()
         {
