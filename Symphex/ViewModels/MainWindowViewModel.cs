@@ -17,7 +17,6 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
-using Avalonia.Input;
 
 namespace Symphex.ViewModels
 {
@@ -154,7 +153,6 @@ namespace Symphex.ViewModels
         {
             try
             {
-                LogToCli("Checking for required dependencies...");
 
                 // Check and auto-install yt-dlp
                 await SetupOrDownloadYtDlp();
@@ -162,11 +160,9 @@ namespace Symphex.ViewModels
                 // Check and auto-install FFmpeg
                 await SetupOrDownloadFfmpeg();
 
-                LogToCli("✅ All dependencies are ready!");
             }
             catch (Exception ex)
             {
-                LogToCli($"Error during auto-installation: {ex.Message}");
             }
         }
 
@@ -193,7 +189,6 @@ namespace Symphex.ViewModels
                             MakeExecutable(path);
                         }
 
-                        LogToCli($"✅ yt-dlp found at: {path}");
                         return;
                     }
                 }
@@ -202,19 +197,16 @@ namespace Symphex.ViewModels
                 if (await IsExecutableInPath(YtDlpExecutableName))
                 {
                     YtDlpPath = YtDlpExecutableName;
-                    LogToCli($"✅ yt-dlp found in system PATH");
                     return;
                 }
 
                 // If not found, auto-download
                 string os = GetCurrentOS();
-                LogToCli($"yt-dlp not found for {os}, downloading automatically...");
 
                 await AutoDownloadYtDlp();
             }
             catch (Exception ex)
             {
-                LogToCli($"ERROR setting up yt-dlp: {ex.Message}");
                 YtDlpPath = "";
             }
         }
@@ -244,7 +236,6 @@ namespace Symphex.ViewModels
                             MakeExecutable(path);
                         }
 
-                        LogToCli($"✅ FFmpeg found at: {path}");
                         return;
                     }
                 }
@@ -253,7 +244,6 @@ namespace Symphex.ViewModels
                 if (await IsExecutableInPath(FfmpegExecutableName))
                 {
                     FfmpegPath = FfmpegExecutableName;
-                    LogToCli($"✅ FFmpeg found in system PATH");
                     return;
                 }
 
@@ -262,22 +252,16 @@ namespace Symphex.ViewModels
 
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                 {
-                    LogToCli($"⚠️ FFmpeg not found on Linux. Please install via package manager:");
-                    LogToCli("  Ubuntu/Debian: sudo apt install ffmpeg");
-                    LogToCli("  Fedora: sudo dnf install ffmpeg");
-                    LogToCli("  Arch: sudo pacman -S ffmpeg");
-                    LogToCli("Metadata embedding may not work without FFmpeg.");
+                 
                     FfmpegPath = "";
                 }
                 else
                 {
-                    LogToCli($"FFmpeg not found for {os}, downloading automatically...");
                     await AutoDownloadFfmpeg();
                 }
             }
             catch (Exception ex)
             {
-                LogToCli($"ERROR setting up FFmpeg: {ex.Message}");
                 FfmpegPath = "";
             }
         }
@@ -286,7 +270,6 @@ namespace Symphex.ViewModels
         {
             try
             {
-                LogToCli($"🔄 Auto-downloading yt-dlp for {GetCurrentOS()}...");
 
                 string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
                 string toolsDir = Path.Combine(appDirectory, "tools");
@@ -299,7 +282,6 @@ namespace Symphex.ViewModels
                 string ytDlpPath = Path.Combine(toolsDir, YtDlpExecutableName);
                 string downloadUrl = GetYtDlpDownloadUrl();
 
-                LogToCli($"📥 Downloading from: {downloadUrl}");
 
                 using (var localHttpClient = new HttpClient())
                 {
@@ -313,17 +295,14 @@ namespace Symphex.ViewModels
                     if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     {
                         MakeExecutable(ytDlpPath);
-                        LogToCli("✅ Made executable for Unix system");
                     }
 
-                    LogToCli("✅ yt-dlp downloaded and installed successfully!");
                     YtDlpPath = ytDlpPath;
                 }
             }
             catch (Exception ex)
             {
-                LogToCli($"❌ Failed to auto-download yt-dlp: {ex.Message}");
-                LogToCli("You can manually download yt-dlp or use the Download button in the UI");
+             
                 YtDlpPath = "";
             }
         }
@@ -337,11 +316,9 @@ namespace Symphex.ViewModels
 
                 if (string.IsNullOrEmpty(downloadUrl))
                 {
-                    LogToCli("❌ Auto-download not available for this platform");
                     return;
                 }
 
-                LogToCli($"🔄 Auto-downloading FFmpeg for {os}...");
 
                 string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
                 string toolsDir = Path.Combine(appDirectory, "tools");
@@ -351,7 +328,6 @@ namespace Symphex.ViewModels
                     Directory.CreateDirectory(toolsDir);
                 }
 
-                LogToCli($"📥 Downloading from: {downloadUrl}");
 
                 using (var localHttpClient = new HttpClient())
                 {
@@ -365,7 +341,6 @@ namespace Symphex.ViewModels
                     string zipPath = Path.Combine(toolsDir, "ffmpeg.zip");
                     await File.WriteAllBytesAsync(zipPath, zipBytes);
 
-                    LogToCli("📦 Extracting FFmpeg...");
 
                     if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     {
@@ -381,13 +356,11 @@ namespace Symphex.ViewModels
                     // Re-run setup to find the extracted executable
                     await SetupOrDownloadFfmpeg();
 
-                    LogToCli("✅ FFmpeg downloaded and installed successfully!");
                 }
             }
             catch (Exception ex)
             {
-                LogToCli($"❌ Failed to auto-download FFmpeg: {ex.Message}");
-                LogToCli("You can manually download FFmpeg or use the Download button in the UI");
+              
                 FfmpegPath = "";
             }
         }
@@ -421,41 +394,6 @@ namespace Symphex.ViewModels
             else
                 return "";
         }
-
-        private void LogToCli(string message)
-        {
-            var timestamp = DateTime.Now.ToString("HH:mm:ss");
-
-            string cleanMessage = message.Trim();
-
-            string logEntry = $"[{timestamp}] {cleanMessage}\n";
-
-            if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-            {
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                {
-                    CliOutput += logEntry;
-                    ScrollToBottom();
-                });
-            }
-            else
-            {
-                CliOutput += logEntry;
-                ScrollToBottom();
-            }
-        }
-
-        private void ScrollToBottom()
-        {
-            if (CliScrollViewer != null)
-            {
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                {
-                    CliScrollViewer.ScrollToEnd();
-                }, Avalonia.Threading.DispatcherPriority.Background);
-            }
-        }
-
         
         private async Task<bool> IsExecutableInPath(string executableName)
         {
@@ -499,7 +437,6 @@ namespace Symphex.ViewModels
                             MakeExecutable(path);
                         }
 
-                        LogToCli($"FFmpeg found at: {path}");
                         return;
                     }
                 }
@@ -507,17 +444,14 @@ namespace Symphex.ViewModels
                 if (await IsExecutableInPath(FfmpegExecutableName))
                 {
                     FfmpegPath = FfmpegExecutableName;
-                    LogToCli($"FFmpeg found in system PATH");
                     return;
                 }
 
                 string os = GetCurrentOS();
-                LogToCli($"FFmpeg not found for {os}. Metadata embedding may not work properly.");
                 FfmpegPath = "";
             }
             catch (Exception ex)
             {
-                LogToCli($"ERROR setting up FFmpeg: {ex.Message}");
                 FfmpegPath = "";
             }
         }
@@ -554,7 +488,6 @@ namespace Symphex.ViewModels
         {
             try
             {
-                LogToCli("Extracting metadata...");
 
                 bool isUrl = url.StartsWith("http://") || url.StartsWith("https://");
                 string searchPrefix = isUrl ? "" : "ytsearch1:";
@@ -571,7 +504,6 @@ namespace Symphex.ViewModels
 
                 if (result.ExitCode != 0)
                 {
-                    LogToCli("Failed to extract metadata");
                     return null;
                 }
 
@@ -581,7 +513,6 @@ namespace Symphex.ViewModels
 
                 if (string.IsNullOrEmpty(jsonLine))
                 {
-                    LogToCli("No valid JSON found in metadata output");
                     return null;
                 }
 
@@ -591,8 +522,7 @@ namespace Symphex.ViewModels
                 string rawTitle = root.TryGetProperty("title", out var title) ? title.GetString() ?? "Unknown" : "Unknown";
                 string rawUploader = root.TryGetProperty("uploader", out var uploader) ? uploader.GetString() ?? "Unknown" : "Unknown";
 
-                LogToCli($"Raw title: {rawTitle}");
-                LogToCli($"Raw uploader: {rawUploader}");
+
 
                 string finalArtist = "Unknown";
                 string finalTitle = rawTitle;
@@ -608,7 +538,6 @@ namespace Symphex.ViewModels
                         finalArtist = CleanArtistName(potentialArtist);
                         finalTitle = CleanSongTitle(potentialSong);
 
-                        LogToCli($"Parsed from title: Song='{finalTitle}' by Artist='{finalArtist}'");
                     }
                 }
                 else
@@ -641,7 +570,6 @@ namespace Symphex.ViewModels
                     trackInfo.Thumbnail = await LoadImageAsync(thumbnailUrl);
                 }
 
-                LogToCli($"Final metadata: '{trackInfo.Title}' by '{trackInfo.Artist}'");
 
                 await FindRealAlbumArt(trackInfo);
 
@@ -649,7 +577,6 @@ namespace Symphex.ViewModels
             }
             catch (Exception ex)
             {
-                LogToCli($"Error extracting metadata: {ex.Message}");
                 return null;
             }
         }
@@ -675,6 +602,7 @@ namespace Symphex.ViewModels
         @"\s*\[Official Audio\]",
         @"\s*\[Official Music Video\]",
         @"\s*\[Lyrics\]",
+        @"\s*\[(Official HD Music Video)]",
         @"\s*\[HD\]"
     };
 
@@ -751,19 +679,16 @@ namespace Symphex.ViewModels
         {
             try
             {
-                LogToCli("Searching for album artwork...");
 
                 var albumArt = await SearchITunesAlbumArt(trackInfo.Title, trackInfo.Artist);
 
                 if (albumArt == null)
                 {
-                    LogToCli("iTunes search failed, trying Deezer...");
                     albumArt = await SearchDeezerAlbumArt(trackInfo.Title, trackInfo.Artist);
                 }
 
                 if (albumArt == null && trackInfo.Title.Contains(" - "))
                 {
-                    LogToCli("Trying alternative search without separators...");
                     string altTitle = trackInfo.Title.Replace(" - ", " ");
                     albumArt = await SearchITunesAlbumArt(altTitle, trackInfo.Artist);
 
@@ -775,7 +700,6 @@ namespace Symphex.ViewModels
 
                 if (albumArt == null)
                 {
-                    LogToCli("Trying artist-focused search...");
                     albumArt = await SearchITunesAlbumArt("", trackInfo.Artist);
                 }
 
@@ -783,18 +707,15 @@ namespace Symphex.ViewModels
                 {
                     trackInfo.AlbumArt = albumArt;
                     trackInfo.HasRealAlbumArt = true;
-                    LogToCli("✅ Real album artwork found!");
                 }
                 else
                 {
-                    LogToCli("⚠️ No album artwork found in databases, using video thumbnail");
                     trackInfo.AlbumArt = trackInfo.Thumbnail;
                     trackInfo.HasRealAlbumArt = false;
                 }
             }
             catch (Exception ex)
             {
-                LogToCli($"Error finding album art: {ex.Message}");
                 trackInfo.AlbumArt = trackInfo.Thumbnail;
                 trackInfo.HasRealAlbumArt = false;
             }
@@ -806,18 +727,15 @@ namespace Symphex.ViewModels
             {
                 if (CurrentTrack == null || string.IsNullOrEmpty(CurrentTrack.FileName) || string.IsNullOrEmpty(FfmpegPath))
                 {
-                    LogToCli("Skipping metadata application - missing requirements");
                     return;
                 }
 
                 string audioFilePath = Path.Combine(DownloadFolder, CurrentTrack.FileName);
                 if (!File.Exists(audioFilePath))
                 {
-                    LogToCli($"Audio file not found: {audioFilePath}");
                     return;
                 }
 
-                LogToCli("Applying proper metadata and artwork...");
 
                 string tempOutput = Path.Combine(DownloadFolder, $"temp_{Guid.NewGuid():N}.mp3");
 
@@ -828,7 +746,6 @@ namespace Symphex.ViewModels
                 Bitmap? artworkToUse = CurrentTrack.AlbumArt ?? CurrentTrack.Thumbnail;
                 string artworkSource = CurrentTrack.HasRealAlbumArt ? "album art" : "thumbnail";
 
-                LogToCli($"Using {artworkSource} for metadata");
 
                 string? tempArtwork = null;
                 if (artworkToUse != null)
@@ -841,7 +758,6 @@ namespace Symphex.ViewModels
                         {
                             artworkToUse.Save(fileStream);
                         }
-                        LogToCli($"Saved {artworkSource} to: {tempArtwork}");
 
                         argsList.AddRange(new[] { "-i", tempArtwork });
 
@@ -853,14 +769,12 @@ namespace Symphex.ViewModels
                     }
                     catch (Exception ex)
                     {
-                        LogToCli($"Error preparing artwork: {ex.Message}");
                         tempArtwork = null;
                         argsList.AddRange(new[] { "-c", "copy" });
                     }
                 }
                 else
                 {
-                    LogToCli("No artwork available to embed");
                     argsList.AddRange(new[] { "-c", "copy" });
                 }
 
@@ -888,7 +802,6 @@ namespace Symphex.ViewModels
 
                 argsList.Add(tempOutput);
 
-                LogToCli($"Applying metadata: '{CurrentTrack.Title}' by '{CurrentTrack.Artist}' with {artworkSource}");
 
                 var output = new StringBuilder();
                 var error = new StringBuilder();
@@ -905,12 +818,10 @@ namespace Symphex.ViewModels
 
                 if (!string.IsNullOrEmpty(outputText))
                 {
-                    LogToCli($"FFmpeg output: {outputText}");
                 }
 
                 if (!string.IsNullOrEmpty(errorText))
                 {
-                    LogToCli($"FFmpeg error: {errorText}");
                 }
 
                 try
@@ -920,11 +831,9 @@ namespace Symphex.ViewModels
                         if (File.Exists(audioFilePath))
                             File.Delete(audioFilePath);
                         File.Move(tempOutput, audioFilePath);
-                        LogToCli($"✅ Metadata and {artworkSource} applied successfully");
                     }
                     else
                     {
-                        LogToCli($"⚠️ Failed to apply metadata (exit code: {result.ExitCode})");
                         if (File.Exists(tempOutput))
                             File.Delete(tempOutput);
                     }
@@ -934,13 +843,11 @@ namespace Symphex.ViewModels
                     if (tempArtwork != null && File.Exists(tempArtwork))
                     {
                         File.Delete(tempArtwork);
-                        LogToCli("Cleaned up temporary artwork file");
                     }
                 }
             }
             catch (Exception ex)
             {
-                LogToCli($"Error applying metadata: {ex.Message}");
             }
         }
 
@@ -976,7 +883,6 @@ namespace Symphex.ViewModels
                     if (string.IsNullOrEmpty(searchTerm.Trim()))
                         continue;
 
-                    LogToCli($"iTunes search strategy: {searchTerm}");
 
                     string searchUrl = $"https://itunes.apple.com/search?term={Uri.EscapeDataString(searchTerm)}&media=music&entity=song&limit=15";
 
@@ -1022,7 +928,6 @@ namespace Symphex.ViewModels
                                         var albumArt = await LoadImageAsync(imageUrl);
                                         if (albumArt != null)
                                         {
-                                            LogToCli($"Found artwork via iTunes (score: {score:F2})");
                                             return albumArt;
                                         }
                                     }
@@ -1032,14 +937,12 @@ namespace Symphex.ViewModels
                     }
                     catch (Exception ex)
                     {
-                        LogToCli($"iTunes search failed for '{searchTerm}': {ex.Message}");
                         continue;
                     }
                 }
             }
             catch (Exception ex)
             {
-                LogToCli($"iTunes search failed: {ex.Message}");
             }
 
             return null;
@@ -1050,7 +953,7 @@ namespace Symphex.ViewModels
             if (string.IsNullOrEmpty(text))
                 return text;
 
-            var commonWords = new[] { "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", "official", "video", "audio", "lyrics", "hd", "4k", "1080", "1080p", "720", "720p" };
+            var commonWords = new[] { "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", "official", "video", "audio", "lyrics", "hd", "4k", "1080", "1080p", "720", "720p", "HD" };
 
             var words = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             var filteredWords = words.Where(word => !commonWords.Contains(word.ToLowerInvariant())).ToArray();
@@ -1068,7 +971,6 @@ namespace Symphex.ViewModels
                 string searchTerm = $"{cleanArtist} {cleanTitle}".Trim();
                 string searchUrl = $"https://api.deezer.com/search/track?q={Uri.EscapeDataString(searchTerm)}&limit=10";
 
-                LogToCli($"Deezer search: {searchTerm}");
 
                 var response = await httpClient.GetStringAsync(searchUrl);
                 using var doc = JsonDocument.Parse(response);
@@ -1112,7 +1014,6 @@ namespace Symphex.ViewModels
                                 var albumArt = await LoadImageAsync(imageUrl);
                                 if (albumArt != null)
                                 {
-                                    LogToCli($"Found artwork via Deezer (score: {score:F2})");
                                     return albumArt;
                                 }
                             }
@@ -1122,7 +1023,6 @@ namespace Symphex.ViewModels
             }
             catch (Exception ex)
             {
-                LogToCli($"Deezer search failed: {ex.Message}");
             }
 
             return null;
@@ -1188,7 +1088,6 @@ namespace Symphex.ViewModels
             }
             catch (Exception ex)
             {
-                LogToCli($"Failed to load image: {ex.Message}");
                 return null;
             }
         }
@@ -1229,14 +1128,12 @@ namespace Symphex.ViewModels
             if (string.IsNullOrWhiteSpace(DownloadUrl))
             {
                 StatusText = "⚠️ Please enter a URL or search term.";
-                LogToCli("WARNING: No URL or search term provided");
                 return;
             }
 
             if (string.IsNullOrEmpty(YtDlpPath))
             {
                 StatusText = "❌ yt-dlp not available. Please download it first.";
-                LogToCli("ERROR: yt-dlp not available");
                 return;
             }
 
@@ -1246,7 +1143,6 @@ namespace Symphex.ViewModels
             CurrentTrack = new TrackInfo();
 
             StatusText = $"🚀 Starting download for: {DownloadUrl}";
-            LogToCli($"Starting download: {DownloadUrl}");
 
             try
             {
@@ -1258,11 +1154,9 @@ namespace Symphex.ViewModels
                     CurrentTrack = extractedTrack;
                     ShowMetadata = true;
                     StatusText = $"📝 Found: {CurrentTrack.Title} by {CurrentTrack.Artist}";
-                    LogToCli($"Metadata: {CurrentTrack.Title} by {CurrentTrack.Artist}");
                 }
                 else
                 {
-                    LogToCli("Failed to extract metadata, continuing with download...");
                 }
 
                 DownloadProgress = 15;
@@ -1270,12 +1164,10 @@ namespace Symphex.ViewModels
                 await RealDownload();
 
                 StatusText = $"✅ Download completed! Check your music folder.";
-                LogToCli("Download completed successfully");
             }
             catch (Exception ex)
             {
                 StatusText = $"❌ Error: {ex.Message}";
-                LogToCli($"ERROR: {ex.Message}");
                 ShowMetadata = false;
             }
             finally
@@ -1290,18 +1182,15 @@ namespace Symphex.ViewModels
             try
             {
                 DownloadProgress = 20;
-                LogToCli($"Using yt-dlp at: {YtDlpPath}");
 
                 if (!string.IsNullOrEmpty(FfmpegPath))
                 {
-                    LogToCli($"Using FFmpeg at: {FfmpegPath}");
                 }
 
                 bool isUrl = DownloadUrl.StartsWith("http://") || DownloadUrl.StartsWith("https://");
                 string searchPrefix = isUrl ? "" : "ytsearch1:";
                 string fullUrl = $"{searchPrefix}{DownloadUrl}";
 
-                LogToCli(isUrl ? "Direct URL detected" : "Search term detected - will search YouTube");
 
                 var output = new StringBuilder();
                 var error = new StringBuilder();
@@ -1312,7 +1201,6 @@ namespace Symphex.ViewModels
                     string cleanTitle = SanitizeFilename(CurrentTrack.Title);
                     string cleanArtist = SanitizeFilename(CurrentTrack.Artist);
                     filenameTemplate = Path.Combine(DownloadFolder, $"{cleanTitle} - {cleanArtist}.%(ext)s");
-                    LogToCli($"Using custom filename: {cleanTitle} - {cleanArtist}.mp3");
                 }
                 else
                 {
@@ -1337,7 +1225,6 @@ namespace Symphex.ViewModels
 
                 string args = string.Join(" ", argsList);
 
-                LogToCli($"Command: yt-dlp {args}");
                 StatusText = isUrl ? "🎵 Downloading audio..." : "🔍 Searching and downloading audio...";
                 DownloadProgress = 30;
 
@@ -1355,17 +1242,14 @@ namespace Symphex.ViewModels
 
                 if (!string.IsNullOrEmpty(outputText))
                 {
-                    LogToCli($"yt-dlp output:\n{outputText}");
                 }
 
                 if (!string.IsNullOrEmpty(errorText))
                 {
-                    LogToCli($"yt-dlp stderr:\n{errorText}");
                 }
 
                 if (result.ExitCode == 0)
                 {
-                    LogToCli("SUCCESS: Audio download completed");
                     DownloadProgress = 100;
 
                     if (CurrentTrack != null)
@@ -1383,7 +1267,6 @@ namespace Symphex.ViewModels
                                 string fullPath = destinationLine.Substring(destinationIndex + "Destination: ".Length).Trim();
                                 string filename = Path.GetFileName(fullPath);
                                 CurrentTrack.FileName = filename;
-                                LogToCli($"Downloaded file: {filename}");
 
                                 await ApplyProperMetadata();
                             }
@@ -1395,7 +1278,6 @@ namespace Symphex.ViewModels
                                 string cleanTitle = SanitizeFilename(CurrentTrack.Title);
                                 string cleanArtist = SanitizeFilename(CurrentTrack.Artist);
                                 CurrentTrack.FileName = $"{cleanTitle} - {cleanArtist}.mp3";
-                                LogToCli($"Using constructed filename: {CurrentTrack.FileName}");
                                 await ApplyProperMetadata();
                             }
                         }
@@ -1408,7 +1290,6 @@ namespace Symphex.ViewModels
             }
             catch (Exception ex)
             {
-                LogToCli($"Download error: {ex.Message}");
                 throw;
             }
         }
@@ -1449,7 +1330,6 @@ namespace Symphex.ViewModels
             try
             {
                 StatusText = $"⬇️ Downloading yt-dlp for {GetCurrentOS()}...";
-                LogToCli($"Downloading yt-dlp for {GetCurrentOS()}");
                 IsDownloading = true;
                 DownloadProgress = 0;
 
@@ -1464,8 +1344,7 @@ namespace Symphex.ViewModels
                 string ytDlpPath = Path.Combine(toolsDir, YtDlpExecutableName);
                 string downloadUrl = GetYtDlpDownloadUrl();
 
-                LogToCli($"Download URL: {downloadUrl}");
-                LogToCli($"Saving to: {ytDlpPath}");
+               
 
                 using (var localHttpClient = new HttpClient())
                 {
@@ -1479,12 +1358,10 @@ namespace Symphex.ViewModels
                     if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     {
                         MakeExecutable(ytDlpPath);
-                        LogToCli("Made executable for Unix system");
                     }
 
                     DownloadProgress = 100;
                     StatusText = $"✅ yt-dlp downloaded successfully for {GetCurrentOS()}!";
-                    LogToCli("yt-dlp download completed successfully");
 
                     YtDlpPath = ytDlpPath;
                 }
@@ -1492,7 +1369,6 @@ namespace Symphex.ViewModels
             catch (Exception ex)
             {
                 StatusText = $"❌ Failed to download yt-dlp: {ex.Message}";
-                LogToCli($"ERROR downloading yt-dlp: {ex.Message}");
             }
             finally
             {
@@ -1512,15 +1388,11 @@ namespace Symphex.ViewModels
                 if (string.IsNullOrEmpty(downloadUrl))
                 {
                     StatusText = "ℹ️ Linux users should install FFmpeg via package manager (apt install ffmpeg)";
-                    LogToCli("Linux detected. Please install FFmpeg using your package manager:");
-                    LogToCli("Ubuntu/Debian: sudo apt install ffmpeg");
-                    LogToCli("Fedora: sudo dnf install ffmpeg");
-                    LogToCli("Arch: sudo pacman -S ffmpeg");
+                   
                     return;
                 }
 
                 StatusText = $"⬇️ Downloading FFmpeg for {os}...";
-                LogToCli($"Downloading FFmpeg for {os}");
                 IsDownloading = true;
                 DownloadProgress = 0;
 
@@ -1532,7 +1404,6 @@ namespace Symphex.ViewModels
                     Directory.CreateDirectory(toolsDir);
                 }
 
-                LogToCli($"Download URL: {downloadUrl}");
                 DownloadProgress = 10;
 
                 using (var localHttpClient = new HttpClient())
@@ -1549,7 +1420,6 @@ namespace Symphex.ViewModels
                     await File.WriteAllBytesAsync(zipPath, zipBytes);
 
                     DownloadProgress = 60;
-                    LogToCli("Extracting FFmpeg...");
 
                     if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     {
@@ -1568,15 +1438,12 @@ namespace Symphex.ViewModels
 
                     DownloadProgress = 100;
                     StatusText = $"✅ FFmpeg downloaded and extracted for {os}!";
-                    LogToCli("FFmpeg download and extraction completed successfully");
                 }
             }
             catch (Exception ex)
             {
                 StatusText = $"❌ Failed to download FFmpeg: {ex.Message}";
-                LogToCli($"ERROR downloading FFmpeg: {ex.Message}");
-                LogToCli("You can manually download FFmpeg from https://ffmpeg.org/download.html");
-                LogToCli("Extract and place the executable in the 'tools' folder");
+                
             }
             finally
             {
@@ -1596,7 +1463,6 @@ namespace Symphex.ViewModels
                 {
                     string extractPath = Path.Combine(toolsDir, "ffmpeg.exe");
                     ffmpegEntry.ExtractToFile(extractPath, true);
-                    LogToCli($"Extracted ffmpeg.exe to: {extractPath}");
                 }
                 else
                 {
@@ -1615,7 +1481,6 @@ namespace Symphex.ViewModels
                         string sourcePath = ffmpegFiles[0];
                         string destPath = Path.Combine(toolsDir, "ffmpeg.exe");
                         File.Copy(sourcePath, destPath, true);
-                        LogToCli($"Copied ffmpeg.exe to: {destPath}");
                     }
 
                     Directory.Delete(extractDir, true);
@@ -1636,7 +1501,6 @@ namespace Symphex.ViewModels
                     string extractPath = Path.Combine(toolsDir, "ffmpeg");
                     ffmpegEntry.ExtractToFile(extractPath, true);
                     MakeExecutable(extractPath);
-                    LogToCli($"Extracted ffmpeg to: {extractPath}");
                 }
             }
             return Task.CompletedTask;
@@ -1656,17 +1520,14 @@ namespace Symphex.ViewModels
                     if (topLevel?.Clipboard != null)
                     {
                         await topLevel.Clipboard.SetTextAsync(CliOutput);
-                        LogToCli("Console output copied to clipboard");
                     }
                     else
                     {
-                        LogToCli("Clipboard not available");
                     }
                 }
             }
             catch (Exception ex)
             {
-                LogToCli($"Error copying to clipboard: {ex.Message}");
             }
         }
 
@@ -1678,7 +1539,6 @@ namespace Symphex.ViewModels
             DownloadProgress = 0;
             ShowMetadata = false;
             CurrentTrack = new TrackInfo();
-            LogToCli("Input cleared");
         }
 
         [RelayCommand]
@@ -1706,11 +1566,9 @@ namespace Symphex.ViewModels
                 {
                     Process.Start("xdg-open", DownloadFolder);
                 }
-                LogToCli("Opened download folder");
             }
             catch (Exception ex)
             {
-                LogToCli($"ERROR opening folder: {ex.Message}");
             }
         }
     }
