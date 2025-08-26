@@ -113,12 +113,14 @@ namespace Symphex.ViewModels
                 Directory.CreateDirectory(DownloadFolder);
             }
 
+            // Start auto-installation in background
             _ = Task.Run(async () =>
             {
-                await Task.Run(() => SetupPortableYtDlp());
-                await Task.Run(() => SetupPortableFfmpeg());
+                await AutoInstallDependencies();
             });
         }
+
+
 
         private void SetupDownloadFolder()
         {
@@ -133,6 +135,248 @@ namespace Symphex.ViewModels
             else
             {
                 DownloadFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Music", "Symphex Downloads");
+            }
+        }
+
+        private async Task AutoInstallDependencies()
+        {
+            try
+            {
+                LogToCli("Checking for required dependencies...");
+
+                // Check and auto-install yt-dlp
+                await SetupOrDownloadYtDlp();
+
+                // Check and auto-install FFmpeg
+                await SetupOrDownloadFfmpeg();
+
+                LogToCli("✅ All dependencies are ready!");
+            }
+            catch (Exception ex)
+            {
+                LogToCli($"Error during auto-installation: {ex.Message}");
+            }
+        }
+
+        private async Task SetupOrDownloadYtDlp()
+        {
+            try
+            {
+                string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
+
+                string[] possiblePaths = {
+            Path.Combine(appDirectory, "tools", YtDlpExecutableName),
+            Path.Combine(appDirectory, YtDlpExecutableName)
+        };
+
+                // First check local paths
+                foreach (string path in possiblePaths)
+                {
+                    if (File.Exists(path))
+                    {
+                        YtDlpPath = path;
+
+                        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                        {
+                            MakeExecutable(path);
+                        }
+
+                        LogToCli($"✅ yt-dlp found at: {path}");
+                        return;
+                    }
+                }
+
+                // Then check system PATH
+                if (await IsExecutableInPath(YtDlpExecutableName))
+                {
+                    YtDlpPath = YtDlpExecutableName;
+                    LogToCli($"✅ yt-dlp found in system PATH");
+                    return;
+                }
+
+                // If not found, auto-download
+                string os = GetCurrentOS();
+                LogToCli($"yt-dlp not found for {os}, downloading automatically...");
+
+                await AutoDownloadYtDlp();
+            }
+            catch (Exception ex)
+            {
+                LogToCli($"ERROR setting up yt-dlp: {ex.Message}");
+                YtDlpPath = "";
+            }
+        }
+
+        private async Task SetupOrDownloadFfmpeg()
+        {
+            try
+            {
+                string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
+
+                string[] possiblePaths = {
+            Path.Combine(appDirectory, "tools", FfmpegExecutableName),
+            Path.Combine(appDirectory, "tools", "ffmpeg", "bin", FfmpegExecutableName),
+            Path.Combine(appDirectory, "tools", "bin", FfmpegExecutableName),
+            Path.Combine(appDirectory, FfmpegExecutableName)
+        };
+
+                // First check local paths
+                foreach (string path in possiblePaths)
+                {
+                    if (File.Exists(path))
+                    {
+                        FfmpegPath = path;
+
+                        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                        {
+                            MakeExecutable(path);
+                        }
+
+                        LogToCli($"✅ FFmpeg found at: {path}");
+                        return;
+                    }
+                }
+
+                // Check system PATH
+                if (await IsExecutableInPath(FfmpegExecutableName))
+                {
+                    FfmpegPath = FfmpegExecutableName;
+                    LogToCli($"✅ FFmpeg found in system PATH");
+                    return;
+                }
+
+                // If not found, auto-download (except for Linux)
+                string os = GetCurrentOS();
+
+                if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                {
+                    LogToCli($"⚠️ FFmpeg not found on Linux. Please install via package manager:");
+                    LogToCli("  Ubuntu/Debian: sudo apt install ffmpeg");
+                    LogToCli("  Fedora: sudo dnf install ffmpeg");
+                    LogToCli("  Arch: sudo pacman -S ffmpeg");
+                    LogToCli("Metadata embedding may not work without FFmpeg.");
+                    FfmpegPath = "";
+                }
+                else
+                {
+                    LogToCli($"FFmpeg not found for {os}, downloading automatically...");
+                    await AutoDownloadFfmpeg();
+                }
+            }
+            catch (Exception ex)
+            {
+                LogToCli($"ERROR setting up FFmpeg: {ex.Message}");
+                FfmpegPath = "";
+            }
+        }
+
+        private async Task AutoDownloadYtDlp()
+        {
+            try
+            {
+                LogToCli($"🔄 Auto-downloading yt-dlp for {GetCurrentOS()}...");
+
+                string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
+                string toolsDir = Path.Combine(appDirectory, "tools");
+
+                if (!Directory.Exists(toolsDir))
+                {
+                    Directory.CreateDirectory(toolsDir);
+                }
+
+                string ytDlpPath = Path.Combine(toolsDir, YtDlpExecutableName);
+                string downloadUrl = GetYtDlpDownloadUrl();
+
+                LogToCli($"📥 Downloading from: {downloadUrl}");
+
+                using (var localHttpClient = new HttpClient())
+                {
+                    localHttpClient.Timeout = TimeSpan.FromMinutes(5);
+
+                    var response = await localHttpClient.GetAsync(downloadUrl);
+                    response.EnsureSuccessStatusCode();
+
+                    await File.WriteAllBytesAsync(ytDlpPath, await response.Content.ReadAsByteArrayAsync());
+
+                    if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        MakeExecutable(ytDlpPath);
+                        LogToCli("✅ Made executable for Unix system");
+                    }
+
+                    LogToCli("✅ yt-dlp downloaded and installed successfully!");
+                    YtDlpPath = ytDlpPath;
+                }
+            }
+            catch (Exception ex)
+            {
+                LogToCli($"❌ Failed to auto-download yt-dlp: {ex.Message}");
+                LogToCli("You can manually download yt-dlp or use the Download button in the UI");
+                YtDlpPath = "";
+            }
+        }
+
+        private async Task AutoDownloadFfmpeg()
+        {
+            try
+            {
+                string os = GetCurrentOS();
+                string downloadUrl = GetFfmpegDownloadUrl();
+
+                if (string.IsNullOrEmpty(downloadUrl))
+                {
+                    LogToCli("❌ Auto-download not available for this platform");
+                    return;
+                }
+
+                LogToCli($"🔄 Auto-downloading FFmpeg for {os}...");
+
+                string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
+                string toolsDir = Path.Combine(appDirectory, "tools");
+
+                if (!Directory.Exists(toolsDir))
+                {
+                    Directory.CreateDirectory(toolsDir);
+                }
+
+                LogToCli($"📥 Downloading from: {downloadUrl}");
+
+                using (var localHttpClient = new HttpClient())
+                {
+                    localHttpClient.Timeout = TimeSpan.FromMinutes(10); // FFmpeg is larger
+
+                    var response = await localHttpClient.GetAsync(downloadUrl);
+                    response.EnsureSuccessStatusCode();
+
+                    var zipBytes = await response.Content.ReadAsByteArrayAsync();
+
+                    string zipPath = Path.Combine(toolsDir, "ffmpeg.zip");
+                    await File.WriteAllBytesAsync(zipPath, zipBytes);
+
+                    LogToCli("📦 Extracting FFmpeg...");
+
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        await ExtractFfmpegWindows(zipPath, toolsDir);
+                    }
+                    else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                    {
+                        await ExtractFfmpegMacOS(zipPath, toolsDir);
+                    }
+
+                    File.Delete(zipPath);
+
+                    // Re-run setup to find the extracted executable
+                    await SetupOrDownloadFfmpeg();
+
+                    LogToCli("✅ FFmpeg downloaded and installed successfully!");
+                }
+            }
+            catch (Exception ex)
+            {
+                LogToCli($"❌ Failed to auto-download FFmpeg: {ex.Message}");
+                LogToCli("You can manually download FFmpeg or use the Download button in the UI");
+                FfmpegPath = "";
             }
         }
 
@@ -200,52 +444,7 @@ namespace Symphex.ViewModels
             }
         }
 
-        private async void SetupPortableYtDlp()
-        {
-            try
-            {
-                string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
-
-                string[] possiblePaths = {
-            Path.Combine(appDirectory, "tools", YtDlpExecutableName),
-            Path.Combine(appDirectory, YtDlpExecutableName)
-        };
-
-                // First check local paths
-                foreach (string path in possiblePaths)
-                {
-                    if (File.Exists(path))
-                    {
-                        YtDlpPath = path;
-
-                        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                        {
-                            MakeExecutable(path);
-                        }
-
-                        LogToCli($"yt-dlp found at: {path}");
-                        return;
-                    }
-                }
-
-                // Then check system PATH
-                if (await IsExecutableInPath(YtDlpExecutableName))
-                {
-                    YtDlpPath = YtDlpExecutableName;
-                    LogToCli($"yt-dlp found in system PATH");
-                    return;
-                }
-
-                string os = GetCurrentOS();
-                LogToCli($"yt-dlp not found for {os}");
-                YtDlpPath = "";
-            }
-            catch (Exception ex)
-            {
-                LogToCli($"ERROR setting up yt-dlp: {ex.Message}");
-                YtDlpPath = "";
-            }
-        }
+        
         private async Task<bool> IsExecutableInPath(string executableName)
         {
             try
@@ -1429,49 +1628,6 @@ namespace Symphex.ViewModels
                 }
             }
             return Task.CompletedTask;
-        }
-
-        [RelayCommand]
-        private void CheckDependencies()
-        {
-            try
-            {
-                LogToCli("Checking dependencies...");
-
-                bool ytDlpFound = !string.IsNullOrEmpty(YtDlpPath) && (File.Exists(YtDlpPath) || YtDlpPath == YtDlpExecutableName);
-                bool ffmpegFound = !string.IsNullOrEmpty(FfmpegPath) && (File.Exists(FfmpegPath) || FfmpegPath == FfmpegExecutableName);
-
-                LogToCli($"yt-dlp: {(ytDlpFound ? "✅ Found" : "❌ Not found")}");
-                LogToCli($"FFmpeg: {(ffmpegFound ? "✅ Found" : "❌ Not found")}");
-
-                if (ytDlpFound && ffmpegFound)
-                {
-                    StatusText = "✅ All dependencies found! Ready to download with full metadata support.";
-                    LogToCli("All dependencies are available. You can download music with full metadata and album art.");
-                }
-                else if (ytDlpFound && !ffmpegFound)
-                {
-                    StatusText = "⚠️ yt-dlp found, but FFmpeg missing. Downloads will work but metadata may be limited.";
-                    LogToCli("yt-dlp is available but FFmpeg is missing.");
-                    LogToCli("Click 'Get FFmpeg' to download it for full metadata support.");
-                }
-                else if (!ytDlpFound && ffmpegFound)
-                {
-                    StatusText = "⚠️ FFmpeg found, but yt-dlp missing. Cannot download without yt-dlp.";
-                    LogToCli("FFmpeg is available but yt-dlp is missing.");
-                    LogToCli("Click 'Get yt-dlp' to download it.");
-                }
-                else
-                {
-                    StatusText = "❌ Both yt-dlp and FFmpeg are missing. Please download them first.";
-                    LogToCli("Both yt-dlp and FFmpeg are missing.");
-                    LogToCli("Use the 'Get yt-dlp' and 'Get FFmpeg' buttons to download them.");
-                }
-            }
-            catch (Exception ex)
-            {
-                LogToCli($"Error checking dependencies: {ex.Message}");
-            }
         }
 
         [RelayCommand]

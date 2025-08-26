@@ -183,9 +183,6 @@
 
 				<StackPanel Orientation="Horizontal" Spacing="16">
 					<Button Content="Download" Command="{Binding DownloadCommand}" Classes="primary"/>
-					<Button Content="Get yt-dlp" Command="{Binding DownloadYtDlpCommand}" Classes="secondary"/>
-					<Button Content="Get FFmpeg" Command="{Binding DownloadFfmpegCommand}" Classes="secondary"/>
-					<Button Content="Check Dependencies" Command="{Binding CheckDependenciesCommand}" Classes="secondary"/>
 					<Button Content="Clear" Command="{Binding ClearCommand}" Classes="secondary"/>
 				</StackPanel>
 			</StackPanel>
