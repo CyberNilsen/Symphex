@@ -6,11 +6,38 @@
 		<BuiltInComInteropSupport>true</BuiltInComInteropSupport>
 		<ApplicationManifest>app.manifest</ApplicationManifest>
 		<AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+		<PackageIcon>SymphexLogo.png</PackageIcon>
+		
+		<!-- Windows Icon -->
+		<ApplicationIcon Condition="$([MSBuild]::IsOSPlatform('Windows'))">Assets\SymphexLogo256.ico</ApplicationIcon>
+		
+		<!-- macOS Icon -->
+		<ApplicationIcon Condition="$([MSBuild]::IsOSPlatform('OSX'))">Assets\SymphexLogo.icns</ApplicationIcon>
+		
+		<!-- Default Runtime Identifier for Apple Silicon -->
+		<RuntimeIdentifier Condition="$([MSBuild]::IsOSPlatform('OSX'))">osx-arm64</RuntimeIdentifier>
 	</PropertyGroup>
+
+	<!-- macOS Bundle Properties -->
+	<PropertyGroup Condition="$([MSBuild]::IsOSPlatform('OSX'))">
+		<CFBundleName>Symphex Music Downloader</CFBundleName>
+		<CFBundleDisplayName>Symphex</CFBundleDisplayName>
+		<CFBundleIdentifier>com.yourcompany.symphex</CFBundleIdentifier>
+		<CFBundleVersion>1.0.0</CFBundleVersion>
+		<CFBundleShortVersionString>1.0.0</CFBundleShortVersionString>
+		<CFBundlePackageType>APPL</CFBundlePackageType>
+		<CFBundleSignature>SYMX</CFBundleSignature>
+		<CFBundleExecutable>Symphex</CFBundleExecutable>
+		<CFBundleIconFile>SymphexLogo.icns</CFBundleIconFile>
+		<NSHighResolutionCapable>true</NSHighResolutionCapable>
+		<LSMinimumSystemVersion>10.15</LSMinimumSystemVersion>
+	</PropertyGroup>
+
 	<ItemGroup>
 		<Folder Include="Models\" />
 		<AvaloniaResource Include="Assets\**" />
 	</ItemGroup>
+
 	<ItemGroup>
 		<PackageReference Include="Avalonia" Version="11.3.4" />
 		<PackageReference Include="Avalonia.Desktop" Version="11.3.4" />
@@ -25,5 +52,22 @@
 		<PackageReference Include="CliWrap" Version="3.6.4" />
 		<PackageReference Include="System.IO.Compression" Version="4.3.0" />
 		<PackageReference Include="System.IO.Compression.ZipFile" Version="4.3.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<AvaloniaResource Update="Assets\SymphexLogo.png">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</AvaloniaResource>
+		<!-- Add your .icns file -->
+		<AvaloniaResource Include="Assets\SymphexLogo.icns" Condition="Exists('Assets\SymphexLogo.icns')">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</AvaloniaResource>
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Update="Assets\SymphexLogo.png">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
 	</ItemGroup>
 </Project>
