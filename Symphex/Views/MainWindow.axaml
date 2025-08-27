@@ -9,7 +9,7 @@
 		x:DataType="vm:MainWindowViewModel"
 		Icon="/Assets/avalonia-logo.ico"
 		Title="Music Downloader - Simple and Easy"
-		MinWidth="750" MinHeight="500"
+		MinWidth="900" MinHeight="650"
 		Width="900" Height="650"
 		Background="#000000">
 
@@ -144,7 +144,7 @@
 					</Grid.ColumnDefinitions>
 
 					<!-- Left Column - Download Controls -->
-					<Border Grid.Column="0" Classes="card" Padding="24" MinHeight="360">
+					<Border Grid.Column="0" Classes="card" Padding="24" MinHeight="360" Width="390">
 						<StackPanel Spacing="16" VerticalAlignment="Center">
 							<TextBlock Text="Download Section" FontSize="18" FontWeight="Bold"
 									   Foreground="#ffffff" HorizontalAlignment="Center"/>
@@ -157,8 +157,10 @@
 								<TextBox Name="UrlTextBox"
 										 Text="{Binding DownloadUrl}"
 										 Classes="large"
-										 Watermark="Paste YouTube, Spotify, or any music link here..."
-										 Height="44"/>
+										 Watermark="Paste YouTube link, or enter: song title - artist..."
+										 Height="44"
+										 Width="325"
+										 FontSize="13"/>
 							</StackPanel>
 
 							<!-- Download Progress -->
@@ -185,13 +187,13 @@
 					</Border>
 
 					<!-- Right Column - Song Preview -->
-					<Border Grid.Column="2" Classes="preview" Padding="24" MinHeight="360">
-						<StackPanel Spacing="16">
+					<Border Grid.Column="2" Classes="preview" Padding="24" MinHeight="360" Width="390">
+						<StackPanel Spacing="16" Width="342">
 							<TextBlock Text="Song Preview" FontSize="18" FontWeight="Bold"
 									   Foreground="#ffffff" HorizontalAlignment="Center"/>
 
 							<!-- Preview Content -->
-							<StackPanel Spacing="12" VerticalAlignment="Center" Height="280">
+							<StackPanel Spacing="12" VerticalAlignment="Center" Height="280" Width="342">
 
 								<!-- When No Song -->
 								<StackPanel Spacing="12" HorizontalAlignment="Center" VerticalAlignment="Center"
