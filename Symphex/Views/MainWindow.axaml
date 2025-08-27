@@ -9,7 +9,8 @@
 		x:DataType="vm:MainWindowViewModel"
 		Icon="/Assets/avalonia-logo.ico"
 		Title="Music Downloader - Simple and Easy"
-		MinWidth="800" MinHeight="600"
+		MinWidth="750" MinHeight="500"
+		Width="900" Height="650"
 		Background="#000000">
 
 	<Design.DataContext>
@@ -22,52 +23,48 @@
 			<Setter Property="Background" Value="#1e40af"/>
 			<Setter Property="Foreground" Value="White"/>
 			<Setter Property="BorderThickness" Value="0"/>
-			<Setter Property="CornerRadius" Value="14"/>
-			<Setter Property="Padding" Value="28,16"/>
+			<Setter Property="CornerRadius" Value="12"/>
+			<Setter Property="Padding" Value="28,14"/>
 			<Setter Property="FontWeight" Value="Bold"/>
-			<Setter Property="FontSize" Value="17"/>
+			<Setter Property="FontSize" Value="16"/>
 			<Setter Property="Cursor" Value="Hand"/>
 			<Setter Property="Effect">
-				<DropShadowEffect Color="#1e40af" Opacity="0.3" BlurRadius="18" OffsetX="0" OffsetY="7"/>
+				<DropShadowEffect Color="#1e40af" Opacity="0.3" BlurRadius="15" OffsetX="0" OffsetY="5"/>
 			</Setter>
 		</Style>
 		<Style Selector="Button.download:pointerover">
 			<Setter Property="Background" Value="#1d4ed8"/>
-			<Setter Property="RenderTransform" Value="scale(1.04) translateY(-2px)"/>
-			<Setter Property="Effect">
-				<DropShadowEffect Color="#1e40af" Opacity="0.4" BlurRadius="22" OffsetX="0" OffsetY="10"/>
-			</Setter>
+			<Setter Property="RenderTransform" Value="scale(1.02) translateY(-1px)"/>
 		</Style>
 		<Style Selector="Button.download:pressed">
 			<Setter Property="Background" Value="#1e3a8a"/>
-			<Setter Property="RenderTransform" Value="scale(0.96)"/>
+			<Setter Property="RenderTransform" Value="scale(0.98)"/>
 		</Style>
 
 		<!-- Simple Button Style -->
 		<Style Selector="Button.simple">
 			<Setter Property="Background" Value="#1a1a1a"/>
 			<Setter Property="Foreground" Value="#ffffff"/>
-			<Setter Property="BorderThickness" Value="2"/>
+			<Setter Property="BorderThickness" Value="1"/>
 			<Setter Property="BorderBrush" Value="#404040"/>
-			<Setter Property="CornerRadius" Value="10"/>
-			<Setter Property="Padding" Value="18,10"/>
-			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="CornerRadius" Value="8"/>
+			<Setter Property="Padding" Value="16,8"/>
+			<Setter Property="FontSize" Value="13"/>
 			<Setter Property="FontWeight" Value="Medium"/>
 			<Setter Property="Cursor" Value="Hand"/>
 		</Style>
 		<Style Selector="Button.simple:pointerover">
 			<Setter Property="Background" Value="#2a2a2a"/>
 			<Setter Property="BorderBrush" Value="#606060"/>
-			<Setter Property="RenderTransform" Value="translateY(-1px)"/>
 		</Style>
 
 		<!-- Large Input Style -->
 		<Style Selector="TextBox.large">
 			<Setter Property="Background" Value="#1a1a1a"/>
 			<Setter Property="BorderBrush" Value="#404040"/>
-			<Setter Property="BorderThickness" Value="2"/>
-			<Setter Property="CornerRadius" Value="14"/>
-			<Setter Property="Padding" Value="18,14"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="CornerRadius" Value="10"/>
+			<Setter Property="Padding" Value="16,12"/>
 			<Setter Property="FontSize" Value="15"/>
 			<Setter Property="Foreground" Value="#ffffff"/>
 			<Setter Property="CaretBrush" Value="#3b82f6"/>
@@ -75,211 +72,197 @@
 		</Style>
 		<Style Selector="TextBox.large:focus /template/ Border#PART_BorderElement">
 			<Setter Property="BorderBrush" Value="#3b82f6"/>
-			<Setter Property="Effect">
-				<DropShadowEffect Color="#3b82f6" Opacity="0.25" BlurRadius="14" OffsetX="0" OffsetY="0"/>
-			</Setter>
 		</Style>
 
 		<!-- Card Style -->
 		<Style Selector="Border.card">
 			<Setter Property="Background" Value="#111111"/>
-			<Setter Property="CornerRadius" Value="18"/>
+			<Setter Property="CornerRadius" Value="14"/>
 			<Setter Property="Effect">
-				<DropShadowEffect Color="Black" Opacity="0.4" BlurRadius="22" OffsetX="0" OffsetY="7"/>
+				<DropShadowEffect Color="Black" Opacity="0.3" BlurRadius="15" OffsetX="0" OffsetY="4"/>
 			</Setter>
 		</Style>
 
-		<!-- Status Card -->
-		<Style Selector="Border.status">
-			<Setter Property="Background" Value="#1a1a1a"/>
-			<Setter Property="BorderBrush" Value="#404040"/>
-			<Setter Property="BorderThickness" Value="2"/>
+		<!-- Preview Card Style -->
+		<Style Selector="Border.preview">
+			<Setter Property="Background" Value="#0f0f0f"/>
+			<Setter Property="BorderBrush" Value="#333333"/>
+			<Setter Property="BorderThickness" Value="1"/>
 			<Setter Property="CornerRadius" Value="14"/>
+			<Setter Property="Effect">
+				<DropShadowEffect Color="Black" Opacity="0.2" BlurRadius="10" OffsetX="0" OffsetY="2"/>
+			</Setter>
 		</Style>
 
-		<!-- Compact Card -->
-		<Style Selector="Border.compact">
-			<Setter Property="Background" Value="#111111"/>
-			<Setter Property="CornerRadius" Value="12"/>
+		<!-- Progress Bar -->
+		<Style Selector="Border.progress">
+			<Setter Property="Background" Value="#1a1a1a"/>
+			<Setter Property="CornerRadius" Value="8"/>
+			<Setter Property="Height" Value="8"/>
 		</Style>
 	</Window.Styles>
 
 	<Grid>
-		<ScrollViewer VerticalScrollBarVisibility="Auto" Padding="25">
-			<StackPanel Spacing="18" MaxWidth="720" HorizontalAlignment="Center">
+		<ScrollViewer VerticalScrollBarVisibility="Auto" Padding="40">
+			<!-- Centered container with equal margins -->
+			<Grid MaxWidth="800" HorizontalAlignment="Center">
+				<Grid.RowDefinitions>
+					<RowDefinition Height="Auto"/>
+					<RowDefinition Height="20"/>
+					<RowDefinition Height="*"/>
+					<RowDefinition Height="20"/>
+					<RowDefinition Height="Auto"/>
+				</Grid.RowDefinitions>
 
-				<!-- Header -->
-				<StackPanel Spacing="12" HorizontalAlignment="Center">
-					<Border Width="65" Height="65" CornerRadius="32" HorizontalAlignment="Center">
+				<!-- Header - Centered at top -->
+				<StackPanel Grid.Row="0" Spacing="8" HorizontalAlignment="Center">
+					<Border Width="70" Height="70" CornerRadius="25" HorizontalAlignment="Center">
 						<Border.Background>
 							<LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
 								<GradientStop Color="#3b82f6" Offset="0"/>
 								<GradientStop Color="#2563eb" Offset="1"/>
 							</LinearGradientBrush>
 						</Border.Background>
-						<Border.Effect>
-							<DropShadowEffect Color="#3b82f6" Opacity="0.3" BlurRadius="18" OffsetX="0" OffsetY="6"/>
-						</Border.Effect>
-						<TextBlock Text="🎵" FontSize="32" Foreground="White"
+						<TextBlock Text="🎵" FontSize="24" Foreground="White"
 								   HorizontalAlignment="Center" VerticalAlignment="Center"/>
 					</Border>
 
-					<StackPanel Spacing="6" HorizontalAlignment="Center">
-						<TextBlock Text="Music Downloader" FontSize="28" FontWeight="Bold"
+					<StackPanel Spacing="4" HorizontalAlignment="Center">
+						<TextBlock Text="Music Downloader" FontSize="24" FontWeight="Bold"
 								   Foreground="#ffffff" HorizontalAlignment="Center"/>
-						<TextBlock Text="Download any song with just a link!" FontSize="16"
+						<TextBlock Text="Download any song with just a link!" FontSize="14"
 								   Foreground="#cccccc" HorizontalAlignment="Center"/>
 					</StackPanel>
 				</StackPanel>
 
-				<!-- Main Download Section -->
-				<Border Classes="card" Padding="30">
-					<StackPanel Spacing="24">
+				<!-- Main Content - Two equal columns -->
+				<Grid Grid.Row="2">
+					<Grid.ColumnDefinitions>
+						<ColumnDefinition Width="*"/>
+						<ColumnDefinition Width="20"/>
+						<ColumnDefinition Width="*"/>
+					</Grid.ColumnDefinitions>
 
-						<!-- Step 1 -->
-						<StackPanel Spacing="14">
-							<StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
-								<Border Width="30" Height="30" CornerRadius="15" Background="#3b82f6">
-									<TextBlock Text="1" FontSize="16" FontWeight="Bold" Foreground="White"
-											   HorizontalAlignment="Center" VerticalAlignment="Center"/>
-								</Border>
-								<TextBlock Text="Paste your music link here" FontSize="18" FontWeight="SemiBold"
-										   Foreground="#ffffff" VerticalAlignment="Center"/>
+					<!-- Left Column - Download Controls -->
+					<Border Grid.Column="0" Classes="card" Padding="24" MinHeight="360">
+						<StackPanel Spacing="16" VerticalAlignment="Center">
+							<TextBlock Text="Download Section" FontSize="18" FontWeight="Bold"
+									   Foreground="#ffffff" HorizontalAlignment="Center"/>
+
+							<!-- URL Input -->
+							<StackPanel Spacing="10">
+								<TextBlock Text="Paste your music link here" FontSize="16" FontWeight="Medium"
+										   Foreground="#ffffff" HorizontalAlignment="Center"/>
+
+								<TextBox Name="UrlTextBox"
+										 Text="{Binding DownloadUrl}"
+										 Classes="large"
+										 Watermark="Paste YouTube, Spotify, or any music link here..."
+										 Height="44"/>
 							</StackPanel>
 
-							<TextBox Name="UrlTextBox"
-									 Text="{Binding DownloadUrl}"
-									 Classes="large"
-									 Watermark="Paste YouTube, Spotify, or any music link here..."
-									 Height="52"/>
+							<!-- Download Progress -->
+							<StackPanel Spacing="6" IsVisible="{Binding IsDownloading}">
+								<TextBlock Text="Downloading..." FontSize="14" FontWeight="Medium"
+										   Foreground="#ffffff" HorizontalAlignment="Center"/>
 
-							<TextBlock Text="💡 You can paste links from YouTube, Spotify, Apple Music, and more!"
-									   FontSize="13" Foreground="#999999" HorizontalAlignment="Center"/>
-						</StackPanel>
-
-						<!-- Step 2 -->
-						<StackPanel Spacing="16">
-							<StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
-								<Border Width="30" Height="30" CornerRadius="15" Background="#3b82f6">
-									<TextBlock Text="2" FontSize="16" FontWeight="Bold" Foreground="White"
-											   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+								<Border Classes="progress" Padding="1">
+									<Border CornerRadius="7" HorizontalAlignment="Left" Background="#3b82f6"
+											Width="{Binding DownloadProgress, Converter={x:Static converters:PercentageToWidthConverter.Instance}}"/>
 								</Border>
-								<TextBlock Text="Click the big download button!" FontSize="18" FontWeight="SemiBold"
-										   Foreground="#ffffff" VerticalAlignment="Center"/>
 							</StackPanel>
 
+							<!-- Download Button -->
 							<Button Content="🎵 Download My Music" Command="{Binding DownloadCommand}"
 									Classes="download" HorizontalAlignment="Center"/>
 
-							<StackPanel Orientation="Horizontal" Spacing="14" HorizontalAlignment="Center">
+							<!-- Action Buttons -->
+							<StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
 								<Button Content="Clear" Command="{Binding ClearCommand}" Classes="simple"/>
 								<Button Content="📁 Open Downloads" Command="{Binding OpenFolderCommand}" Classes="simple"/>
 							</StackPanel>
 						</StackPanel>
+					</Border>
 
-					</StackPanel>
-				</Border>
+					<!-- Right Column - Song Preview -->
+					<Border Grid.Column="2" Classes="preview" Padding="24" MinHeight="360">
+						<StackPanel Spacing="16">
+							<TextBlock Text="Song Preview" FontSize="18" FontWeight="Bold"
+									   Foreground="#ffffff" HorizontalAlignment="Center"/>
 
-				<!-- Preview Section - Only show when something is loaded -->
-				<Border Classes="card" Padding="26" IsVisible="{Binding CurrentTrack.Title, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-					<StackPanel Spacing="18">
-						<TextBlock Text="📋 Song Preview" FontSize="20" FontWeight="Bold"
-								   Foreground="#ffffff" HorizontalAlignment="Center"/>
+							<!-- Preview Content -->
+							<StackPanel Spacing="12" VerticalAlignment="Center" Height="280">
 
-						<!-- Song Info -->
-						<Border Background="#000000" CornerRadius="14" Padding="18">
-							<Grid>
-								<Grid.ColumnDefinitions>
-									<ColumnDefinition Width="Auto"/>
-									<ColumnDefinition Width="18"/>
-									<ColumnDefinition Width="*"/>
-								</Grid.ColumnDefinitions>
-
-								<!-- Album Art -->
-								<Border Grid.Column="0" Width="95" Height="95" CornerRadius="12" Background="#2a2a2a">
-									<Grid>
-										<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="6">
-											<TextBlock Text="🎵" FontSize="38" Foreground="#666666"/>
-											<TextBlock Text="Album Art" FontSize="10" Foreground="#999999" FontWeight="Medium"/>
-										</StackPanel>
-										<Image Source="{Binding CurrentTrack.AlbumArt}" Stretch="UniformToFill"/>
-									</Grid>
-								</Border>
-
-								<!-- Song Details -->
-								<StackPanel Grid.Column="2" VerticalAlignment="Center" Spacing="6">
-									<TextBlock Text="{Binding CurrentTrack.Title, FallbackValue='Song Title'}"
-											   FontSize="18" FontWeight="Bold" Foreground="#ffffff"
-											   TextWrapping="Wrap"/>
-
-									<TextBlock Text="{Binding CurrentTrack.Artist, FallbackValue='Artist Name'}"
-											   FontSize="15" Foreground="#cccccc"
-											   TextWrapping="Wrap"/>
-
-									<TextBlock Text="{Binding CurrentTrack.Album}" FontSize="13" Foreground="#999999"
-											   IsVisible="{Binding CurrentTrack.Album, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-											   TextWrapping="Wrap"/>
-
-									<!-- Quality Badge -->
-									<Border Background="#3b82f6" CornerRadius="14" Padding="10,5" HorizontalAlignment="Left"
-											IsVisible="{Binding CurrentTrack.AlbumArt, Converter={x:Static ObjectConverters.IsNotNull}}">
-										<TextBlock Text="{Binding CurrentTrack.HasRealAlbumArt, Converter={x:Static converters:BoolToAlbumArtStatusConverter.Instance}}"
-												   FontSize="11" FontWeight="Bold" Foreground="White"/>
+								<!-- When No Song -->
+								<StackPanel Spacing="12" HorizontalAlignment="Center" VerticalAlignment="Center"
+											IsVisible="{Binding CurrentTrack.Title, Converter={x:Static StringConverters.IsNullOrEmpty}}">
+									<Border Width="80" Height="80" CornerRadius="12" Background="#2a2a2a">
+										<TextBlock Text="🎵" FontSize="32" Foreground="#666666"
+												   HorizontalAlignment="Center" VerticalAlignment="Center"/>
 									</Border>
+									<StackPanel Spacing="4">
+										<TextBlock Text="No song loaded" FontSize="16" FontWeight="Medium"
+												   Foreground="#666666" HorizontalAlignment="Center"/>
+										<TextBlock Text="Enter a link and click download to see song details here"
+												   FontSize="12" Foreground="#555555" HorizontalAlignment="Center"
+												   TextWrapping="Wrap" TextAlignment="Center"/>
+									</StackPanel>
 								</StackPanel>
-							</Grid>
-						</Border>
 
-					</StackPanel>
-				</Border>
+								<!-- When Song is Loaded -->
+								<StackPanel Spacing="12" IsVisible="{Binding CurrentTrack.Title, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
 
-				<!-- Download Progress -->
-				<Border Classes="status" Padding="18" IsVisible="{Binding IsDownloading}">
-					<StackPanel Spacing="14">
-						<StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
-							<TextBlock Text="⏳" FontSize="18"/>
-							<TextBlock Text="Downloading your music..." FontSize="17" FontWeight="SemiBold" Foreground="#ffffff"/>
+									<!-- Album Art -->
+									<Border Width="120" Height="120" CornerRadius="12" Background="#2a2a2a" HorizontalAlignment="Center">
+										<Grid>
+											<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="4">
+												<TextBlock Text="🎵" FontSize="40" Foreground="#666666"/>
+												<TextBlock Text="Album Art" FontSize="10" Foreground="#999999"/>
+											</StackPanel>
+											<Image Source="{Binding CurrentTrack.AlbumArt}" Stretch="UniformToFill"/>
+										</Grid>
+									</Border>
+
+									<!-- Song Details -->
+									<StackPanel Spacing="6">
+										<TextBlock Text="{Binding CurrentTrack.Title, FallbackValue='Song Title'}"
+												   FontSize="17" FontWeight="Bold" Foreground="#ffffff"
+												   TextWrapping="Wrap" TextAlignment="Center" MaxLines="2"/>
+
+										<TextBlock Text="{Binding CurrentTrack.Artist, FallbackValue='Artist Name'}"
+												   FontSize="15" Foreground="#cccccc"
+												   TextWrapping="Wrap" TextAlignment="Center"/>
+
+										<TextBlock Text="{Binding CurrentTrack.Album}" FontSize="13" Foreground="#999999"
+												   IsVisible="{Binding CurrentTrack.Album, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+												   TextWrapping="Wrap" TextAlignment="Center"/>
+
+										<!-- Quality Badge -->
+										<Border Background="#3b82f6" CornerRadius="12" Padding="8,4" HorizontalAlignment="Center" Margin="0,4,0,0"
+												IsVisible="{Binding CurrentTrack.AlbumArt, Converter={x:Static ObjectConverters.IsNotNull}}">
+											<TextBlock Text="{Binding CurrentTrack.HasRealAlbumArt, Converter={x:Static converters:BoolToAlbumArtStatusConverter.Instance}}"
+													   FontSize="11" FontWeight="Bold" Foreground="White"/>
+										</Border>
+									</StackPanel>
+
+								</StackPanel>
+
+							</StackPanel>
 						</StackPanel>
+					</Border>
 
-						<Border Background="#1a1a1a" Height="14" CornerRadius="7" Padding="2">
-							<Border CornerRadius="5" HorizontalAlignment="Left" Background="#3b82f6"
-									Width="{Binding DownloadProgress, Converter={x:Static converters:PercentageToWidthConverter.Instance}}">
-								<Border.Effect>
-									<DropShadowEffect Color="#3b82f6" Opacity="0.4" BlurRadius="7" OffsetX="0" OffsetY="0"/>
-								</Border.Effect>
-							</Border>
-						</Border>
+				</Grid>
 
-						<TextBlock Text="{Binding DownloadProgress, StringFormat='Progress: {0:0}%'}"
-								   FontSize="14" FontWeight="SemiBold" Foreground="#ffffff" HorizontalAlignment="Center"/>
+				<!-- Footer - Centered at bottom -->
+				<Border Grid.Row="4" Background="#1a1a1a" CornerRadius="10" Padding="16,10" HorizontalAlignment="Center" MinWidth="400">
+					<StackPanel Spacing="4">
+						<TextBlock Text="📁 Downloads saved to:" FontSize="13" Foreground="#999999" HorizontalAlignment="Center"/>
+						<TextBlock Text="{Binding DownloadFolder}" FontSize="12" FontWeight="Medium"
+								   Foreground="#cccccc" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
 					</StackPanel>
 				</Border>
 
-				<!-- Status Messages -->
-				<Border Classes="compact" Padding="16" IsVisible="{Binding StatusText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-					<StackPanel Spacing="10">
-						<TextBlock Text="📝 Status" FontSize="16" FontWeight="SemiBold"
-								   Foreground="#ffffff" HorizontalAlignment="Center"/>
-
-						<Border Background="#000000" CornerRadius="10" Padding="16">
-							<TextBlock Text="{Binding StatusText}" TextWrapping="Wrap" FontSize="13"
-									   Foreground="#cccccc" LineHeight="18" MaxHeight="60"
-									   TextTrimming="CharacterEllipsis"/>
-						</Border>
-					</StackPanel>
-				</Border>
-
-				<!-- Footer -->
-				<Border Background="#111111" CornerRadius="14" Padding="16">
-					<StackPanel Spacing="6">
-						<TextBlock Text="📁 Your downloads are saved to:" FontSize="13" Foreground="#999999" HorizontalAlignment="Center"/>
-						<TextBlock Text="{Binding DownloadFolder}" FontSize="13" FontWeight="Medium"
-								   Foreground="#cccccc" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"
-								   MaxWidth="550"/>
-					</StackPanel>
-				</Border>
-
-			</StackPanel>
+			</Grid>
 		</ScrollViewer>
 	</Grid>
 </Window>
