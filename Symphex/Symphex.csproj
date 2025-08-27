@@ -8,6 +8,16 @@
 		<AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
 		<PackageIcon>SymphexLogo.png</PackageIcon>
 		<ApplicationIcon>Assets\SymphexLogo.ico</ApplicationIcon>
+
+		<!-- macOS specific properties -->
+		<CFBundleName>Symphex Music Downloader</CFBundleName>
+		<CFBundleDisplayName>Music Downloader</CFBundleDisplayName>
+		<CFBundleIdentifier>com.symphex.musicdownloader</CFBundleIdentifier>
+		<CFBundleVersion>1.0.0</CFBundleVersion>
+		<CFBundlePackageType>APPL</CFBundlePackageType>
+		<CFBundleSignature>????</CFBundleSignature>
+		<CFBundleExecutable>Symphex</CFBundleExecutable>
+		<CFBundleIconFile>SymphexLogo.icns</CFBundleIconFile>
 	</PropertyGroup>
 
 	<ItemGroup>
@@ -37,6 +47,10 @@
 		<AvaloniaResource Update="Assets\SymphexLogo.ico">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</AvaloniaResource>
+		<!-- Add ICNS file for macOS -->
+		<AvaloniaResource Update="Assets\SymphexLogo.icns">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</AvaloniaResource>
 	</ItemGroup>
 
 	<ItemGroup>
@@ -45,6 +59,10 @@
 			<PackagePath>\</PackagePath>
 		</None>
 		<None Update="Assets\SymphexLogo.ico">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+		<None Update="Assets\SymphexLogo.icns">
 			<Pack>True</Pack>
 			<PackagePath>\</PackagePath>
 		</None>
