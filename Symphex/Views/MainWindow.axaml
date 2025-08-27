@@ -7,7 +7,7 @@
 		mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="700"
 		x:Class="Symphex.Views.MainWindow"
 		x:DataType="vm:MainWindowViewModel"
-		Icon="/Assets/avalonia-logo.ico"
+		Icon="/Assets/SymphexLogo.ico"
 		Title="Music Downloader - Simple and Easy"
 		MinWidth="900" MinHeight="650"
 		Width="900" Height="650"
@@ -17,8 +17,9 @@
 		<vm:MainWindowViewModel/>
 	</Design.DataContext>
 
+	<!-- Rest of your existing XAML content remains the same -->
 	<Window.Styles>
-		<!-- Big Download Button -->
+		<!-- Your existing styles -->
 		<Style Selector="Button.download">
 			<Setter Property="Background" Value="#1e40af"/>
 			<Setter Property="Foreground" Value="White"/>
@@ -41,7 +42,6 @@
 			<Setter Property="RenderTransform" Value="scale(0.98)"/>
 		</Style>
 
-		<!-- Simple Button Style -->
 		<Style Selector="Button.simple">
 			<Setter Property="Background" Value="#1a1a1a"/>
 			<Setter Property="Foreground" Value="#ffffff"/>
@@ -58,7 +58,6 @@
 			<Setter Property="BorderBrush" Value="#606060"/>
 		</Style>
 
-		<!-- Large Input Style -->
 		<Style Selector="TextBox.large">
 			<Setter Property="Background" Value="#1a1a1a"/>
 			<Setter Property="BorderBrush" Value="#404040"/>
@@ -74,7 +73,6 @@
 			<Setter Property="BorderBrush" Value="#3b82f6"/>
 		</Style>
 
-		<!-- Card Style -->
 		<Style Selector="Border.card">
 			<Setter Property="Background" Value="#111111"/>
 			<Setter Property="CornerRadius" Value="14"/>
@@ -83,7 +81,6 @@
 			</Setter>
 		</Style>
 
-		<!-- Preview Card Style -->
 		<Style Selector="Border.preview">
 			<Setter Property="Background" Value="#0f0f0f"/>
 			<Setter Property="BorderBrush" Value="#333333"/>
@@ -94,7 +91,6 @@
 			</Setter>
 		</Style>
 
-		<!-- Progress Bar -->
 		<Style Selector="Border.progress">
 			<Setter Property="Background" Value="#1a1a1a"/>
 			<Setter Property="CornerRadius" Value="8"/>
@@ -102,6 +98,7 @@
 		</Style>
 	</Window.Styles>
 
+	<!-- Rest of your existing grid content remains exactly the same -->
 	<Grid>
 		<!-- Success Toast Notification -->
 		<Border IsVisible="{Binding IsToastVisible}"
