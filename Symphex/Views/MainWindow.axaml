@@ -103,6 +103,33 @@
 	</Window.Styles>
 
 	<Grid>
+		<!-- Success Toast Notification -->
+		<Border IsVisible="{Binding IsToastVisible}"
+				HorizontalAlignment="Center"
+				VerticalAlignment="Top"
+				Margin="0,60,0,0"
+				CornerRadius="12"
+				Padding="20,12"
+				ZIndex="1000">
+			<Border.Background>
+				<LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+					<GradientStop Color="#10b981" Offset="0"/>
+					<GradientStop Color="#059669" Offset="1"/>
+				</LinearGradientBrush>
+			</Border.Background>
+			<Border.Effect>
+				<DropShadowEffect Color="Black" Opacity="0.3" BlurRadius="20" OffsetX="0" OffsetY="8"/>
+			</Border.Effect>
+			<StackPanel Orientation="Horizontal" Spacing="12">
+				<Border Width="24" Height="24" CornerRadius="12" Background="White">
+					<TextBlock Text="✓" FontSize="14" FontWeight="Bold"
+							  Foreground="#10b981" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+				</Border>
+				<TextBlock Text="{Binding ToastMessage}" FontSize="14" FontWeight="Medium"
+						   Foreground="White" VerticalAlignment="Center" MaxWidth="400" TextWrapping="Wrap"/>
+			</StackPanel>
+		</Border>
+
 		<ScrollViewer VerticalScrollBarVisibility="Auto" Padding="40">
 			<!-- Centered container with equal margins -->
 			<Grid MaxWidth="800" HorizontalAlignment="Center">

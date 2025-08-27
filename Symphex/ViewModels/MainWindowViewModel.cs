@@ -1,6 +1,9 @@
 ﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Input;
+using Avalonia.Layout;
+using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using CliWrap;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -66,7 +69,6 @@ namespace Symphex.ViewModels
 
         [ObservableProperty]
         private bool hasRealAlbumArt = false;
-
     }
 
     public partial class MainWindowViewModel : ViewModelBase
@@ -104,6 +106,12 @@ namespace Symphex.ViewModels
 
         [ObservableProperty]
         private bool showMetadata = false;
+
+        [ObservableProperty]
+        private bool isToastVisible = false;
+
+        [ObservableProperty]
+        private string toastMessage = "";
 
         private string YtDlpPath { get; set; } = "";
         private string FfmpegPath { get; set; } = "";
@@ -1162,8 +1170,6 @@ namespace Symphex.ViewModels
                 DownloadProgress = 15;
 
                 await RealDownload();
-
-                StatusText = $"✅ Download completed! Check your music folder.";
             }
             catch (Exception ex)
             {
@@ -1177,6 +1183,192 @@ namespace Symphex.ViewModels
             }
         }
 
+        private async Task ShowDownloadSuccessPopup(string filename, string fileSize)
+        {
+            try
+            {
+                var mainWindow = Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
+                    ? desktop.MainWindow
+                    : null;
+
+                if (mainWindow != null)
+                {
+                    // Get song info for the popup
+                    string songTitle = CurrentTrack?.Title ?? "Unknown Song";
+                    string artist = CurrentTrack?.Artist ?? "Unknown Artist";
+
+                    // Create the popup content
+                    var popup = new Window
+                    {
+                        Title = "Download Complete!",
+                        Width = 400,
+                        Height = 280,
+                        WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                        CanResize = false,
+                        ShowInTaskbar = false,
+                        SystemDecorations = SystemDecorations.BorderOnly,
+                        Background = new SolidColorBrush(Color.FromArgb(255, 17, 17, 17))
+                    };
+
+                    var mainGrid = new Grid();
+                    mainGrid.RowDefinitions.Add(new RowDefinition(GridLength.Star));
+                    mainGrid.RowDefinitions.Add(new RowDefinition(GridLength.Auto));
+
+                    // Content area
+                    var contentPanel = new StackPanel
+                    {
+                        Spacing = 16,
+                        Margin = new Thickness(24),
+                        VerticalAlignment = VerticalAlignment.Center
+                    };
+
+                    // Success icon
+                    var iconBorder = new Border
+                    {
+                        Width = 60,
+                        Height = 60,
+                        CornerRadius = new CornerRadius(30),
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        Background = new LinearGradientBrush
+                        {
+                            StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
+                            EndPoint = new RelativePoint(1, 1, RelativeUnit.Relative),
+                            GradientStops = new GradientStops
+                    {
+                        new GradientStop(Color.FromRgb(34, 197, 94), 0),
+                        new GradientStop(Color.FromRgb(22, 163, 74), 1)
+                    }
+                        }
+                    };
+
+                    var iconText = new TextBlock
+                    {
+                        Text = "✓",
+                        FontSize = 28,
+                        FontWeight = FontWeight.Bold,
+                        Foreground = Brushes.White,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        VerticalAlignment = VerticalAlignment.Center
+                    };
+                    iconBorder.Child = iconText;
+                    contentPanel.Children.Add(iconBorder);
+
+                    // Success message
+                    var successText = new TextBlock
+                    {
+                        Text = "Download Complete!",
+                        FontSize = 20,
+                        FontWeight = FontWeight.Bold,
+                        Foreground = Brushes.White,
+                        HorizontalAlignment = HorizontalAlignment.Center
+                    };
+                    contentPanel.Children.Add(successText);
+
+                    // Song details
+                    var songDetails = new StackPanel
+                    {
+                        Spacing = 8,
+                        HorizontalAlignment = HorizontalAlignment.Center
+                    };
+
+                    var titleText = new TextBlock
+                    {
+                        Text = songTitle,
+                        FontSize = 16,
+                        FontWeight = FontWeight.SemiBold,
+                        Foreground = Brushes.White,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        TextWrapping = TextWrapping.Wrap,
+                        TextAlignment = TextAlignment.Center,
+                        MaxWidth = 350
+                    };
+                    songDetails.Children.Add(titleText);
+
+                    var artistText = new TextBlock
+                    {
+                        Text = $"by {artist}",
+                        FontSize = 14,
+                        Foreground = new SolidColorBrush(Color.FromRgb(204, 204, 204)),
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        TextWrapping = TextWrapping.Wrap,
+                        TextAlignment = TextAlignment.Center
+                    };
+                    songDetails.Children.Add(artistText);
+
+                    var sizeText = new TextBlock
+                    {
+                        Text = $"File size: {fileSize}",
+                        FontSize = 12,
+                        Foreground = new SolidColorBrush(Color.FromRgb(156, 163, 175)),
+                        HorizontalAlignment = HorizontalAlignment.Center
+                    };
+                    songDetails.Children.Add(sizeText);
+
+                    contentPanel.Children.Add(songDetails);
+
+                    Grid.SetRow(contentPanel, 0);
+                    mainGrid.Children.Add(contentPanel);
+
+                    // Button area
+                    var buttonPanel = new StackPanel
+                    {
+                        Orientation = Orientation.Horizontal,
+                        Spacing = 12,
+                        HorizontalAlignment = HorizontalAlignment.Center,
+                        Margin = new Thickness(24, 0, 24, 24)
+                    };
+
+                    // Open folder button
+                    var openFolderBtn = new Button
+                    {
+                        Content = "📁 Open Folder",
+                        Padding = new Thickness(16, 8),
+                        Background = new SolidColorBrush(Color.FromRgb(59, 130, 246)),
+                        Foreground = Brushes.White,
+                        BorderThickness = new Thickness(0),
+                        CornerRadius = new CornerRadius(8),
+                        FontWeight = FontWeight.Medium,
+                        Cursor = new Cursor(StandardCursorType.Hand)
+                    };
+                    openFolderBtn.Click += (s, e) =>
+                    {
+                        OpenFolder();
+                        popup.Close();
+                    };
+
+                    // OK button
+                    var okBtn = new Button
+                    {
+                        Content = "OK",
+                        Padding = new Thickness(20, 8),
+                        Background = new SolidColorBrush(Color.FromRgb(55, 65, 81)),
+                        Foreground = Brushes.White,
+                        BorderBrush = new SolidColorBrush(Color.FromRgb(107, 114, 128)),
+                        BorderThickness = new Thickness(1),
+                        CornerRadius = new CornerRadius(8),
+                        FontWeight = FontWeight.Medium,
+                        Cursor = new Cursor(StandardCursorType.Hand)
+                    };
+                    okBtn.Click += (s, e) => popup.Close();
+
+                    buttonPanel.Children.Add(openFolderBtn);
+                    buttonPanel.Children.Add(okBtn);
+
+                    Grid.SetRow(buttonPanel, 1);
+                    mainGrid.Children.Add(buttonPanel);
+
+                    popup.Content = mainGrid;
+
+                    // Show the popup
+                    await popup.ShowDialog(mainWindow);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Fallback to status text if popup fails
+                StatusText = $"✅ Download completed! {filename} ({fileSize})";
+            }
+        }
         private async Task RealDownload()
         {
             try
@@ -1190,7 +1382,6 @@ namespace Symphex.ViewModels
                 bool isUrl = DownloadUrl.StartsWith("http://") || DownloadUrl.StartsWith("https://");
                 string searchPrefix = isUrl ? "" : "ytsearch1:";
                 string fullUrl = $"{searchPrefix}{DownloadUrl}";
-
 
                 var output = new StringBuilder();
                 var error = new StringBuilder();
@@ -1250,7 +1441,10 @@ namespace Symphex.ViewModels
 
                 if (result.ExitCode == 0)
                 {
-                    DownloadProgress = 100;
+                    DownloadProgress = 95;
+                    StatusText = "🔧 Applying metadata and finalizing...";
+
+                    string actualFilePath = "";
 
                     if (CurrentTrack != null)
                     {
@@ -1264,8 +1458,8 @@ namespace Symphex.ViewModels
                             int destinationIndex = destinationLine.IndexOf("Destination: ");
                             if (destinationIndex >= 0)
                             {
-                                string fullPath = destinationLine.Substring(destinationIndex + "Destination: ".Length).Trim();
-                                string filename = Path.GetFileName(fullPath);
+                                actualFilePath = destinationLine.Substring(destinationIndex + "Destination: ".Length).Trim();
+                                string filename = Path.GetFileName(actualFilePath);
                                 CurrentTrack.FileName = filename;
 
                                 await ApplyProperMetadata();
@@ -1277,11 +1471,18 @@ namespace Symphex.ViewModels
                             {
                                 string cleanTitle = SanitizeFilename(CurrentTrack.Title);
                                 string cleanArtist = SanitizeFilename(CurrentTrack.Artist);
-                                CurrentTrack.FileName = $"{cleanTitle} - {cleanArtist}.mp3";
+                                string expectedFilename = $"{cleanTitle} - {cleanArtist}.mp3";
+                                actualFilePath = Path.Combine(DownloadFolder, expectedFilename);
+                                CurrentTrack.FileName = expectedFilename;
                                 await ApplyProperMetadata();
                             }
                         }
                     }
+
+                    DownloadProgress = 100;
+
+                    // Verify the file actually exists and provide detailed feedback
+                    await VerifyAndReportDownloadSuccess(actualFilePath);
                 }
                 else
                 {
@@ -1292,6 +1493,133 @@ namespace Symphex.ViewModels
             {
                 throw;
             }
+        }
+        private async Task ShowSuccessToastInternal(string filename, string fileSize)
+        {
+            try
+            {
+                string songTitle = CurrentTrack?.Title ?? "Unknown Song";
+                string artist = CurrentTrack?.Artist ?? "Unknown Artist";
+
+                ToastMessage = $"Downloaded: {songTitle} by {artist} ({fileSize})";
+                IsToastVisible = true;
+
+                // Hide the toast after 5 seconds
+                await Task.Delay(5000);
+                IsToastVisible = false;
+            }
+            catch (Exception ex)
+            {
+                // Fallback to status text if toast fails
+                StatusText = $"Successfully downloaded {filename} ({fileSize})";
+            }
+        }
+
+
+        private async Task ShowSuccessToastNotification(string filename, string fileSize)
+        {
+            try
+            {
+                string songTitle = CurrentTrack?.Title ?? "Unknown Song";
+                string artist = CurrentTrack?.Artist ?? "Unknown Artist";
+
+                ToastMessage = $"Downloaded: {songTitle} by {artist} ({fileSize})";
+                IsToastVisible = true;
+
+                // Hide the toast after 5 seconds
+                await Task.Delay(5000);
+                IsToastVisible = false;
+            }
+            catch (Exception ex)
+            {
+                // Fallback to status text if toast fails
+                StatusText = $"Successfully downloaded {filename} ({fileSize})";
+            }
+        }
+
+        private async Task VerifyAndReportDownloadSuccess(string expectedFilePath)
+        {
+            try
+            {
+                // Wait a moment for file system to update
+                await Task.Delay(500);
+
+                string actualFilePath = "";
+                long fileSize = 0;
+
+                // Try to find the downloaded file
+                if (!string.IsNullOrEmpty(expectedFilePath) && File.Exists(expectedFilePath))
+                {
+                    actualFilePath = expectedFilePath;
+                    fileSize = new FileInfo(expectedFilePath).Length;
+                }
+                else
+                {
+                    // Fallback: search for recently created MP3 files in the download folder
+                    var recentFiles = Directory.GetFiles(DownloadFolder, "*.mp3")
+                        .Where(f => File.GetCreationTime(f) > DateTime.Now.AddMinutes(-5))
+                        .OrderByDescending(f => File.GetCreationTime(f))
+                        .ToArray();
+
+                    if (recentFiles.Length > 0)
+                    {
+                        actualFilePath = recentFiles[0];
+                        fileSize = new FileInfo(actualFilePath).Length;
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(actualFilePath) && File.Exists(actualFilePath))
+                {
+                    string filename = Path.GetFileName(actualFilePath);
+                    string fileSizeText = FormatFileSize(fileSize);
+
+                    // Update CurrentTrack with actual filename if not already set
+                    if (CurrentTrack != null && string.IsNullOrEmpty(CurrentTrack.FileName))
+                    {
+                        CurrentTrack.FileName = filename;
+                    }
+
+                    // Show toast notification instead of popup
+                    await ShowSuccessToastNotification(filename, fileSizeText);
+
+                    // Also update status text as backup
+                    if (CurrentTrack != null && !string.IsNullOrEmpty(CurrentTrack.Title))
+                    {
+                        StatusText = $"Successfully downloaded '{CurrentTrack.Title}' by {CurrentTrack.Artist} ({fileSizeText})";
+                    }
+                    else
+                    {
+                        StatusText = $"Successfully downloaded '{filename}' ({fileSizeText})";
+                    }
+                }
+                else
+                {
+                    // File not found - this shouldn't happen if download was successful
+                    StatusText = "Download completed but file not found. Check your download folder.";
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusText = "Download completed but couldn't verify file details.";
+            }
+        }
+
+        // Add this helper method to format file sizes nicely
+        private string FormatFileSize(long bytes)
+        {
+            if (bytes == 0) return "0 B";
+
+            string[] suffixes = { "B", "KB", "MB", "GB" };
+            double size = bytes;
+            int suffixIndex = 0;
+
+            while (size >= 1024 && suffixIndex < suffixes.Length - 1)
+            {
+                size /= 1024;
+                suffixIndex++;
+            }
+
+            return $"{size:F1} {suffixes[suffixIndex]}";
         }
 
         private string SanitizeFilename(string filename)
