@@ -17,7 +17,6 @@
 		<vm:MainWindowViewModel/>
 	</Design.DataContext>
 
-	<!-- Rest of your existing XAML content remains the same -->
 	<Window.Styles>
 		<!-- Your existing styles -->
 		<Style Selector="Button.download">
@@ -72,6 +71,16 @@
 		<Style Selector="TextBox.large:focus /template/ Border#PART_BorderElement">
 			<Setter Property="BorderBrush" Value="#3b82f6"/>
 		</Style>
+		<!-- Watermark styling for better visibility -->
+		<Style Selector="TextBox.large /template/ TextBlock#PART_Watermark">
+			<Setter Property="Foreground" Value="#666666"/>
+		</Style>
+		<Style Selector="TextBox.large:pointerover /template/ TextBlock#PART_Watermark">
+			<Setter Property="Foreground" Value="#777777"/>
+		</Style>
+		<Style Selector="TextBox.large:focus /template/ TextBlock#PART_Watermark">
+			<Setter Property="Foreground" Value="#555555"/>
+		</Style>
 
 		<Style Selector="Border.card">
 			<Setter Property="Background" Value="#111111"/>
@@ -98,7 +107,6 @@
 		</Style>
 	</Window.Styles>
 
-	<!-- Rest of your existing grid content remains exactly the same -->
 	<Grid>
 		<!-- Success Toast Notification -->
 		<Border IsVisible="{Binding IsToastVisible}"
