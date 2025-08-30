@@ -969,6 +969,7 @@ namespace Symphex.ViewModels
                 if (!string.IsNullOrEmpty(CurrentTrack.AlbumArtist))
                 {
                     argsList.AddRange(new[] { "-metadata", $"albumartist={CurrentTrack.AlbumArtist}" });
+                    argsList.AddRange(new[] { "-metadata", $"album_artist={CurrentTrack.AlbumArtist}" });
                 }
 
                 if (!string.IsNullOrEmpty(CurrentTrack.Genre))
