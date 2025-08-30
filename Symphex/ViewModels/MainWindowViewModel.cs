@@ -97,15 +97,6 @@ namespace Symphex.ViewModels
         [ObservableProperty]
         private string encoder = "";
 
-        [ObservableProperty]
-        private bool isProcessingSpotify = false;
-
-        [ObservableProperty]
-        private int totalSpotifyTracks = 0;
-
-        [ObservableProperty]
-        private int processedSpotifyTracks = 0;
-
     }
 
     public partial class MainWindowViewModel : ViewModelBase
@@ -527,6 +518,540 @@ namespace Symphex.ViewModels
                 result?.WaitForExit();
             }
             catch { }
+        }
+
+        private bool IsSpotifyUrl(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url)) return false;
+
+            // More comprehensive Spotify URL detection
+            return url.Contains("open.spotify.com/") ||
+                   url.Contains("spotify.com/") ||
+                   url.StartsWith("spotify:") ||
+                   url.Contains("spotify://");
+        }
+
+        private string ExtractSpotifyId(string url)
+        {
+            try
+            {
+                // Handle different Spotify URL formats
+                // https://open.spotify.com/track/4iV5W9uYEdYUVa79Axb7Rh
+                // https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M
+                // spotify:track:4iV5W9uYEdYUVa79Axb7Rh
+
+                if (url.Contains("spotify:"))
+                {
+                    var parts = url.Split(':');
+                    return parts.Length >= 3 ? parts[2] : "";
+                }
+
+                if (url.Contains("spotify.com/"))
+                {
+                    var uri = new Uri(url);
+                    var segments = uri.AbsolutePath.Split('/');
+                    return segments.Length >= 3 ? segments[2].Split('?')[0] : "";
+                }
+
+                return "";
+            }
+            catch
+            {
+                return "";
+            }
+        }
+
+        private string GetSpotifyType(string url)
+        {
+            if (url.Contains("/track/") || url.Contains("spotify:track:"))
+                return "track";
+            if (url.Contains("/playlist/") || url.Contains("spotify:playlist:"))
+                return "playlist";
+            if (url.Contains("/album/") || url.Contains("spotify:album:"))
+                return "album";
+
+            return "";
+        }
+
+        private async Task<List<SpotifyTrack>> GetSpotifyMetadata(string url)
+        {
+            var tracks = new List<SpotifyTrack>();
+
+            try
+            {
+                CliOutput += $"DEBUG: Processing Spotify URL: {url}\n";
+
+                string spotifyId = ExtractSpotifyId(url);
+                string spotifyType = GetSpotifyType(url);
+
+                CliOutput += $"DEBUG: Extracted ID: {spotifyId}, Type: {spotifyType}\n";
+
+                if (string.IsNullOrEmpty(spotifyId) || string.IsNullOrEmpty(spotifyType))
+                {
+                    StatusText = "Invalid Spotify URL format";
+                    CliOutput += "DEBUG: Invalid Spotify URL format\n";
+                    return tracks;
+                }
+
+                StatusText = $"Extracting Spotify {spotifyType} info via web scraping...";
+                CliOutput += $"DEBUG: Starting web scraping for {spotifyType}\n";
+
+                // Try web scraping
+                tracks = await ExtractSpotifyTracksFromWebPage(url);
+
+                CliOutput += $"DEBUG: Web scraping returned {tracks.Count} tracks\n";
+
+                if (tracks.Count == 0)
+                {
+                    StatusText = "Web scraping failed. Trying manual approach...";
+                    CliOutput += "DEBUG: Web scraping failed, trying manual extraction\n";
+
+                    // FALLBACK: Manual track creation for testing
+                    tracks = CreateManualSpotifyTrack(url, spotifyType);
+                }
+                else
+                {
+                    StatusText = $"Found {tracks.Count} track(s) from Spotify {spotifyType}";
+                    CliOutput += $"DEBUG: Successfully extracted {tracks.Count} tracks\n";
+                }
+
+                return tracks;
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"Error extracting Spotify metadata: {ex.Message}";
+                CliOutput += $"DEBUG: Exception in GetSpotifyMetadata: {ex.Message}\n";
+                return tracks;
+            }
+        }
+
+        private List<SpotifyTrack> CreateManualSpotifyTrack(string url, string type)
+        {
+            var tracks = new List<SpotifyTrack>();
+
+            try
+            {
+                if (type == "track")
+                {
+                    // For single tracks, create a placeholder that will trigger manual search
+                    tracks.Add(new SpotifyTrack
+                    {
+                        Title = "MANUAL_SEARCH_NEEDED",
+                        Artist = "MANUAL_SEARCH_NEEDED",
+                        SpotifyUrl = url
+                    });
+
+                    StatusText = "Could not auto-extract. Please copy the track name from Spotify and search manually.";
+                    CliOutput += "INSTRUCTION: Copy track name from Spotify, clear the URL, and paste track name instead.\n";
+                }
+                else
+                {
+                    StatusText = "Playlist/Album extraction failed. Try individual track URLs.";
+                    CliOutput += "INSTRUCTION: Open the playlist/album and copy individual track URLs.\n";
+                }
+            }
+            catch (Exception ex)
+            {
+                CliOutput += $"DEBUG: Error in CreateManualSpotifyTrack: {ex.Message}\n";
+            }
+
+            return tracks;
+        }
+
+        private async Task<TrackInfo?> SearchYouTubeForSpotifyTrack(SpotifyTrack spotifyTrack)
+        {
+            try
+            {
+                // Create comprehensive search queries for YouTube
+                var searchQueries = new[]
+                {
+            $"{spotifyTrack.Artist} {spotifyTrack.Title}",
+            $"{spotifyTrack.Artist} - {spotifyTrack.Title}",
+            $"{spotifyTrack.Title} {spotifyTrack.Artist}",
+            $"\"{spotifyTrack.Artist}\" \"{spotifyTrack.Title}\"",
+            $"{spotifyTrack.Artist} {spotifyTrack.Title} official"
+        };
+
+                foreach (var query in searchQueries)
+                {
+                    try
+                    {
+                        string searchUrl = $"ytsearch1:{query}";
+                        var trackInfo = await ExtractMetadata(searchUrl);
+
+                        if (trackInfo != null)
+                        {
+                            // Verify it's a reasonable match
+                            if (IsReasonableMatch(spotifyTrack, trackInfo))
+                            {
+                                // Add Spotify source info to metadata
+                                trackInfo.Comment = $"Found via Spotify: {spotifyTrack.SpotifyUrl}";
+                                return trackInfo;
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        continue; // Try next search query
+                    }
+
+                    await Task.Delay(200); // Rate limiting
+                }
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                return null;
+            }
+        }
+
+        private bool IsReasonableMatch(SpotifyTrack spotifyTrack, TrackInfo foundTrack)
+        {
+            // Basic similarity check to ensure we found the right song
+            if (string.IsNullOrEmpty(foundTrack.Title) || string.IsNullOrEmpty(foundTrack.Artist))
+                return false;
+
+            double titleSimilarity = CalculateFlexibleSimilarity(
+                spotifyTrack.Title.ToLowerInvariant(),
+                foundTrack.Title.ToLowerInvariant());
+
+            double artistSimilarity = CalculateFlexibleSimilarity(
+                spotifyTrack.Artist.ToLowerInvariant(),
+                foundTrack.Artist.ToLowerInvariant());
+
+            // Require reasonable similarity for both title and artist
+            return titleSimilarity > 0.6 && artistSimilarity > 0.5;
+        }
+
+        public class SpotifyTrack
+        {
+            public string Title { get; set; } = "";
+            public string Artist { get; set; } = "";
+            public string Album { get; set; } = "";
+            public string Duration { get; set; } = "";
+            public string SpotifyUrl { get; set; } = "";
+        }
+
+        private async Task<List<SpotifyTrack>> ExtractSpotifyTracksFromWebPage(string spotifyUrl)
+        {
+            var tracks = new List<SpotifyTrack>();
+
+            try
+            {
+                StatusText = "Scraping Spotify page for track information...";
+
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.Add("User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+
+                // Add headers to look more like a real browser
+                client.DefaultRequestHeaders.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8");
+                client.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.5");
+                client.DefaultRequestHeaders.Add("Accept-Encoding", "gzip, deflate");
+                client.DefaultRequestHeaders.Add("Upgrade-Insecure-Requests", "1");
+
+                var response = await client.GetStringAsync(spotifyUrl);
+
+                // Method 1: Look for JSON-LD structured data
+                var jsonLdMatch = System.Text.RegularExpressions.Regex.Match(response,
+                    @"<script[^>]*type=""application/ld\+json""[^>]*>(.*?)</script>",
+                    System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                if (jsonLdMatch.Success)
+                {
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(jsonLdMatch.Groups[1].Value);
+                        var root = doc.RootElement;
+
+                        if (root.TryGetProperty("name", out var nameEl) &&
+                            root.TryGetProperty("byArtist", out var artistEl))
+                        {
+                            string title = nameEl.GetString() ?? "";
+                            string artist = "";
+
+                            if (artistEl.ValueKind == JsonValueKind.Array)
+                            {
+                                var firstArtist = artistEl.EnumerateArray().FirstOrDefault();
+                                if (firstArtist.TryGetProperty("name", out var artistName))
+                                {
+                                    artist = artistName.GetString() ?? "";
+                                }
+                            }
+                            else if (artistEl.TryGetProperty("name", out var artistName))
+                            {
+                                artist = artistName.GetString() ?? "";
+                            }
+
+                            if (!string.IsNullOrEmpty(title) && !string.IsNullOrEmpty(artist))
+                            {
+                                tracks.Add(new SpotifyTrack
+                                {
+                                    Title = title,
+                                    Artist = artist,
+                                    SpotifyUrl = spotifyUrl
+                                });
+                                return tracks;
+                            }
+                        }
+                    }
+                    catch
+                    {
+                        // Continue to other methods
+                    }
+                }
+
+                // Method 2: Look for Open Graph meta tags
+                var titleMatch = System.Text.RegularExpressions.Regex.Match(response,
+                    @"<meta\s+property=""og:title""\s+content=""([^""]+)""",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                var descMatch = System.Text.RegularExpressions.Regex.Match(response,
+                    @"<meta\s+property=""og:description""\s+content=""([^""]+)""",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                if (titleMatch.Success)
+                {
+                    string fullTitle = System.Net.WebUtility.HtmlDecode(titleMatch.Groups[1].Value);
+                    string description = descMatch.Success ? System.Net.WebUtility.HtmlDecode(descMatch.Groups[1].Value) : "";
+
+                    // Parse "Song Name - Artist Name" or "Song Name by Artist Name" format
+                    string title = "";
+                    string artist = "";
+
+                    if (fullTitle.Contains(" - "))
+                    {
+                        var parts = fullTitle.Split(new[] { " - " }, 2, StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length == 2)
+                        {
+                            title = parts[0].Trim();
+                            artist = parts[1].Trim();
+                        }
+                    }
+                    else if (fullTitle.Contains(" by "))
+                    {
+                        var parts = fullTitle.Split(new[] { " by " }, 2, StringSplitOptions.RemoveEmptyEntries);
+                        if (parts.Length == 2)
+                        {
+                            title = parts[0].Trim();
+                            artist = parts[1].Trim();
+                        }
+                    }
+                    else if (description.Contains("Song ·"))
+                    {
+                        title = fullTitle;
+                        var artistMatch = System.Text.RegularExpressions.Regex.Match(description, @"Song · ([^·]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                        if (artistMatch.Success)
+                        {
+                            artist = artistMatch.Groups[1].Value.Trim();
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(title) && !string.IsNullOrEmpty(artist))
+                    {
+                        tracks.Add(new SpotifyTrack
+                        {
+                            Title = title,
+                            Artist = artist,
+                            SpotifyUrl = spotifyUrl
+                        });
+                    }
+                }
+
+                // Method 3: Try to extract from page title
+                if (tracks.Count == 0)
+                {
+                    var pageTitleMatch = System.Text.RegularExpressions.Regex.Match(response,
+                        @"<title>([^<]+)</title>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                    if (pageTitleMatch.Success)
+                    {
+                        string pageTitle = System.Net.WebUtility.HtmlDecode(pageTitleMatch.Groups[1].Value);
+
+                        // Remove " | Spotify" from end
+                        pageTitle = System.Text.RegularExpressions.Regex.Replace(pageTitle, @"\s*\|\s*Spotify\s*$", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                        if (pageTitle.Contains(" - "))
+                        {
+                            var parts = pageTitle.Split(new[] { " - " }, 2, StringSplitOptions.RemoveEmptyEntries);
+                            if (parts.Length == 2)
+                            {
+                                tracks.Add(new SpotifyTrack
+                                {
+                                    Title = parts[0].Trim(),
+                                    Artist = parts[1].Trim(),
+                                    SpotifyUrl = spotifyUrl
+                                });
+                            }
+                        }
+                    }
+                }
+
+                return tracks;
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"Web scraping failed: {ex.Message}";
+                return tracks;
+            }
+        }
+
+
+
+        [ObservableProperty]
+        private bool isProcessingSpotify = false;
+
+        [ObservableProperty]
+        private int totalSpotifyTracks = 0;
+
+        [ObservableProperty]
+        private int processedSpotifyTracks = 0;
+
+        private async Task ProcessSpotifyDownload(string spotifyUrl)
+        {
+            try
+            {
+                CliOutput += $"Spotify URL detected: {spotifyUrl}\n";
+                CliOutput += "Converting to YouTube search...\n";
+
+                StatusText = "Spotify URL detected. Converting to YouTube search...";
+
+                // Since web scraping is unreliable, let's try a different approach
+                // Convert the Spotify URL to a search term and let user confirm
+
+                string searchTerm = await ConvertSpotifyUrlToSearchTerm(spotifyUrl);
+
+                if (!string.IsNullOrEmpty(searchTerm))
+                {
+                    CliOutput += $"Converted to search: {searchTerm}\n";
+                    StatusText = $"Searching YouTube for: {searchTerm}";
+
+                    // Update the download URL to the search term and process it
+                    DownloadUrl = searchTerm;
+
+                    // Process as a regular YouTube search
+                    await ProcessAsYouTubeSearch(searchTerm);
+                }
+                else
+                {
+                    StatusText = "Could not convert Spotify URL. Please copy track name manually.";
+                    CliOutput += "Conversion failed. Manual input required.\n";
+
+                    // Show instructions to user
+                    await ShowSpotifyInstructions();
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"Error processing Spotify URL: {ex.Message}";
+                CliOutput += $"Spotify processing error: {ex.Message}\n";
+            }
+        }
+
+        private async Task<string> ConvertSpotifyUrlToSearchTerm(string spotifyUrl)
+        {
+            try
+            {
+                // Try to extract basic info from URL structure or page title
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.Add("User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+
+                // Set a reasonable timeout
+                client.Timeout = TimeSpan.FromSeconds(10);
+
+                var response = await client.GetStringAsync(spotifyUrl);
+
+                // Look for page title which often contains track info
+                var titleMatch = System.Text.RegularExpressions.Regex.Match(response,
+                    @"<title>([^<]+)</title>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                if (titleMatch.Success)
+                {
+                    string pageTitle = System.Net.WebUtility.HtmlDecode(titleMatch.Groups[1].Value);
+
+                    // Remove Spotify branding
+                    pageTitle = System.Text.RegularExpressions.Regex.Replace(pageTitle,
+                        @"\s*[\|\-]\s*Spotify\s*$", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                    // Clean up the title for search
+                    pageTitle = pageTitle.Trim();
+
+                    if (!string.IsNullOrEmpty(pageTitle) && !pageTitle.Equals("Spotify", StringComparison.OrdinalIgnoreCase))
+                    {
+                        CliOutput += $"Extracted title: {pageTitle}\n";
+                        return pageTitle;
+                    }
+                }
+
+                return "";
+            }
+            catch (Exception ex)
+            {
+                CliOutput += $"Title extraction failed: {ex.Message}\n";
+                return "";
+            }
+        }
+
+        // ADD: Process the search term as a YouTube search
+        private async Task ProcessAsYouTubeSearch(string searchTerm)
+        {
+            try
+            {
+                IsDownloading = true;
+                DownloadProgress = 0;
+                ShowMetadata = false;
+                CurrentTrack = new TrackInfo();
+
+                StatusText = $"Searching YouTube for: {searchTerm}";
+                CliOutput += $"YouTube search initiated: {searchTerm}\n";
+
+                DownloadProgress = 5;
+
+                var extractedTrack = await ExtractMetadata(searchTerm);
+
+                if (extractedTrack != null)
+                {
+                    CurrentTrack = extractedTrack;
+                    ShowMetadata = true;
+                    StatusText = $"Found: {CurrentTrack.Title} by {CurrentTrack.Artist}";
+                    CliOutput += $"Match found: {CurrentTrack.Title} by {CurrentTrack.Artist}\n";
+                    DownloadProgress = 15;
+
+                    await RealDownload();
+                }
+                else
+                {
+                    StatusText = "No results found. Try refining your search.";
+                    CliOutput += "No YouTube results found for search term.\n";
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"Search failed: {ex.Message}";
+                CliOutput += $"YouTube search error: {ex.Message}\n";
+            }
+            finally
+            {
+                IsDownloading = false;
+                DownloadProgress = 0;
+            }
+        }
+
+        // ADD: Show instructions to user when auto-extraction fails
+        private async Task ShowSpotifyInstructions()
+        {
+            CliOutput += "\n=== SPOTIFY HELP ===\n";
+            CliOutput += "Since Spotify blocks automatic extraction, please:\n";
+            CliOutput += "1. Go to your Spotify link\n";
+            CliOutput += "2. Copy the track name and artist\n";
+            CliOutput += "3. Clear the URL field\n";
+            CliOutput += "4. Paste the track name (e.g., 'Artist Name - Song Title')\n";
+            CliOutput += "5. Click Download\n";
+            CliOutput += "===================\n\n";
+
+            StatusText = "See instructions in log. Copy track name manually from Spotify.";
         }
 
         private async Task<TrackInfo?> ExtractMetadata(string url)
@@ -1987,40 +2512,47 @@ namespace Symphex.ViewModels
         {
             if (string.IsNullOrWhiteSpace(DownloadUrl))
             {
-                StatusText = "⚠️ Please enter a URL or search term.";
+                StatusText = "Please enter a URL or search term.";
                 return;
             }
 
             if (string.IsNullOrEmpty(YtDlpPath))
             {
-                StatusText = "❌ yt-dlp not available. Please download it first.";
+                StatusText = "yt-dlp not available. Please download it first.";
                 return;
             }
 
+            // Check if it's a Spotify URL
+            if (IsSpotifyUrl(DownloadUrl))
+            {
+                await ProcessSpotifyDownload(DownloadUrl);
+                return;
+            }
+
+            // Continue with existing download logic for non-Spotify URLs
             IsDownloading = true;
             DownloadProgress = 0;
             ShowMetadata = false;
             CurrentTrack = new TrackInfo();
 
-            StatusText = $"🚀 Starting download for: {DownloadUrl}";
+            StatusText = $"Starting download for: {DownloadUrl}";
 
             try
             {
                 DownloadProgress = 5;
 
-                // ALWAYS extract metadata first, regardless of URL type
                 var extractedTrack = await ExtractMetadata(DownloadUrl);
 
                 if (extractedTrack != null)
                 {
                     CurrentTrack = extractedTrack;
                     ShowMetadata = true;
-                    StatusText = $"📝 Found: {CurrentTrack.Title} by {CurrentTrack.Artist}";
+                    StatusText = $"Found: {CurrentTrack.Title} by {CurrentTrack.Artist}";
                     DownloadProgress = 15;
                 }
                 else
                 {
-                    StatusText = "⚠️ Could not extract metadata, proceeding with download...";
+                    StatusText = "Could not extract metadata, proceeding with download...";
                     DownloadProgress = 10;
                 }
 
@@ -2028,7 +2560,7 @@ namespace Symphex.ViewModels
             }
             catch (Exception ex)
             {
-                StatusText = $"❌ Error: {ex.Message}";
+                StatusText = $"Error: {ex.Message}";
                 ShowMetadata = false;
             }
             finally
