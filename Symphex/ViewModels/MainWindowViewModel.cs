@@ -69,6 +69,33 @@ namespace Symphex.ViewModels
 
         [ObservableProperty]
         private bool hasRealAlbumArt = false;
+
+        [ObservableProperty]
+        private string genre = "";
+
+        [ObservableProperty]
+        private string year = "";
+
+        [ObservableProperty]
+        private int trackNumber = 0;
+
+        [ObservableProperty]
+        private int discNumber = 0;
+
+        [ObservableProperty]
+        private string composer = "";
+
+        [ObservableProperty]
+        private string albumArtist = "";
+
+        [ObservableProperty]
+        private string comment = "";
+
+        [ObservableProperty]
+        private int bitrate = 0;
+
+        [ObservableProperty]
+        private string encoder = "";
     }
 
     public partial class MainWindowViewModel : ViewModelBase
@@ -496,7 +523,6 @@ namespace Symphex.ViewModels
         {
             try
             {
-
                 bool isUrl = url.StartsWith("http://") || url.StartsWith("https://");
                 string searchPrefix = isUrl ? "" : "ytsearch1:";
                 string fullUrl = $"{searchPrefix}{url}";
@@ -530,8 +556,6 @@ namespace Symphex.ViewModels
                 string rawTitle = root.TryGetProperty("title", out var title) ? title.GetString() ?? "Unknown" : "Unknown";
                 string rawUploader = root.TryGetProperty("uploader", out var uploader) ? uploader.GetString() ?? "Unknown" : "Unknown";
 
-
-
                 string finalArtist = "Unknown";
                 string finalTitle = rawTitle;
 
@@ -545,7 +569,6 @@ namespace Symphex.ViewModels
 
                         finalArtist = CleanArtistName(potentialArtist);
                         finalTitle = CleanSongTitle(potentialSong);
-
                     }
                 }
                 else
@@ -554,10 +577,48 @@ namespace Symphex.ViewModels
                     finalTitle = CleanSongTitle(rawTitle);
                 }
 
+                // Extract additional metadata fields
                 string albumInfo = "";
                 if (root.TryGetProperty("album", out var album))
                 {
                     albumInfo = album.GetString() ?? "";
+                }
+
+                // Extract year from upload_date
+                string yearInfo = "";
+                if (root.TryGetProperty("upload_date", out var uploadDate))
+                {
+                    string dateStr = uploadDate.GetString() ?? "";
+                    if (dateStr.Length >= 4)
+                    {
+                        yearInfo = dateStr.Substring(0, 4);
+                    }
+                }
+
+                // Extract genre (often not available from YouTube, but worth trying)
+                string genreInfo = "";
+                if (root.TryGetProperty("genre", out var genre))
+                {
+                    genreInfo = genre.GetString() ?? "";
+                }
+                else if (root.TryGetProperty("categories", out var categories) && categories.ValueKind == JsonValueKind.Array)
+                {
+                    var categoryArray = categories.EnumerateArray().ToArray();
+                    if (categoryArray.Length > 0)
+                    {
+                        genreInfo = categoryArray[0].GetString() ?? "";
+                    }
+                }
+
+                // Extract track number (rarely available from YouTube)
+                int trackNum = 0;
+                if (root.TryGetProperty("track_number", out var trackNumber))
+                {
+                    trackNum = trackNumber.GetInt32();
+                }
+                else if (root.TryGetProperty("playlist_index", out var playlistIndex))
+                {
+                    trackNum = playlistIndex.GetInt32();
                 }
 
                 var trackInfo = new TrackInfo
@@ -568,8 +629,17 @@ namespace Symphex.ViewModels
                     Duration = FormatDuration(root.TryGetProperty("duration", out var duration) ? duration.GetDouble() : 0),
                     Url = root.TryGetProperty("webpage_url", out var webUrl) ? webUrl.GetString() ?? url : url,
                     Uploader = rawUploader,
-                    UploadDate = root.TryGetProperty("upload_date", out var uploadDate) ? FormatUploadDate(uploadDate.GetString()) : "",
-                    ViewCount = root.TryGetProperty("view_count", out var viewCount) ? viewCount.GetInt64() : 0
+                    UploadDate = root.TryGetProperty("upload_date", out var uploadDateProp) ? FormatUploadDate(uploadDateProp.GetString()) : "",
+                    ViewCount = root.TryGetProperty("view_count", out var viewCount) ? viewCount.GetInt64() : 0,
+
+                    // New metadata fields
+                    Genre = genreInfo,
+                    Year = yearInfo,
+                    TrackNumber = trackNum,
+                    AlbumArtist = finalArtist, // Use same as artist for now
+                    Comment = $"Downloaded from {rawUploader}",
+                    Bitrate = 0, // Will be set during download
+                    Encoder = "Symphex"
                 };
 
                 string? thumbnailUrl = GetBestThumbnailUrl(root);
@@ -577,7 +647,6 @@ namespace Symphex.ViewModels
                 {
                     trackInfo.Thumbnail = await LoadImageAsync(thumbnailUrl);
                 }
-
 
                 await FindRealAlbumArt(trackInfo);
 
@@ -687,30 +756,37 @@ namespace Symphex.ViewModels
         {
             try
             {
-
-                var albumArt = await SearchITunesAlbumArt(trackInfo.Title, trackInfo.Artist);
-
-                if (albumArt == null)
+                // Try iTunes first for better metadata
+                var iTunesResult = await SearchITunesForFullMetadata(trackInfo.Title, trackInfo.Artist);
+                if (iTunesResult.HasValue)
                 {
-                    albumArt = await SearchDeezerAlbumArt(trackInfo.Title, trackInfo.Artist);
-                }
+                    var (artworkBitmap, albumName, genreName, releaseYear, trackNum) = iTunesResult.Value;
 
-                if (albumArt == null && trackInfo.Title.Contains(" - "))
-                {
-                    string altTitle = trackInfo.Title.Replace(" - ", " ");
-                    albumArt = await SearchITunesAlbumArt(altTitle, trackInfo.Artist);
+                    trackInfo.AlbumArt = artworkBitmap;
+                    trackInfo.HasRealAlbumArt = artworkBitmap != null;
 
-                    if (albumArt == null)
+                    // Update metadata from iTunes if available and better
+                    if (!string.IsNullOrEmpty(albumName) && string.IsNullOrEmpty(trackInfo.Album))
                     {
-                        albumArt = await SearchDeezerAlbumArt(altTitle, trackInfo.Artist);
+                        trackInfo.Album = albumName;
                     }
+                    if (!string.IsNullOrEmpty(genreName) && string.IsNullOrEmpty(trackInfo.Genre))
+                    {
+                        trackInfo.Genre = genreName;
+                    }
+                    if (!string.IsNullOrEmpty(releaseYear) && string.IsNullOrEmpty(trackInfo.Year))
+                    {
+                        trackInfo.Year = releaseYear;
+                    }
+                    if (trackNum > 0 && trackInfo.TrackNumber == 0)
+                    {
+                        trackInfo.TrackNumber = trackNum;
+                    }
+                    return;
                 }
 
-                if (albumArt == null)
-                {
-                    albumArt = await SearchITunesAlbumArt("", trackInfo.Artist);
-                }
-
+                // Fallback to Deezer
+                var albumArt = await SearchDeezerAlbumArt(trackInfo.Title, trackInfo.Artist);
                 if (albumArt != null)
                 {
                     trackInfo.AlbumArt = albumArt;
@@ -729,6 +805,99 @@ namespace Symphex.ViewModels
             }
         }
 
+        private async Task<(Bitmap? albumArt, string album, string genre, string year, int trackNumber)?> SearchITunesForFullMetadata(string title, string artist)
+        {
+            try
+            {
+                var searchStrategies = new List<string>();
+
+                if (!string.IsNullOrEmpty(artist) && !string.IsNullOrEmpty(title))
+                {
+                    searchStrategies.Add($"{CleanForSearch(artist)} {CleanForSearch(title)}");
+                    searchStrategies.Add($"{CleanForSearch(title)} {CleanForSearch(artist)}");
+                }
+
+                foreach (var searchTerm in searchStrategies)
+                {
+                    if (string.IsNullOrEmpty(searchTerm.Trim()))
+                        continue;
+
+                    string searchUrl = $"https://itunes.apple.com/search?term={Uri.EscapeDataString(searchTerm)}&media=music&entity=song&limit=15";
+
+                    try
+                    {
+                        var response = await httpClient.GetStringAsync(searchUrl);
+                        using var doc = JsonDocument.Parse(response);
+
+                        if (doc.RootElement.TryGetProperty("results", out var results))
+                        {
+                            var scoredResults = new List<(JsonElement result, double score)>();
+
+                            foreach (var result in results.EnumerateArray())
+                            {
+                                if (result.TryGetProperty("trackName", out var trackName) &&
+                                    result.TryGetProperty("artistName", out var artistName))
+                                {
+                                    string resultTitle = trackName.GetString() ?? "";
+                                    string resultArtist = artistName.GetString() ?? "";
+
+                                    double titleScore = CalculateSimilarity(CleanForSearch(title), CleanForSearch(resultTitle));
+                                    double artistScore = CalculateSimilarity(CleanForSearch(artist), CleanForSearch(resultArtist));
+                                    double totalScore = (titleScore * 0.7) + (artistScore * 0.3);
+
+                                    if (totalScore > 0.6)
+                                    {
+                                        scoredResults.Add((result, totalScore));
+                                    }
+                                }
+                            }
+
+                            scoredResults.Sort((a, b) => b.score.CompareTo(a.score));
+
+                            var bestResult = scoredResults.FirstOrDefault().result;
+                            if (bestResult.ValueKind != JsonValueKind.Undefined)
+                            {
+                                Bitmap? albumArt = null;
+                                if (bestResult.TryGetProperty("artworkUrl100", out var artworkUrl))
+                                {
+                                    string imageUrl = artworkUrl.GetString()?.Replace("100x100", "600x600");
+                                    if (!string.IsNullOrEmpty(imageUrl))
+                                    {
+                                        albumArt = await LoadImageAsync(imageUrl);
+                                    }
+                                }
+
+                                string album = bestResult.TryGetProperty("collectionName", out var albumProp) ? albumProp.GetString() ?? "" : "";
+                                string genre = bestResult.TryGetProperty("primaryGenreName", out var genreProp) ? genreProp.GetString() ?? "" : "";
+                                string year = "";
+                                if (bestResult.TryGetProperty("releaseDate", out var releaseProp))
+                                {
+                                    string releaseDate = releaseProp.GetString() ?? "";
+                                    if (releaseDate.Length >= 4)
+                                    {
+                                        year = releaseDate.Substring(0, 4);
+                                    }
+                                }
+                                int trackNumber = bestResult.TryGetProperty("trackNumber", out var trackProp) ? trackProp.GetInt32() : 0;
+
+                                return (albumArt, album, genre, year, trackNumber);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        continue;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Handle exception
+            }
+
+            return null;
+        }
+
         private async Task ApplyProperMetadata()
         {
             try
@@ -744,16 +913,12 @@ namespace Symphex.ViewModels
                     return;
                 }
 
-
                 string tempOutput = Path.Combine(DownloadFolder, $"temp_{Guid.NewGuid():N}.mp3");
 
                 var argsList = new List<string>();
-
                 argsList.AddRange(new[] { "-i", audioFilePath });
 
                 Bitmap? artworkToUse = CurrentTrack.AlbumArt ?? CurrentTrack.Thumbnail;
-                string artworkSource = CurrentTrack.HasRealAlbumArt ? "album art" : "thumbnail";
-
 
                 string? tempArtwork = null;
                 if (artworkToUse != null)
@@ -768,11 +933,8 @@ namespace Symphex.ViewModels
                         }
 
                         argsList.AddRange(new[] { "-i", tempArtwork });
-
                         argsList.AddRange(new[] { "-map", "0:a", "-map", "1:0" });
-
                         argsList.AddRange(new[] { "-c:a", "copy", "-c:v", "mjpeg" });
-
                         argsList.AddRange(new[] { "-disposition:v", "attached_pic" });
                     }
                     catch (Exception ex)
@@ -788,6 +950,7 @@ namespace Symphex.ViewModels
 
                 argsList.AddRange(new[] { "-id3v2_version", "3" });
 
+                // Apply comprehensive metadata
                 if (!string.IsNullOrEmpty(CurrentTrack.Title) && CurrentTrack.Title != "Unknown")
                 {
                     argsList.AddRange(new[] { "-metadata", $"title={CurrentTrack.Title}" });
@@ -803,13 +966,54 @@ namespace Symphex.ViewModels
                     argsList.AddRange(new[] { "-metadata", $"album={CurrentTrack.Album}" });
                 }
 
-                if (!string.IsNullOrEmpty(CurrentTrack.UploadDate))
+                if (!string.IsNullOrEmpty(CurrentTrack.AlbumArtist))
                 {
-                    argsList.AddRange(new[] { "-metadata", $"date={CurrentTrack.UploadDate}" });
+                    argsList.AddRange(new[] { "-metadata", $"albumartist={CurrentTrack.AlbumArtist}" });
+                }
+
+                if (!string.IsNullOrEmpty(CurrentTrack.Genre))
+                {
+                    argsList.AddRange(new[] { "-metadata", $"genre={CurrentTrack.Genre}" });
+                }
+
+                if (!string.IsNullOrEmpty(CurrentTrack.Year))
+                {
+                    argsList.AddRange(new[] { "-metadata", $"date={CurrentTrack.Year}" });
+                    argsList.AddRange(new[] { "-metadata", $"year={CurrentTrack.Year}" });
+                }
+
+                if (CurrentTrack.TrackNumber > 0)
+                {
+                    argsList.AddRange(new[] { "-metadata", $"track={CurrentTrack.TrackNumber}" });
+                }
+
+                if (CurrentTrack.DiscNumber > 0)
+                {
+                    argsList.AddRange(new[] { "-metadata", $"disc={CurrentTrack.DiscNumber}" });
+                }
+
+                if (!string.IsNullOrEmpty(CurrentTrack.Comment))
+                {
+                    argsList.AddRange(new[] { "-metadata", $"comment={CurrentTrack.Comment}" });
+                }
+
+                if (!string.IsNullOrEmpty(CurrentTrack.Composer))
+                {
+                    argsList.AddRange(new[] { "-metadata", $"composer={CurrentTrack.Composer}" });
+                }
+
+                if (!string.IsNullOrEmpty(CurrentTrack.Encoder))
+                {
+                    argsList.AddRange(new[] { "-metadata", $"encoded_by={CurrentTrack.Encoder}" });
+                }
+
+                // Add URL as metadata for reference
+                if (!string.IsNullOrEmpty(CurrentTrack.Url))
+                {
+                    argsList.AddRange(new[] { "-metadata", $"website={CurrentTrack.Url}" });
                 }
 
                 argsList.Add(tempOutput);
-
 
                 var output = new StringBuilder();
                 var error = new StringBuilder();
@@ -820,17 +1024,6 @@ namespace Symphex.ViewModels
                     .WithStandardErrorPipe(PipeTarget.ToStringBuilder(error))
                     .WithValidation(CommandResultValidation.None)
                     .ExecuteAsync();
-
-                var outputText = output.ToString();
-                var errorText = error.ToString();
-
-                if (!string.IsNullOrEmpty(outputText))
-                {
-                }
-
-                if (!string.IsNullOrEmpty(errorText))
-                {
-                }
 
                 try
                 {
@@ -856,6 +1049,7 @@ namespace Symphex.ViewModels
             }
             catch (Exception ex)
             {
+                // Handle exception
             }
         }
 
