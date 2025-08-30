@@ -523,68 +523,90 @@ namespace Symphex.ViewModels
         {
             try
             {
-                bool isUrl = url.StartsWith("http://") || url.StartsWith("https://");
-                string searchPrefix = isUrl ? "" : "ytsearch1:";
-                string fullUrl = $"{searchPrefix}{url}";
+                // Always treat direct URLs as URLs, don't add search prefix
+                bool isDirectUrl = url.StartsWith("http://") || url.StartsWith("https://");
+                string fullUrl = isDirectUrl ? url : $"ytsearch1:{url}";
 
                 var output = new StringBuilder();
-                var args = $"\"{fullUrl}\" --dump-json --no-playlist";
+                var error = new StringBuilder();
+
+                // Use simpler arguments for better compatibility
+                var args = new List<string>
+        {
+            $"\"{fullUrl}\"",
+            "--dump-json",
+            "--no-playlist",
+            "--no-warnings",
+            "--quiet"
+        };
 
                 var result = await Cli.Wrap(YtDlpPath)
-                    .WithArguments(args)
+                    .WithArguments(string.Join(" ", args))
                     .WithStandardOutputPipe(PipeTarget.ToStringBuilder(output))
+                    .WithStandardErrorPipe(PipeTarget.ToStringBuilder(error))
                     .WithValidation(CommandResultValidation.None)
                     .ExecuteAsync();
 
+                var outputText = output.ToString().Trim();
+                var errorText = error.ToString();
+
                 if (result.ExitCode != 0)
                 {
+                    StatusText = $"Failed to extract metadata. Exit code: {result.ExitCode}";
+                    if (!string.IsNullOrEmpty(errorText))
+                    {
+                        StatusText += $" Error: {errorText.Split('\n').FirstOrDefault()}";
+                    }
                     return null;
                 }
 
-                var jsonOutput = output.ToString().Trim();
-                var lines = jsonOutput.Split('\n');
-                var jsonLine = lines.FirstOrDefault(line => line.StartsWith("{"));
+                if (string.IsNullOrEmpty(outputText))
+                {
+                    StatusText = "No metadata output received from yt-dlp";
+                    return null;
+                }
+
+                // Parse the JSON response
+                var lines = outputText.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                var jsonLine = lines.FirstOrDefault(line => line.Trim().StartsWith("{"));
 
                 if (string.IsNullOrEmpty(jsonLine))
                 {
+                    StatusText = "No valid JSON found in yt-dlp output";
                     return null;
                 }
 
                 using var doc = JsonDocument.Parse(jsonLine);
                 var root = doc.RootElement;
 
+                // Extract basic info
                 string rawTitle = root.TryGetProperty("title", out var title) ? title.GetString() ?? "Unknown" : "Unknown";
                 string rawUploader = root.TryGetProperty("uploader", out var uploader) ? uploader.GetString() ?? "Unknown" : "Unknown";
 
+                // Clean up title and extract artist
                 string finalArtist = "Unknown";
                 string finalTitle = rawTitle;
 
+                // Try to parse artist - title format
                 if (rawTitle.Contains(" - "))
                 {
                     var parts = rawTitle.Split(new[] { " - " }, 2, StringSplitOptions.RemoveEmptyEntries);
                     if (parts.Length == 2)
                     {
-                        string potentialArtist = parts[0].Trim();
-                        string potentialSong = parts[1].Trim();
-
-                        finalArtist = CleanArtistName(potentialArtist);
-                        finalTitle = CleanSongTitle(potentialSong);
+                        finalArtist = CleanArtistName(parts[0]);
+                        finalTitle = CleanSongTitle(parts[1]);
                     }
                 }
                 else
                 {
+                    // Fallback to using uploader as artist
                     finalArtist = CleanArtistName(rawUploader);
                     finalTitle = CleanSongTitle(rawTitle);
                 }
 
-                // Extract additional metadata fields
-                string albumInfo = "";
-                if (root.TryGetProperty("album", out var album))
-                {
-                    albumInfo = album.GetString() ?? "";
-                }
+                // Extract additional metadata
+                string albumInfo = root.TryGetProperty("album", out var album) ? album.GetString() ?? "" : "";
 
-                // Extract year from upload_date
                 string yearInfo = "";
                 if (root.TryGetProperty("upload_date", out var uploadDate))
                 {
@@ -593,32 +615,6 @@ namespace Symphex.ViewModels
                     {
                         yearInfo = dateStr.Substring(0, 4);
                     }
-                }
-
-                // Extract genre (often not available from YouTube, but worth trying)
-                string genreInfo = "";
-                if (root.TryGetProperty("genre", out var genre))
-                {
-                    genreInfo = genre.GetString() ?? "";
-                }
-                else if (root.TryGetProperty("categories", out var categories) && categories.ValueKind == JsonValueKind.Array)
-                {
-                    var categoryArray = categories.EnumerateArray().ToArray();
-                    if (categoryArray.Length > 0)
-                    {
-                        genreInfo = categoryArray[0].GetString() ?? "";
-                    }
-                }
-
-                // Extract track number (rarely available from YouTube)
-                int trackNum = 0;
-                if (root.TryGetProperty("track_number", out var trackNumber))
-                {
-                    trackNum = trackNumber.GetInt32();
-                }
-                else if (root.TryGetProperty("playlist_index", out var playlistIndex))
-                {
-                    trackNum = playlistIndex.GetInt32();
                 }
 
                 var trackInfo = new TrackInfo
@@ -631,32 +627,31 @@ namespace Symphex.ViewModels
                     Uploader = rawUploader,
                     UploadDate = root.TryGetProperty("upload_date", out var uploadDateProp) ? FormatUploadDate(uploadDateProp.GetString()) : "",
                     ViewCount = root.TryGetProperty("view_count", out var viewCount) ? viewCount.GetInt64() : 0,
-
-                    // New metadata fields
-                    Genre = genreInfo,
-                    Year = yearInfo,
-                    TrackNumber = trackNum,
-                    AlbumArtist = finalArtist, // Use same as artist for now
+                    AlbumArtist = finalArtist,
                     Comment = $"Downloaded from {rawUploader}",
-                    Bitrate = 0, // Will be set during download
-                    Encoder = "Symphex"
+                    Encoder = "Symphex",
+                    Year = yearInfo
                 };
 
+                // Load thumbnail
                 string? thumbnailUrl = GetBestThumbnailUrl(root);
                 if (!string.IsNullOrEmpty(thumbnailUrl))
                 {
                     trackInfo.Thumbnail = await LoadImageAsync(thumbnailUrl);
                 }
 
+                // Find real album art and additional metadata
                 await FindRealAlbumArt(trackInfo);
 
                 return trackInfo;
             }
             catch (Exception ex)
             {
+                StatusText = $"Error extracting metadata: {ex.Message}";
                 return null;
             }
         }
+
 
         private string CleanSongTitle(string title)
         {
@@ -665,22 +660,69 @@ namespace Symphex.ViewModels
 
             string cleaned = title;
 
+            // More comprehensive cleaning patterns
             var patterns = new[]
             {
-        @"\s*\(Official Video\)",
-        @"\s*\(Official Audio\)",
-        @"\s*\(Official Music Video\)",
+        @"\s*\(Official\s*Video\)",
+        @"\s*\(Official\s*Audio\)",
+        @"\s*\(Official\s*Music\s*Video\)",
         @"\s*\(Official\)",
-        @"\s*\(Lyrics\)",
-        @"\s*\(Lyric Video\)",
+        @"\s*\(Lyrics?\)",
+        @"\s*\(Lyric\s*Video\)",
         @"\s*\(HD\)",
         @"\s*\(4K\)",
-        @"\s*\[Official Video\]",
-        @"\s*\[Official Audio\]",
-        @"\s*\[Official Music Video\]",
-        @"\s*\[Lyrics\]",
-        @"\s*\[(Official HD Music Video)]",
-        @"\s*\[HD\]"
+        @"\s*\[Official\s*Video\]",
+        @"\s*\[Official\s*Audio\]",
+        @"\s*\[Official\s*Music\s*Video\]",
+        @"\s*\[Lyrics?\]",
+        @"\s*\[HD\]",
+        @"\s*\[4K\]",
+        @"\s*\(Music\s*Video\)",
+        @"\s*\[Music\s*Video\]",
+        @"\s*\(Visualizer\)",
+        @"\s*\[Visualizer\]",
+        @"\s*\(Live\)",
+        @"\s*\[Live\]"
+    };
+
+            foreach (var pattern in patterns)
+            {
+                cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, pattern, "",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            }
+
+            // Clean up quotes and special characters
+            cleaned = cleaned
+                .Replace("\"", "")
+                .Replace("'", "")
+                .Replace("\u201C", "") // Left double quote
+                .Replace("\u201D", "") // Right double quote
+                .Replace("\u2018", "") // Left single quote
+                .Replace("\u2019", "") // Right single quote
+                .Replace("_", " ")
+                .Replace("  ", " ")
+                .Trim();
+
+            return string.IsNullOrEmpty(cleaned) ? title : cleaned;
+        }
+
+        private string CleanArtistName(string artist)
+        {
+            if (string.IsNullOrEmpty(artist))
+                return "Unknown";
+
+            string cleaned = artist;
+
+            // Clean common channel suffixes and patterns
+            var patterns = new[]
+            {
+        @"\s*-\s*Topic",
+        @"\s*VEVO",
+        @"\s*Records",
+        @"\s*Music",
+        @"\s*Official",
+        @"\s*Channel",
+        @"\s*TV"
     };
 
             foreach (var pattern in patterns)
@@ -700,33 +742,7 @@ namespace Symphex.ViewModels
                 .Replace("  ", " ")
                 .Trim();
 
-            return cleaned;
-        }
-
-        private string CleanArtistName(string artist)
-        {
-            if (string.IsNullOrEmpty(artist))
-                return "Unknown";
-
-            string cleaned = artist;
-
-            cleaned = cleaned
-                .Replace(" - Topic", "", StringComparison.OrdinalIgnoreCase)
-                .Replace("VEVO", "", StringComparison.OrdinalIgnoreCase)
-                .Replace(" Records", "", StringComparison.OrdinalIgnoreCase)
-                .Replace(" Music", "", StringComparison.OrdinalIgnoreCase)
-                .Replace("Official", "", StringComparison.OrdinalIgnoreCase)
-                .Replace("\"", "")
-                .Replace("'", "")
-                .Replace("\u201C", "")
-                .Replace("\u201D", "")
-                .Replace("\u2018", "")
-                .Replace("\u2019", "")
-                .Replace("_", " ")
-                .Replace("  ", " ")
-                .Trim();
-
-            return cleaned;
+            return string.IsNullOrEmpty(cleaned) ? artist : cleaned;
         }
 
         private string GetBestThumbnailUrl(JsonElement root)
@@ -756,6 +772,15 @@ namespace Symphex.ViewModels
         {
             try
             {
+                // Skip if we don't have proper title/artist info
+                if (string.IsNullOrEmpty(trackInfo.Title) || string.IsNullOrEmpty(trackInfo.Artist) ||
+                    trackInfo.Title == "Unknown" || trackInfo.Artist == "Unknown")
+                {
+                    trackInfo.AlbumArt = trackInfo.Thumbnail;
+                    trackInfo.HasRealAlbumArt = false;
+                    return;
+                }
+
                 // Try iTunes first for better metadata
                 var iTunesResult = await SearchITunesForFullMetadata(trackInfo.Title, trackInfo.Artist);
                 if (iTunesResult.HasValue)
@@ -766,22 +791,24 @@ namespace Symphex.ViewModels
                     trackInfo.HasRealAlbumArt = artworkBitmap != null;
 
                     // Update metadata from iTunes if available and better
-                    if (!string.IsNullOrEmpty(albumName) && string.IsNullOrEmpty(trackInfo.Album))
+                    if (!string.IsNullOrEmpty(albumName))
                     {
                         trackInfo.Album = albumName;
                     }
-                    if (!string.IsNullOrEmpty(genreName) && string.IsNullOrEmpty(trackInfo.Genre))
+                    if (!string.IsNullOrEmpty(genreName))
                     {
                         trackInfo.Genre = genreName;
                     }
-                    if (!string.IsNullOrEmpty(releaseYear) && string.IsNullOrEmpty(trackInfo.Year))
+                    if (!string.IsNullOrEmpty(releaseYear))
                     {
                         trackInfo.Year = releaseYear;
                     }
-                    if (trackNum > 0 && trackInfo.TrackNumber == 0)
+                    if (trackNum > 0)
                     {
                         trackInfo.TrackNumber = trackNum;
                     }
+
+                    trackInfo.AlbumArtist = trackInfo.Artist;
                     return;
                 }
 
@@ -1052,7 +1079,7 @@ namespace Symphex.ViewModels
             {
                 // Handle exception
             }
-        }    
+        }
 
         private async Task<Bitmap?> SearchDeezerAlbumArt(string title, string artist)
         {
@@ -1240,6 +1267,8 @@ namespace Symphex.ViewModels
             try
             {
                 DownloadProgress = 5;
+
+                // ALWAYS extract metadata first, regardless of URL type
                 var extractedTrack = await ExtractMetadata(DownloadUrl);
 
                 if (extractedTrack != null)
@@ -1247,12 +1276,13 @@ namespace Symphex.ViewModels
                     CurrentTrack = extractedTrack;
                     ShowMetadata = true;
                     StatusText = $"📝 Found: {CurrentTrack.Title} by {CurrentTrack.Artist}";
+                    DownloadProgress = 15;
                 }
                 else
                 {
+                    StatusText = "⚠️ Could not extract metadata, proceeding with download...";
+                    DownloadProgress = 10;
                 }
-
-                DownloadProgress = 15;
 
                 await RealDownload();
             }
@@ -1273,27 +1303,24 @@ namespace Symphex.ViewModels
             {
                 DownloadProgress = 20;
 
-                if (!string.IsNullOrEmpty(FfmpegPath))
-                {
-                }
-
                 bool isUrl = DownloadUrl.StartsWith("http://") || DownloadUrl.StartsWith("https://");
-                string searchPrefix = isUrl ? "" : "ytsearch1:";
-                string fullUrl = $"{searchPrefix}{DownloadUrl}";
+                string fullUrl = isUrl ? DownloadUrl : $"ytsearch1:{DownloadUrl}";
 
                 var output = new StringBuilder();
                 var error = new StringBuilder();
 
+                // Create filename based on cleaned metadata
                 string filenameTemplate;
                 if (CurrentTrack != null && !string.IsNullOrEmpty(CurrentTrack.Title) && !string.IsNullOrEmpty(CurrentTrack.Artist))
                 {
                     string cleanTitle = SanitizeFilename(CurrentTrack.Title);
                     string cleanArtist = SanitizeFilename(CurrentTrack.Artist);
-                    filenameTemplate = Path.Combine(DownloadFolder, $"{cleanTitle} - {cleanArtist}.%(ext)s");
+                    filenameTemplate = Path.Combine(DownloadFolder, $"{cleanArtist} - {cleanTitle}.%(ext)s");
                 }
                 else
                 {
-                    filenameTemplate = Path.Combine(DownloadFolder, "%(title)s.%(ext)s");
+                    // Fallback to default naming
+                    filenameTemplate = Path.Combine(DownloadFolder, "%(uploader)s - %(title)s.%(ext)s");
                 }
 
                 List<string> argsList = new List<string>
@@ -1303,9 +1330,12 @@ namespace Symphex.ViewModels
             "--audio-format", "mp3",
             "--audio-quality", "0",
             "--no-playlist",
+            "--embed-thumbnail",
+            "--add-metadata",
             "-o", $"\"{filenameTemplate}\""
         };
 
+                // Add FFmpeg location if available
                 if (!string.IsNullOrEmpty(FfmpegPath) && File.Exists(FfmpegPath))
                 {
                     string ffmpegDir = Path.GetDirectoryName(FfmpegPath) ?? "";
@@ -1329,69 +1359,89 @@ namespace Symphex.ViewModels
                 var outputText = output.ToString();
                 var errorText = error.ToString();
 
-                if (!string.IsNullOrEmpty(outputText))
-                {
-                }
-
-                if (!string.IsNullOrEmpty(errorText))
-                {
-                }
-
                 if (result.ExitCode == 0)
                 {
                     DownloadProgress = 95;
                     StatusText = "🔧 Applying metadata and finalizing...";
 
-                    string actualFilePath = "";
+                    // Find the actual downloaded file
+                    string actualFilePath = await FindDownloadedFile(outputText);
 
-                    if (CurrentTrack != null)
+                    if (!string.IsNullOrEmpty(actualFilePath) && CurrentTrack != null)
                     {
-                        var lines = outputText.Split('\n');
-                        var destinationLine = lines.FirstOrDefault(l =>
-                            l.Contains("[ExtractAudio] Destination:") ||
-                            l.Contains("has already been downloaded"));
+                        CurrentTrack.FileName = Path.GetFileName(actualFilePath);
 
-                        if (destinationLine != null)
-                        {
-                            int destinationIndex = destinationLine.IndexOf("Destination: ");
-                            if (destinationIndex >= 0)
-                            {
-                                actualFilePath = destinationLine.Substring(destinationIndex + "Destination: ".Length).Trim();
-                                string filename = Path.GetFileName(actualFilePath);
-                                CurrentTrack.FileName = filename;
-
-                                await ApplyProperMetadata();
-                            }
-                        }
-                        else
-                        {
-                            if (!string.IsNullOrEmpty(CurrentTrack.Title) && !string.IsNullOrEmpty(CurrentTrack.Artist))
-                            {
-                                string cleanTitle = SanitizeFilename(CurrentTrack.Title);
-                                string cleanArtist = SanitizeFilename(CurrentTrack.Artist);
-                                string expectedFilename = $"{cleanTitle} - {cleanArtist}.mp3";
-                                actualFilePath = Path.Combine(DownloadFolder, expectedFilename);
-                                CurrentTrack.FileName = expectedFilename;
-                                await ApplyProperMetadata();
-                            }
-                        }
+                        // Apply enhanced metadata
+                        await ApplyProperMetadata();
                     }
 
                     DownloadProgress = 100;
-
-                    // Verify the file actually exists and provide detailed feedback
                     await VerifyAndReportDownloadSuccess(actualFilePath);
                 }
                 else
                 {
-                    throw new Exception($"Download failed with exit code {result.ExitCode}");
+                    throw new Exception($"Download failed with exit code {result.ExitCode}: {errorText}");
                 }
             }
             catch (Exception ex)
             {
+                StatusText = $"❌ Download failed: {ex.Message}";
                 throw;
             }
         }
+
+        private async Task<string> FindDownloadedFile(string ytDlpOutput)
+        {
+            try
+            {
+                // Parse yt-dlp output to find the actual downloaded file
+                var lines = ytDlpOutput.Split('\n');
+
+                // Look for extraction destination line
+                var destinationLine = lines.FirstOrDefault(l =>
+                    l.Contains("[ExtractAudio] Destination:") ||
+                    l.Contains("has already been downloaded"));
+
+                if (destinationLine != null)
+                {
+                    if (destinationLine.Contains("Destination: "))
+                    {
+                        int destinationIndex = destinationLine.IndexOf("Destination: ");
+                        return destinationLine.Substring(destinationIndex + "Destination: ".Length).Trim();
+                    }
+                }
+
+                // Fallback: look for recently created MP3 files
+                if (Directory.Exists(DownloadFolder))
+                {
+                    var recentFiles = Directory.GetFiles(DownloadFolder, "*.mp3")
+                        .Where(f => File.GetCreationTime(f) > DateTime.Now.AddMinutes(-2))
+                        .OrderByDescending(f => File.GetCreationTime(f))
+                        .ToArray();
+
+                    if (recentFiles.Length > 0)
+                    {
+                        return recentFiles[0];
+                    }
+                }
+
+                // Final fallback: construct expected filename
+                if (CurrentTrack != null && !string.IsNullOrEmpty(CurrentTrack.Title) && !string.IsNullOrEmpty(CurrentTrack.Artist))
+                {
+                    string cleanTitle = SanitizeFilename(CurrentTrack.Title);
+                    string cleanArtist = SanitizeFilename(CurrentTrack.Artist);
+                    string expectedFilename = $"{cleanArtist} - {cleanTitle}.mp3";
+                    return Path.Combine(DownloadFolder, expectedFilename);
+                }
+
+                return "";
+            }
+            catch (Exception ex)
+            {
+                return "";
+            }
+        }
+
         private async Task ShowSuccessToastNotification(string filename, string fileSize)
         {
             try
