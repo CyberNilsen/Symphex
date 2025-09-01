@@ -18,7 +18,7 @@
 	</Design.DataContext>
 
 	<Window.Styles>
-		<!-- Your existing styles -->
+		
 		<Style Selector="Button.download">
 			<Setter Property="Background" Value="#1e40af"/>
 			<Setter Property="Foreground" Value="White"/>
@@ -71,7 +71,7 @@
 		<Style Selector="TextBox.large:focus /template/ Border#PART_BorderElement">
 			<Setter Property="BorderBrush" Value="#3b82f6"/>
 		</Style>
-		<!-- Watermark styling for better visibility -->
+		
 		<Style Selector="TextBox.large /template/ TextBlock#PART_Watermark">
 			<Setter Property="Foreground" Value="#666666"/>
 		</Style>
@@ -108,7 +108,7 @@
 	</Window.Styles>
 
 	<Grid>
-		<!-- Success Toast Notification -->
+		
 		<Border IsVisible="{Binding IsToastVisible}"
 				HorizontalAlignment="Center"
 				VerticalAlignment="Top"
@@ -136,7 +136,7 @@
 		</Border>
 
 		<ScrollViewer VerticalScrollBarVisibility="Auto" Padding="40">
-			<!-- Centered container with equal margins -->
+			
 			<Grid MaxWidth="800" HorizontalAlignment="Center">
 				<Grid.RowDefinitions>
 					<RowDefinition Height="Auto"/>
@@ -146,7 +146,6 @@
 					<RowDefinition Height="Auto"/>
 				</Grid.RowDefinitions>
 
-				<!-- Header - Centered at top -->
 				<StackPanel Grid.Row="0" Spacing="8" HorizontalAlignment="Center">
 					<Border Width="70" Height="70" CornerRadius="25" HorizontalAlignment="Center">
 						<Border.Background>
@@ -167,7 +166,6 @@
 					</StackPanel>
 				</StackPanel>
 
-				<!-- Main Content - Two equal columns -->
 				<Grid Grid.Row="2">
 					<Grid.ColumnDefinitions>
 						<ColumnDefinition Width="*"/>
@@ -175,13 +173,11 @@
 						<ColumnDefinition Width="*"/>
 					</Grid.ColumnDefinitions>
 
-					<!-- Left Column - Download Controls -->
 					<Border Grid.Column="0" Classes="card" Padding="24" MinHeight="360" Width="390">
 						<StackPanel Spacing="16" VerticalAlignment="Center">
 							<TextBlock Text="Download Section" FontSize="18" FontWeight="Bold"
 									   Foreground="#ffffff" HorizontalAlignment="Center"/>
 
-							<!-- URL Input -->
 							<StackPanel Spacing="10">
 								<TextBlock Text="Paste your music link here" FontSize="16" FontWeight="Medium"
 										   Foreground="#ffffff" HorizontalAlignment="Center"/>
@@ -201,7 +197,6 @@
 										 ScrollViewer.VerticalScrollBarVisibility="Auto"/>
 							</StackPanel>
 
-							<!-- Download Progress -->
 							<StackPanel Spacing="6" IsVisible="{Binding IsDownloading}">
 								<TextBlock Text="Downloading..." FontSize="14" FontWeight="Medium"
 										   Foreground="#ffffff" HorizontalAlignment="Center"/>
@@ -212,11 +207,9 @@
 								</Border>
 							</StackPanel>
 
-							<!-- Download Button -->
 							<Button Content="🎵 Download My Music" Command="{Binding DownloadCommand}"
 									Classes="download" HorizontalAlignment="Center"/>
 
-							<!-- Action Buttons -->
 							<StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
 								<Button Content="Clear" Command="{Binding ClearCommand}" Classes="simple"/>
 								<Button Content="📁 Open Downloads" Command="{Binding OpenFolderCommand}" Classes="simple"/>
@@ -224,16 +217,13 @@
 						</StackPanel>
 					</Border>
 
-					<!-- Right Column - Song Preview -->
 					<Border Grid.Column="2" Classes="preview" Padding="24" MinHeight="360" Width="390">
 						<StackPanel Spacing="16" Width="342">
 							<TextBlock Text="Song Preview" FontSize="18" FontWeight="Bold"
 									   Foreground="#ffffff" HorizontalAlignment="Center"/>
 
-							<!-- Preview Content -->
 							<StackPanel Spacing="12" VerticalAlignment="Center" Height="280" Width="342">
 
-								<!-- When No Song -->
 								<StackPanel Spacing="12" HorizontalAlignment="Center" VerticalAlignment="Center"
 											IsVisible="{Binding CurrentTrack.Title, Converter={x:Static StringConverters.IsNullOrEmpty}}">
 									<Border Width="80" Height="80" CornerRadius="12" Background="#2a2a2a">
@@ -249,10 +239,8 @@
 									</StackPanel>
 								</StackPanel>
 
-								<!-- When Song is Loaded -->
 								<StackPanel Spacing="12" IsVisible="{Binding CurrentTrack.Title, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
 
-									<!-- Album Art -->
 									<Border Width="120" Height="120" CornerRadius="12" Background="#2a2a2a" HorizontalAlignment="Center">
 										<Grid>
 											<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="4">
@@ -263,7 +251,6 @@
 										</Grid>
 									</Border>
 
-									<!-- Song Details -->
 									<StackPanel Spacing="6">
 										<TextBlock Text="{Binding CurrentTrack.Title, FallbackValue='Song Title'}"
 												   FontSize="17" FontWeight="Bold" Foreground="#ffffff"
@@ -277,7 +264,6 @@
 												   IsVisible="{Binding CurrentTrack.Album, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
 												   TextWrapping="Wrap" TextAlignment="Center"/>
 
-										<!-- Quality Badge -->
 										<Border Background="#3b82f6" CornerRadius="12" Padding="8,4" HorizontalAlignment="Center" Margin="0,4,0,0"
 												IsVisible="{Binding CurrentTrack.AlbumArt, Converter={x:Static ObjectConverters.IsNotNull}}">
 											<TextBlock Text="{Binding CurrentTrack.HasRealAlbumArt, Converter={x:Static converters:BoolToAlbumArtStatusConverter.Instance}}"
@@ -293,7 +279,6 @@
 
 				</Grid>
 
-				<!-- Footer - Centered at bottom -->
 				<Border Grid.Row="4" Background="#1a1a1a" CornerRadius="10" Padding="16,10" HorizontalAlignment="Center" MinWidth="400">
 					<StackPanel Spacing="4">
 						<TextBlock Text="📁 Downloads saved to:" FontSize="13" Foreground="#999999" HorizontalAlignment="Center"/>
