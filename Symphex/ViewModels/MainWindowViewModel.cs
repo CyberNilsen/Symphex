@@ -153,6 +153,9 @@ namespace Symphex.ViewModels
         [ObservableProperty]
         private int totalBatchCount = 0;
 
+        [ObservableProperty]
+        private string currentBatchFilePath = "";
+
         private string YtDlpPath { get; set; } = "";
         private string FfmpegPath { get; set; } = "";
         private string YtDlpExecutableName => GetYtDlpExecutableName();
@@ -2355,6 +2358,10 @@ namespace Symphex.ViewModels
                 string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
                 string batchFilePath = Path.Combine(DownloadFolder, $"batch_urls_{timestamp}.txt");
                 await File.WriteAllLinesAsync(batchFilePath, urls);
+
+                // STORE THE BATCH FILE PATH FOR LATER DELETION
+                CurrentBatchFilePath = batchFilePath;
+
                 CliOutput += $"Created batch file: {Path.GetFileName(batchFilePath)}\n\n";
 
                 // Initialize batch processing state
@@ -2407,17 +2414,32 @@ namespace Symphex.ViewModels
                 // Check if batch is complete
                 if (PendingUrls == null || CurrentBatchIndex >= PendingUrls.Count)
                 {
+                    // DELETE BATCH FILE BEFORE COMPLETING
+                    if (!string.IsNullOrEmpty(CurrentBatchFilePath) && File.Exists(CurrentBatchFilePath))
+                    {
+                        try
+                        {
+                            File.Delete(CurrentBatchFilePath);
+                            CliOutput += $"Batch file deleted: {Path.GetFileName(CurrentBatchFilePath)}\n";
+                        }
+                        catch (Exception deleteEx)
+                        {
+                            CliOutput += $"Could not delete batch file: {deleteEx.Message}\n";
+                        }
+                    }
+
                     // Batch complete
                     StatusText = $"Batch download complete! Downloaded {TotalBatchCount} songs.";
                     CliOutput += $"\n=== BATCH PROCESSING COMPLETE ===\n";
                     CliOutput += $"Successfully processed {TotalBatchCount} URLs.\n";
                     CliOutput += $"Check your download folder: {DownloadFolder}\n\n";
 
-                    // Reset batch state
+                    // Reset batch state including file path
                     IsBatchProcessing = false;
                     IsDownloading = false;
                     CurrentBatchIndex = 0;
                     TotalBatchCount = 0;
+                    CurrentBatchFilePath = ""; // Clear the file path
                     PendingUrls?.Clear();
                     DownloadProgress = 0;
                     ShowMetadata = false;
@@ -2481,8 +2503,24 @@ namespace Symphex.ViewModels
             {
                 CliOutput += $"Critical batch error: {ex.Message}\n";
                 StatusText = "Batch processing stopped due to error.";
+
+                // ALSO DELETE BATCH FILE ON ERROR
+                if (!string.IsNullOrEmpty(CurrentBatchFilePath) && File.Exists(CurrentBatchFilePath))
+                {
+                    try
+                    {
+                        File.Delete(CurrentBatchFilePath);
+                        CliOutput += $"Batch file deleted after error: {Path.GetFileName(CurrentBatchFilePath)}\n";
+                    }
+                    catch (Exception deleteEx)
+                    {
+                        CliOutput += $"Could not delete batch file after error: {deleteEx.Message}\n";
+                    }
+                }
+
                 IsBatchProcessing = false;
                 IsDownloading = false;
+                CurrentBatchFilePath = ""; // Clear the file path
             }
         }
 
