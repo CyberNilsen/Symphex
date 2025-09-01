@@ -141,6 +141,18 @@ namespace Symphex.ViewModels
         [ObservableProperty]
         private string toastMessage = "";
 
+        [ObservableProperty]
+        private List<string> pendingUrls = new List<string>();
+
+        [ObservableProperty]
+        private bool isBatchProcessing = false;
+
+        [ObservableProperty]
+        private int currentBatchIndex = 0;
+
+        [ObservableProperty]
+        private int totalBatchCount = 0;
+
         private string YtDlpPath { get; set; } = "";
         private string FfmpegPath { get; set; } = "";
         private string YtDlpExecutableName => GetYtDlpExecutableName();
@@ -558,9 +570,7 @@ namespace Symphex.ViewModels
 
                 StatusText = "Spotify URL detected. Converting to YouTube search...";
 
-                // Since web scraping is unreliable, let's try a different approach
-                // Convert the Spotify URL to a search term and let user confirm
-
+                // Convert the Spotify URL to a search term
                 string searchTerm = await ConvertSpotifyUrlToSearchTerm(spotifyUrl);
 
                 if (!string.IsNullOrEmpty(searchTerm))
@@ -568,25 +578,170 @@ namespace Symphex.ViewModels
                     CliOutput += $"Converted to search: {searchTerm}\n";
                     StatusText = $"Searching YouTube for: {searchTerm}";
 
-                    // Update the download URL to the search term and process it
-                    DownloadUrl = searchTerm;
+                    // IMPORTANT: Don't update DownloadUrl in batch mode
+                    if (!IsBatchProcessing)
+                    {
+                        DownloadUrl = searchTerm;
+                    }
 
-                    // Process as a regular YouTube search
-                    await ProcessAsYouTubeSearch(searchTerm);
+                    // Process as a regular YouTube search with the converted term
+                    await ProcessConvertedSpotifySearch(searchTerm);
                 }
                 else
                 {
-                    StatusText = "Could not convert Spotify URL. Please copy track name manually.";
-                    CliOutput += "Conversion failed. Manual input required.\n";
+                    StatusText = "Could not convert Spotify URL. Skipping...";
+                    CliOutput += "Conversion failed. Skipping this URL.\n";
 
-                    // Show instructions to user
-                    await ShowSpotifyInstructions();
+                    if (IsBatchProcessing)
+                    {
+                        CliOutput += "Continuing to next URL in batch...\n";
+                    }
                 }
             }
             catch (Exception ex)
             {
                 StatusText = $"Error processing Spotify URL: {ex.Message}";
                 CliOutput += $"Spotify processing error: {ex.Message}\n";
+
+                if (IsBatchProcessing)
+                {
+                    CliOutput += "Continuing to next URL in batch...\n";
+                }
+            }
+        }
+
+        private async Task ProcessConvertedSpotifySearch(string searchTerm)
+        {
+            try
+            {
+                DownloadProgress = 0;
+                ShowMetadata = false;
+                CurrentTrack = new TrackInfo();
+
+                StatusText = $"Searching YouTube for: {searchTerm}";
+                CliOutput += $"YouTube search initiated: {searchTerm}\n";
+
+                DownloadProgress = 5;
+
+                var extractedTrack = await ExtractMetadata(searchTerm);
+
+                if (extractedTrack != null)
+                {
+                    CurrentTrack = extractedTrack;
+                    ShowMetadata = true;
+                    StatusText = $"Found: {CurrentTrack.Title} by {CurrentTrack.Artist}";
+                    CliOutput += $"Match found: {CurrentTrack.Title} by {CurrentTrack.Artist}\n";
+                    DownloadProgress = 15;
+
+                    // Proceed with actual download
+                    await RealDownloadWithSearchTerm(searchTerm);
+                }
+                else
+                {
+                    StatusText = "No results found for converted Spotify search.";
+                    CliOutput += "No YouTube results found for converted Spotify term.\n";
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"Converted search failed: {ex.Message}";
+                CliOutput += $"Converted YouTube search error: {ex.Message}\n";
+                throw;
+            }
+        }
+
+        private async Task RealDownloadWithSearchTerm(string searchTerm)
+        {
+            try
+            {
+                DownloadProgress = 20;
+
+                // Always treat this as a search since it came from Spotify conversion
+                string fullUrl = $"ytsearch1:{searchTerm}";
+
+                var output = new StringBuilder();
+                var error = new StringBuilder();
+
+                // Create filename based on cleaned metadata
+                string filenameTemplate;
+                if (CurrentTrack != null && !string.IsNullOrEmpty(CurrentTrack.Title) && !string.IsNullOrEmpty(CurrentTrack.Artist))
+                {
+                    string cleanTitle = SanitizeFilename(CurrentTrack.Title);
+                    string cleanArtist = SanitizeFilename(CurrentTrack.Artist);
+                    filenameTemplate = Path.Combine(DownloadFolder, $"{cleanArtist} - {cleanTitle}.%(ext)s");
+                }
+                else
+                {
+                    filenameTemplate = Path.Combine(DownloadFolder, "%(uploader)s - %(title)s.%(ext)s");
+                }
+
+                List<string> argsList = new List<string>
+        {
+            $"\"{fullUrl}\"",
+            "--extract-audio",
+            "--audio-format", "mp3",
+            "--audio-quality", "0",
+            "--no-playlist",
+            "--embed-thumbnail",
+            "--add-metadata",
+            "-o", $"\"{filenameTemplate}\""
+        };
+
+                // Add FFmpeg location if available
+                if (!string.IsNullOrEmpty(FfmpegPath) && File.Exists(FfmpegPath))
+                {
+                    string ffmpegDir = Path.GetDirectoryName(FfmpegPath) ?? "";
+                    argsList.AddRange(new[] { "--ffmpeg-location", $"\"{ffmpegDir}\"" });
+                }
+
+                string args = string.Join(" ", argsList);
+
+                StatusText = "Downloading converted Spotify track...";
+                CliOutput += "Starting download of converted Spotify track...\n";
+                DownloadProgress = 30;
+
+                var result = await Cli.Wrap(YtDlpPath)
+                    .WithArguments(args)
+                    .WithStandardOutputPipe(PipeTarget.ToStringBuilder(output))
+                    .WithStandardErrorPipe(PipeTarget.ToStringBuilder(error))
+                    .WithValidation(CommandResultValidation.None)
+                    .ExecuteAsync();
+
+                DownloadProgress = 90;
+
+                var outputText = output.ToString();
+                var errorText = error.ToString();
+
+                if (result.ExitCode == 0)
+                {
+                    DownloadProgress = 95;
+                    StatusText = "Applying metadata and finalizing...";
+
+                    string actualFilePath = await FindDownloadedFile(outputText);
+
+                    if (!string.IsNullOrEmpty(actualFilePath) && CurrentTrack != null)
+                    {
+                        CurrentTrack.FileName = Path.GetFileName(actualFilePath);
+                        CurrentTrack.Comment = $"Converted from Spotify search: {searchTerm}";
+
+                        await ApplyProperMetadata();
+                    }
+
+                    DownloadProgress = 100;
+                    await VerifyAndReportDownloadSuccess(actualFilePath);
+
+                    CliOutput += $"Successfully downloaded converted Spotify track: {CurrentTrack?.Title ?? "Unknown"}\n";
+                }
+                else
+                {
+                    throw new Exception($"Download failed with exit code {result.ExitCode}: {errorText}");
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"Converted download failed: {ex.Message}";
+                CliOutput += $"Converted download error: {ex.Message}\n";
+                throw;
             }
         }
 
@@ -2070,26 +2225,48 @@ namespace Symphex.ViewModels
                 return;
             }
 
-            // Check if it's a Spotify URL
-            if (IsSpotifyUrl(DownloadUrl))
+            // Extract all URLs from the input - this is the key fix
+            var urls = ExtractAllUrls(DownloadUrl);
+
+            CliOutput += $"DEBUG: Found {urls.Count} URLs in input: {DownloadUrl}\n";
+            foreach (var url in urls)
             {
-                await ProcessSpotifyDownload(DownloadUrl);
+                CliOutput += $"  - {url}\n";
+            }
+
+            // If multiple URLs detected, process as batch
+            if (urls.Count > 1)
+            {
+                StatusText = $"Multiple URLs detected ({urls.Count})! Setting up batch processing...";
+                CliOutput += $"Multiple URLs detected, starting batch processing...\n";
+                IsDownloading = true;
+
+                await Task.Delay(1000); // Brief pause for UI update
+                await ProcessMultipleUrlsList(urls);
                 return;
             }
 
-            // Continue with existing download logic for non-Spotify URLs
+            // Single URL processing
+            string singleUrl = urls.Count == 1 ? urls[0] : DownloadUrl;
+
+            if (IsSpotifyUrl(singleUrl))
+            {
+                await ProcessSpotifyDownload(singleUrl);
+                return;
+            }
+
+            // Continue with existing single download logic
             IsDownloading = true;
             DownloadProgress = 0;
             ShowMetadata = false;
             CurrentTrack = new TrackInfo();
 
-            StatusText = $"Starting download for: {DownloadUrl}";
+            StatusText = $"Starting download for: {singleUrl}";
 
             try
             {
                 DownloadProgress = 5;
-
-                var extractedTrack = await ExtractMetadata(DownloadUrl);
+                var extractedTrack = await ExtractMetadata(singleUrl);
 
                 if (extractedTrack != null)
                 {
@@ -2117,6 +2294,301 @@ namespace Symphex.ViewModels
                 DownloadProgress = 0;
             }
         }
+
+        private List<string> ExtractAllUrls(string input)
+        {
+            var urls = new List<string>();
+
+            if (string.IsNullOrWhiteSpace(input))
+                return urls;
+
+            // Split by whitespace and newlines
+            var parts = input.Split(new[] { ' ', '\n', '\r', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+
+            foreach (var part in parts)
+            {
+                var trimmedPart = part.Trim();
+
+                // Check if it's a valid URL (HTTP/HTTPS or Spotify)
+                if (trimmedPart.StartsWith("https://") || trimmedPart.StartsWith("http://"))
+                {
+                    urls.Add(trimmedPart);
+                }
+                else if (trimmedPart.StartsWith("spotify:"))
+                {
+                    urls.Add(trimmedPart);
+                }
+            }
+
+            // Remove duplicates while preserving order
+            return urls.Distinct().ToList();
+        }
+
+        private async Task ProcessMultipleUrlsList(List<string> urls)
+        {
+            try
+            {
+                StatusText = "Setting up batch processing...";
+                CliOutput += "=== BATCH PROCESSING STARTED ===\n";
+                CliOutput += $"Found {urls.Count} URLs to process:\n";
+
+                int spotifyUrls = urls.Count(url => IsSpotifyUrl(url));
+                int otherUrls = urls.Count - spotifyUrls;
+
+                CliOutput += $"- Spotify URLs: {spotifyUrls}\n";
+                CliOutput += $"- Other URLs: {otherUrls}\n\n";
+
+                // List all URLs
+                for (int i = 0; i < urls.Count; i++)
+                {
+                    string urlType = IsSpotifyUrl(urls[i]) ? "[SPOTIFY]" : "[OTHER]";
+                    CliOutput += $"  {i + 1}. {urlType} {urls[i]}\n";
+                }
+                CliOutput += "\n";
+
+                // Create batch file
+                if (!Directory.Exists(DownloadFolder))
+                {
+                    Directory.CreateDirectory(DownloadFolder);
+                }
+
+                string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+                string batchFilePath = Path.Combine(DownloadFolder, $"batch_urls_{timestamp}.txt");
+                await File.WriteAllLinesAsync(batchFilePath, urls);
+                CliOutput += $"Created batch file: {Path.GetFileName(batchFilePath)}\n\n";
+
+                // Initialize batch processing state
+                PendingUrls = new List<string>(urls);
+                IsBatchProcessing = true;
+                CurrentBatchIndex = 0;
+                TotalBatchCount = urls.Count;
+                IsDownloading = true;
+
+                StatusText = $"Starting batch download: {urls.Count} songs queued...";
+                CliOutput += "Starting batch processing in 2 seconds...\n";
+
+                await Task.Delay(2000);
+
+                // Start processing the first URL
+                await ProcessNextBatchUrl();
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"Error setting up batch processing: {ex.Message}";
+                CliOutput += $"Batch setup error: {ex.Message}\n";
+                IsBatchProcessing = false;
+                IsDownloading = false;
+            }
+        }
+
+
+
+        // Add these new methods
+        private int CountOccurrences(string text, string pattern)
+        {
+            int count = 0;
+            int index = 0;
+            while ((index = text.IndexOf(pattern, index)) != -1)
+            {
+                count++;
+                index += pattern.Length;
+            }
+            return count;
+        }
+
+
+
+        private async Task ProcessNextBatchUrl()
+        {
+            try
+            {
+                CliOutput += $"DEBUG: ProcessNextBatchUrl - Index: {CurrentBatchIndex}, Total: {PendingUrls?.Count ?? 0}\n";
+
+                // Check if batch is complete
+                if (PendingUrls == null || CurrentBatchIndex >= PendingUrls.Count)
+                {
+                    // Batch complete
+                    StatusText = $"Batch download complete! Downloaded {TotalBatchCount} songs.";
+                    CliOutput += $"\n=== BATCH PROCESSING COMPLETE ===\n";
+                    CliOutput += $"Successfully processed {TotalBatchCount} URLs.\n";
+                    CliOutput += $"Check your download folder: {DownloadFolder}\n\n";
+
+                    // Reset batch state
+                    IsBatchProcessing = false;
+                    IsDownloading = false;
+                    CurrentBatchIndex = 0;
+                    TotalBatchCount = 0;
+                    PendingUrls?.Clear();
+                    DownloadProgress = 0;
+                    ShowMetadata = false;
+                    CurrentTrack = new TrackInfo();
+                    return;
+                }
+
+                // Get current URL
+                string currentUrl = PendingUrls[CurrentBatchIndex];
+
+                // Update UI with progress
+                StatusText = $"Processing {CurrentBatchIndex + 1}/{TotalBatchCount}: {Path.GetFileName(currentUrl)}";
+                CliOutput += $"\n--- Processing {CurrentBatchIndex + 1}/{TotalBatchCount} ---\n";
+                CliOutput += $"URL: {currentUrl}\n";
+
+                // Reset progress for this item
+                DownloadProgress = 0;
+                ShowMetadata = false;
+
+                try
+                {
+                    // Process this URL
+                    if (IsSpotifyUrl(currentUrl))
+                    {
+                        CliOutput += "Type: Spotify URL - Converting to search...\n";
+                        await ProcessSpotifyDownload(currentUrl);
+                    }
+                    else
+                    {
+                        CliOutput += "Type: Direct URL - Processing...\n";
+                        await ProcessSingleBatchUrl(currentUrl);
+                    }
+
+                    CliOutput += $"✅ Completed {CurrentBatchIndex + 1}/{TotalBatchCount}\n";
+                }
+                catch (Exception urlEx)
+                {
+                    CliOutput += $"❌ Failed {CurrentBatchIndex + 1}/{TotalBatchCount}: {urlEx.Message}\n";
+                    StatusText = $"Error with item {CurrentBatchIndex + 1}, continuing...";
+                }
+
+                // Move to next URL
+                CurrentBatchIndex++;
+
+                // Brief pause between downloads
+                if (CurrentBatchIndex < PendingUrls.Count)
+                {
+                    StatusText = $"Completed {CurrentBatchIndex}/{TotalBatchCount}. Next in 2 seconds...";
+                    await Task.Delay(2000);
+
+                    // Continue to next URL
+                    await ProcessNextBatchUrl();
+                }
+                else
+                {
+                    // This will trigger the completion logic above on next call
+                    await ProcessNextBatchUrl();
+                }
+            }
+            catch (Exception ex)
+            {
+                CliOutput += $"Critical batch error: {ex.Message}\n";
+                StatusText = "Batch processing stopped due to error.";
+                IsBatchProcessing = false;
+                IsDownloading = false;
+            }
+        }
+
+        private async Task ProcessSingleBatchUrl(string url)
+        {
+            try
+            {
+                // Reset track info for this URL
+                CurrentTrack = new TrackInfo();
+
+                // Extract metadata first
+                DownloadProgress = 5;
+                var extractedTrack = await ExtractMetadata(url);
+
+                if (extractedTrack != null)
+                {
+                    CurrentTrack = extractedTrack;
+                    ShowMetadata = true;
+                    CliOutput += $"Found: {CurrentTrack.Title} by {CurrentTrack.Artist}\n";
+                    DownloadProgress = 15;
+                }
+                else
+                {
+                    CliOutput += "Could not extract metadata, proceeding with download...\n";
+                    DownloadProgress = 10;
+                }
+
+                // Perform the actual download
+                await RealDownload();
+
+                CliOutput += $"Download completed for: {url}\n";
+            }
+            catch (Exception ex)
+            {
+                CliOutput += $"Error processing URL {url}: {ex.Message}\n";
+                throw; // Re-throw so the batch processor can handle it
+            }
+        }
+
+        private async Task ProcessSingleUrl(string url)
+        {
+            try
+            {
+                CliOutput += $"Processing URL: {url}\n";
+
+                if (IsSpotifyUrl(url))
+                {
+                    CliOutput += $"Detected as Spotify URL, converting...\n";
+                    await ProcessSpotifyDownload(url);
+                    CliOutput += $"Spotify URL processing completed.\n";
+                    return;
+                }
+
+                // For non-Spotify URLs
+                CliOutput += $"Processing as direct URL: {url}\n";
+
+                if (!IsBatchProcessing)
+                {
+                    IsDownloading = true;
+                }
+
+                DownloadProgress = 0;
+                ShowMetadata = false;
+                CurrentTrack = new TrackInfo();
+
+                StatusText = $"Starting download for: {url}";
+
+                try
+                {
+                    DownloadProgress = 5;
+
+                    var extractedTrack = await ExtractMetadata(url);
+
+                    if (extractedTrack != null)
+                    {
+                        CurrentTrack = extractedTrack;
+                        ShowMetadata = true;
+                        StatusText = $"Found: {CurrentTrack.Title} by {CurrentTrack.Artist}";
+                        DownloadProgress = 15;
+                    }
+                    else
+                    {
+                        StatusText = "Could not extract metadata, proceeding with download...";
+                        DownloadProgress = 10;
+                    }
+
+                    await RealDownload();
+                    CliOutput += $"Direct URL download completed.\n";
+                }
+                finally
+                {
+                    if (!IsBatchProcessing)
+                    {
+                        IsDownloading = false;
+                        DownloadProgress = 0;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                CliOutput += $"Error processing URL {url}: {ex.Message}\n";
+                throw;
+            }
+        }
+
+
         private async Task RealDownload()
         {
             try
@@ -2613,6 +3085,16 @@ namespace Symphex.ViewModels
             DownloadProgress = 0;
             ShowMetadata = false;
             CurrentTrack = new TrackInfo();
+
+            // Clear batch processing state
+            if (IsBatchProcessing)
+            {
+                IsBatchProcessing = false;
+                CurrentBatchIndex = 0;
+                TotalBatchCount = 0;
+                PendingUrls.Clear();
+                StatusText = "Batch processing cancelled.";
+            }
         }
 
         [RelayCommand]

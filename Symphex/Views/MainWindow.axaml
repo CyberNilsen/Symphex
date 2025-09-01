@@ -189,10 +189,16 @@
 								<TextBox Name="UrlTextBox"
 										 Text="{Binding DownloadUrl}"
 										 Classes="large"
-										 Watermark="Paste YouTube link, or enter: song title - artist..."
-										 Height="44"
+										 Watermark="Paste YouTube/Spotify links here (multiple links supported)..."
+										 MinHeight="44"
+										 MaxHeight="120"
 										 Width="325"
-										 FontSize="13"/>
+										 FontSize="13"
+										 AcceptsReturn="True"
+										 AcceptsTab="False"
+										 TextWrapping="Wrap"
+										 VerticalContentAlignment="Top"
+										 ScrollViewer.VerticalScrollBarVisibility="Auto"/>
 							</StackPanel>
 
 							<!-- Download Progress -->
