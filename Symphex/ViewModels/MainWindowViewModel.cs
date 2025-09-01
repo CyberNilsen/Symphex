@@ -774,6 +774,9 @@ namespace Symphex.ViewModels
                     pageTitle = System.Text.RegularExpressions.Regex.Replace(pageTitle,
                         @"\s*[\|\-]\s*Spotify\s*$", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
+                    // CLEAN UP SPOTIFY-SPECIFIC PHRASES
+                    pageTitle = CleanSpotifyTitle(pageTitle);
+
                     // Clean up the title for search
                     pageTitle = pageTitle.Trim();
 
@@ -791,6 +794,97 @@ namespace Symphex.ViewModels
                 CliOutput += $"Title extraction failed: {ex.Message}\n";
                 return "";
             }
+        }
+
+        private string CleanSpotifyTitle(string title)
+        {
+            if (string.IsNullOrEmpty(title))
+                return title;
+
+            // List of Spotify-specific phrases to remove
+            var spotifyPhrases = new[]
+            {
+        @"\s*-\s*song and lyrics by\s*",
+        @"\s*\|\s*song and lyrics by\s*",
+        @"\s*song and lyrics by\s*",
+        @"\s*-\s*lyrics by\s*",
+        @"\s*\|\s*lyrics by\s*",
+        @"\s*lyrics by\s*",
+        @"\s*-\s*song by\s*",
+        @"\s*\|\s*song by\s*",
+        @"\s*song by\s*",
+        @"\s*on Spotify\s*",
+        @"\s*\|\s*Spotify\s*",
+        @"\s*-\s*Spotify\s*"
+    };
+
+            string cleaned = title;
+
+            // Remove each Spotify-specific phrase
+            foreach (var phrase in spotifyPhrases)
+            {
+                cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, phrase, "",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            }
+
+            // Additional cleanup for common Spotify title formats
+            // Handle formats like "Song Title - song and lyrics by Artist Name"
+            var songLyricsMatch = System.Text.RegularExpressions.Regex.Match(cleaned,
+                @"^(.+?)\s*-\s*song and lyrics by\s*(.+)$",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            if (songLyricsMatch.Success)
+            {
+                string songTitle = songLyricsMatch.Groups[1].Value.Trim();
+                string artistName = songLyricsMatch.Groups[2].Value.Trim();
+                cleaned = $"{artistName} - {songTitle}";
+            }
+            else
+            {
+                // Handle other formats like "Song Title | song and lyrics by Artist Name"
+                var pipeMatch = System.Text.RegularExpressions.Regex.Match(cleaned,
+                    @"^(.+?)\s*\|\s*song and lyrics by\s*(.+)$",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                if (pipeMatch.Success)
+                {
+                    string songTitle = pipeMatch.Groups[1].Value.Trim();
+                    string artistName = pipeMatch.Groups[2].Value.Trim();
+                    cleaned = $"{artistName} - {songTitle}";
+                }
+            }
+
+            // Handle concatenated text without spaces (e.g., "Remind Me to ForgetKygo, Miguel")
+            cleaned = AddSpacesToConcatenatedText(cleaned);
+
+            // Final cleanup - remove extra whitespace and normalize
+            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\s+", " ").Trim();
+
+            return cleaned;
+        }
+
+        // NEW METHOD: Add spaces to concatenated artist/title text
+        private string AddSpacesToConcatenatedText(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return text;
+
+            // Pattern to detect when a lowercase letter is immediately followed by an uppercase letter
+            // This catches cases like "ForgetKygo" -> "Forget Kygo"
+            string spaced = System.Text.RegularExpressions.Regex.Replace(text,
+                @"([a-z])([A-Z])", "$1 $2");
+
+            // Pattern to detect when a letter is immediately followed by a number
+            // This catches cases like "Song1Artist" -> "Song1 Artist"
+            spaced = System.Text.RegularExpressions.Regex.Replace(spaced,
+                @"([a-zA-Z])(\d)", "$1 $2");
+
+            // Pattern to detect when a number is immediately followed by a letter
+            // This catches cases like "1Artist" -> "1 Artist"
+            spaced = System.Text.RegularExpressions.Regex.Replace(spaced,
+                @"(\d)([a-zA-Z])", "$1 $2");
+
+            return spaced;
         }
 
         // ADD: Process the search term as a YouTube search
