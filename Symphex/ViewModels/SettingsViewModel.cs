@@ -93,27 +93,8 @@ namespace Symphex.ViewModels
                 // Compare versions
                 if (IsNewerVersion(latestVersion, CURRENT_VERSION))
                 {
-                    // Find the appropriate download asset
-                    if (root.TryGetProperty("assets", out var assets))
-                    {
-                        string platformIdentifier = GetPlatformIdentifier();
-
-                        foreach (var asset in assets.EnumerateArray())
-                        {
-                            if (asset.TryGetProperty("name", out var name) &&
-                                asset.TryGetProperty("browser_download_url", out var downloadUrl))
-                            {
-                                string assetName = name.GetString()?.ToLowerInvariant() ?? "";
-
-                                if (assetName.Contains(platformIdentifier) &&
-                                    (assetName.EndsWith(".zip") || assetName.EndsWith(".exe")))
-                                {
-                                    latestDownloadUrl = downloadUrl.GetString() ?? "";
-                                    break;
-                                }
-                            }
-                        }
-                    }
+                    // Find download URL
+                    latestDownloadUrl = FindDownloadUrl(root);
 
                     if (!string.IsNullOrEmpty(latestDownloadUrl))
                     {
@@ -142,6 +123,99 @@ namespace Symphex.ViewModels
             }
         }
 
+        private string FindDownloadUrl(JsonElement root)
+        {
+            if (!root.TryGetProperty("assets", out var assets))
+            {
+                return "";
+            }
+
+            string platform = GetPlatformIdentifier();
+
+            // Look for platform-specific assets first
+            foreach (var asset in assets.EnumerateArray())
+            {
+                if (asset.TryGetProperty("name", out var name) &&
+                    asset.TryGetProperty("browser_download_url", out var url))
+                {
+                    string assetName = name.GetString()?.ToLowerInvariant() ?? "";
+                    string downloadUrl = url.GetString() ?? "";
+
+                    // Check for platform-specific zip
+                    if (assetName.Contains(platform) && assetName.EndsWith(".zip"))
+                    {
+                        return downloadUrl;
+                    }
+                }
+            }
+
+            // Look for generic zip files
+            foreach (var asset in assets.EnumerateArray())
+            {
+                if (asset.TryGetProperty("name", out var name) &&
+                    asset.TryGetProperty("browser_download_url", out var url))
+                {
+                    string assetName = name.GetString()?.ToLowerInvariant() ?? "";
+                    string downloadUrl = url.GetString() ?? "";
+
+                    // Generic zip file
+                    if (assetName.EndsWith(".zip"))
+                    {
+                        return downloadUrl;
+                    }
+                }
+            }
+
+            // Fallback to source code zip
+            if (root.TryGetProperty("zipball_url", out var zipballUrl))
+            {
+                return zipballUrl.GetString() ?? "";
+            }
+
+            return "";
+        }
+
+        private string FindBestDownloadAsset(JsonElement assets)
+        {
+            string platformIdentifier = GetPlatformIdentifier();
+            string downloadUrl = "";
+
+            // First: Look for platform-specific zip files
+            foreach (var asset in assets.EnumerateArray())
+            {
+                if (asset.TryGetProperty("name", out var name) &&
+                    asset.TryGetProperty("browser_download_url", out var url))
+                {
+                    string assetName = name.GetString()?.ToLowerInvariant() ?? "";
+                    string assetUrl = url.GetString() ?? "";
+
+                    // Platform-specific match
+                    if (assetName.Contains(platformIdentifier) && assetName.EndsWith(".zip"))
+                    {
+                        return assetUrl;
+                    }
+                }
+            }
+
+            // Second: Look for generic zip files
+            foreach (var asset in assets.EnumerateArray())
+            {
+                if (asset.TryGetProperty("name", out var name) &&
+                    asset.TryGetProperty("browser_download_url", out var url))
+                {
+                    string assetName = name.GetString()?.ToLowerInvariant() ?? "";
+                    string assetUrl = url.GetString() ?? "";
+
+                    if (assetName.EndsWith(".zip") && !ContainsPlatformName(assetName))
+                    {
+                        return assetUrl;
+                    }
+                }
+            }
+
+            return downloadUrl;
+        }
+
         [RelayCommand]
         private async Task Update()
         {
@@ -155,59 +229,35 @@ namespace Symphex.ViewModels
             {
                 IsUpdating = true;
                 UpdateProgress = 0;
-                UpdateProgressText = "Downloading update...";
+                UpdateProgressText = "Starting update...";
 
-                // Get current application path
-                string currentAppPath = Assembly.GetExecutingAssembly().Location;
-                string appDirectory = Path.GetDirectoryName(currentAppPath) ?? "";
-                string appExecutableName = Path.GetFileName(currentAppPath);
-
-                // Download the update
-                string tempUpdatePath = Path.Combine(Path.GetTempPath(), $"symphex_update_{Guid.NewGuid():N}.zip");
+                // Get application info
+                string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
+                string processName = Process.GetCurrentProcess().ProcessName;
 
                 UpdateProgress = 10;
-                using var response = await httpClient.GetAsync(latestDownloadUrl);
-                response.EnsureSuccessStatusCode();
+                UpdateProgressText = "Downloading update...";
 
-                UpdateProgress = 40;
-                var updateBytes = await response.Content.ReadAsByteArrayAsync();
-                await File.WriteAllBytesAsync(tempUpdatePath, updateBytes);
+                // Download update
+                string tempUpdatePath = Path.Combine(Path.GetTempPath(), $"symphex_update_{Guid.NewGuid():N}.zip");
+                await DownloadFile(latestDownloadUrl, tempUpdatePath);
 
                 UpdateProgress = 60;
-                UpdateProgressText = "Preparing background installer...";
+                UpdateProgressText = "Creating update script...";
 
-                // Create and launch the background updater
-                string updaterScriptPath = await CreateBackgroundUpdater(tempUpdatePath, appDirectory, appExecutableName);
-
-                UpdateProgress = 80;
-                UpdateProgressText = "Starting background update...";
-
-                // Launch the background updater
-                var updaterProcess = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? updaterScriptPath : "bash",
-                        Arguments = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "" : updaterScriptPath,
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                        WindowStyle = ProcessWindowStyle.Hidden
-                    }
-                };
-
-                updaterProcess.Start();
+                // Create and run updater
+                string updaterPath = CreateSimpleUpdater(tempUpdatePath, appDirectory, processName);
 
                 UpdateProgress = 90;
-                UpdateProgressText = "Update started! Closing application...";
+                UpdateProgressText = "Launching updater...";
 
-                await Task.Delay(1500); // Give user time to see the progress
+                await LaunchUpdater(updaterPath);
 
                 UpdateProgress = 100;
-                UpdateProgressText = "Application will now close and restart with the new version.";
+                UpdateProgressText = "Update starting...";
 
-                await Task.Delay(1000);
-
-                // Close the application - the updater will handle the rest
+                // Close application
+                await Task.Delay(2000);
                 if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                 {
                     desktop.Shutdown();
@@ -216,9 +266,186 @@ namespace Symphex.ViewModels
             catch (Exception ex)
             {
                 UpdateProgressText = $"Update failed: {ex.Message}";
-                UpdateStatusText = "Update failed. Please try again or download manually.";
+                UpdateStatusText = $"Update failed: {ex.Message}";
                 IsUpdating = false;
                 UpdateProgress = 0;
+            }
+        }
+
+        private async Task LaunchUpdater(string updaterPath)
+        {
+            var process = new Process();
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                process.StartInfo.FileName = updaterPath;
+            }
+            else
+            {
+                process.StartInfo.FileName = "bash";
+                process.StartInfo.Arguments = updaterPath;
+            }
+
+            process.StartInfo.UseShellExecute = false;
+            process.StartInfo.CreateNoWindow = true;
+            process.Start();
+
+            await Task.Delay(1000); // Give it time to start
+        }
+
+        private async Task DownloadFile(string url, string filePath)
+        {
+            using var client = new HttpClient();
+            client.DefaultRequestHeaders.Add("User-Agent", "Symphex-Updater/1.0");
+
+            using var response = await client.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+
+            using var fileStream = File.Create(filePath);
+            await response.Content.CopyToAsync(fileStream);
+        }
+
+        private string CreateSimpleUpdater(string zipPath, string appDir, string processName)
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                return CreateWindowsUpdater(zipPath, appDir, processName);
+            }
+            else
+            {
+                return CreateUnixUpdater(zipPath, appDir, processName);
+            }
+        }
+
+
+
+        private void ResetUpdateState()
+        {
+            IsUpdating = false;
+            UpdateProgress = 0;
+        }
+
+        private string NormalizeVersion(string version)
+        {
+            version = version.TrimStart('v');
+            string[] parts = version.Split('.');
+
+            if (parts.Length == 1)
+                return $"{parts[0]}.0.0";
+            else if (parts.Length == 2)
+                return $"{parts[0]}.{parts[1]}.0";
+
+            return version;
+        }
+
+        private async Task DownloadUpdateWithProgress(string downloadUrl, string destinationPath)
+        {
+            try
+            {
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.Add("User-Agent", "Symphex-Updater/1.0");
+                client.Timeout = TimeSpan.FromSeconds(60);
+
+                var progress = new Progress<double>(percent =>
+                {
+                    UpdateProgress = 10 + (percent * 40); // 10-50% for download
+                    UpdateProgressText = $"Downloading update: {percent:P0}";
+                });
+
+                using var response = await client.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead);
+                response.EnsureSuccessStatusCode();
+                var totalBytes = response.Content.Headers.ContentLength ?? -1L;
+
+                using var fileStream = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None);
+                using var contentStream = await response.Content.ReadAsStreamAsync();
+
+                if (totalBytes == -1)
+                {
+                    await contentStream.CopyToAsync(fileStream);
+                }
+                else
+                {
+                    var buffer = new byte[8192];
+                    var totalBytesRead = 0L;
+                    var bytesRead = 0;
+
+                    while ((bytesRead = await contentStream.ReadAsync(buffer, 0, buffer.Length)) != 0)
+                    {
+                        await fileStream.WriteAsync(buffer, 0, bytesRead);
+                        totalBytesRead += bytesRead;
+                        ((IProgress<double>)progress).Report((double)totalBytesRead / totalBytes);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Download failed: {ex.Message}", ex);
+            }
+        }
+
+        private string GetMainExecutableName(string appDirectory, string processName)
+        {
+            // Try to find the main executable
+            string[] possibleNames = {
+                $"{processName}.exe",
+                "Symphex.exe",
+                "symphex.exe"
+            };
+
+            foreach (string name in possibleNames)
+            {
+                string fullPath = Path.Combine(appDirectory, name);
+                if (File.Exists(fullPath))
+                {
+                    return name;
+                }
+            }
+
+            // If nothing found, look for any .exe file
+            var exeFiles = Directory.GetFiles(appDirectory, "*.exe");
+            if (exeFiles.Length > 0)
+            {
+                return Path.GetFileName(exeFiles[0]);
+            }
+
+            // Fallback
+            return $"{processName}.exe";
+        }
+
+        private async Task LaunchUpdaterAndClose(string updaterPath)
+        {
+            var updaterProcess = new Process();
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                updaterProcess.StartInfo.FileName = "powershell.exe";
+                updaterProcess.StartInfo.Arguments = $"-WindowStyle Hidden -ExecutionPolicy Bypass -File \"{updaterPath}\"";
+            }
+            else
+            {
+                updaterProcess.StartInfo.FileName = "bash";
+                updaterProcess.StartInfo.Arguments = $"\"{updaterPath}\"";
+            }
+
+            updaterProcess.StartInfo.UseShellExecute = false;
+            updaterProcess.StartInfo.CreateNoWindow = true;
+            updaterProcess.StartInfo.WindowStyle = ProcessWindowStyle.Hidden;
+
+            updaterProcess.Start();
+
+            UpdateProgress = 90;
+            UpdateProgressText = "Update in progress...";
+
+            // Give the updater a moment to start
+            await Task.Delay(3000);
+
+            UpdateProgress = 100;
+            UpdateProgressText = "Closing application...";
+
+            // Close the application
+            if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                desktop.Shutdown();
             }
         }
 
@@ -236,26 +463,35 @@ namespace Symphex.ViewModels
         {
             try
             {
-                var latestParts = latest.Split('.').Select(int.Parse).ToArray();
-                var currentParts = current.Split('.').Select(int.Parse).ToArray();
+                string normalizedLatest = NormalizeVersion(latest);
+                string normalizedCurrent = NormalizeVersion(current);
 
-                // Ensure both arrays have the same length
-                int maxLength = Math.Max(latestParts.Length, currentParts.Length);
-                Array.Resize(ref latestParts, maxLength);
-                Array.Resize(ref currentParts, maxLength);
+                Version latestVersion = new Version(normalizedLatest);
+                Version currentVersion = new Version(normalizedCurrent);
 
-                for (int i = 0; i < maxLength; i++)
-                {
-                    if (latestParts[i] > currentParts[i]) return true;
-                    if (latestParts[i] < currentParts[i]) return false;
-                }
-
-                return false; // Versions are equal
+                return latestVersion > currentVersion;
             }
             catch
             {
-                return false; // Error parsing versions
+                return false;
             }
+        }
+
+        private string[] GetAlternativePlatformNames(string platformIdentifier)
+        {
+            return platformIdentifier.ToLowerInvariant() switch
+            {
+                "windows" => new[] { "win", "win64", "win32", "windows" },
+                "mac" => new[] { "macos", "osx", "darwin", "mac" },
+                "linux" => new[] { "linux", "unix" },
+                _ => new[] { platformIdentifier }
+            };
+        }
+
+        private bool ContainsPlatformName(string fileName)
+        {
+            string[] allPlatformNames = { "windows", "win", "win64", "win32", "mac", "macos", "osx", "darwin", "linux", "unix" };
+            return allPlatformNames.Any(platform => fileName.Contains(platform));
         }
 
         private string GetPlatformIdentifier()
@@ -263,232 +499,107 @@ namespace Symphex.ViewModels
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 return "windows";
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                return "macos";
+                return "mac"; // Changed from "macos" to match common naming
             else
                 return "linux";
         }
 
-        private async Task<string> CreateBackgroundUpdater(string updateZipPath, string appDirectory, string appExecutableName)
+        private string CreateUpdaterScript(string updateZipPath, string appDirectory, string appExecutableName, string processName)
         {
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                return await CreateWindowsBackgroundUpdater(updateZipPath, appDirectory, appExecutableName);
+                return CreateWindowsUpdater(updateZipPath, appDirectory, processName);
             }
             else
             {
-                return await CreateUnixBackgroundUpdater(updateZipPath, appDirectory, appExecutableName);
+                return CreateUnixUpdater(updateZipPath, appDirectory, processName);
             }
         }
 
-        private async Task<string> CreateWindowsBackgroundUpdater(string updateZipPath, string appDirectory, string appExecutableName)
+        private string CreateWindowsUpdater(string zipPath, string appDir, string processName)
         {
-            string updaterPath = Path.Combine(Path.GetTempPath(), $"symphex_bg_updater_{Guid.NewGuid():N}.bat");
-            string tempExtractPath = Path.Combine(Path.GetTempPath(), $"symphex_extract_{Guid.NewGuid():N}");
+            string updaterPath = Path.Combine(Path.GetTempPath(), $"symphex_updater.bat");
 
             string script = $@"@echo off
-setlocal EnableDelayedExpansion
+timeout /t 5 /nobreak
+taskkill /f /im {processName}.exe 2>nul
+timeout /t 2 /nobreak
 
-:: Hide console window
-if ""%1"" neq ""ELEVATED"" (
-    >nul 2>&1 ""%SYSTEMROOT%\system32\cacls.exe"" ""%SYSTEMROOT%\system32\config\system""
-    if '!errorlevel!' NEQ '0' (
-        echo Set UAC = CreateObject^(""Shell.Application""^) > ""%temp%\getadmin.vbs""
-        echo UAC.ShellExecute ""%~s0"", ""ELEVATED"", """", ""runas"", 0 >> ""%temp%\getadmin.vbs""
-        ""%temp%\getadmin.vbs""
-        del ""%temp%\getadmin.vbs""
-        exit /B
-    )
+powershell -Command ""
+Add-Type -AssemblyName System.IO.Compression.FileSystem;
+$tempDir = '{Path.GetTempPath()}symphex_temp';
+if (Test-Path $tempDir) {{ Remove-Item $tempDir -Recurse -Force }};
+[System.IO.Compression.ZipFile]::ExtractToDirectory('{zipPath}', $tempDir);
+Remove-Item '{appDir}\*' -Recurse -Force -Exclude 'symphex_updater.bat';
+Copy-Item '$tempDir\*' '{appDir}' -Recurse -Force;
+Remove-Item $tempDir -Recurse -Force;
+""
+
+cd /d ""{appDir}""
+for %%f in (*.exe) do (
+    start """" ""%%f""
+    goto :end
 )
+:end
+del ""%~f0""
+";
 
-:: Create log file for debugging
-set LOGFILE=""%temp%\symphex_update.log""
-echo Symphex Background Updater - %date% %time% > %LOGFILE%
-
-echo Waiting for Symphex to close... >> %LOGFILE%
-timeout /t 3 /nobreak > nul
-
-:: Wait for the main application process to close
-:WAIT_LOOP
-tasklist /fi ""imagename eq {appExecutableName}"" 2>nul | find /i ""{appExecutableName}"" > nul
-if not errorlevel 1 (
-    echo Application still running, waiting... >> %LOGFILE%
-    timeout /t 2 /nobreak > nul
-    goto WAIT_LOOP
-)
-
-echo Application closed successfully >> %LOGFILE%
-
-:: Create backup
-echo Creating backup... >> %LOGFILE%
-if exist ""{appDirectory}_backup"" (
-    echo Removing old backup... >> %LOGFILE%
-    rmdir /s /q ""{appDirectory}_backup"" > nul 2>&1
-)
-echo Copying current version to backup... >> %LOGFILE%
-xcopy ""{appDirectory}"" ""{appDirectory}_backup\"" /e /i /h /y /q > nul 2>&1
-
-:: Extract new version to temporary location
-echo Extracting update to temporary location... >> %LOGFILE%
-if exist ""{tempExtractPath}"" rmdir /s /q ""{tempExtractPath}"" > nul 2>&1
-mkdir ""{tempExtractPath}"" > nul 2>&1
-
-powershell -WindowStyle Hidden -ExecutionPolicy Bypass -Command ""& {{ try {{ Expand-Archive -Path '{updateZipPath}' -DestinationPath '{tempExtractPath}' -Force; Write-Host 'Extract successful' }} catch {{ Write-Host 'Extract failed:' $_.Exception.Message }} }}"" >> %LOGFILE% 2>&1
-
-:: Verify extraction
-if not exist ""{tempExtractPath}"" (
-    echo ERROR: Extraction failed, aborting update >> %LOGFILE%
-    goto CLEANUP
-)
-
-:: Remove all files from current application directory
-echo Removing old application files... >> %LOGFILE%
-pushd ""{appDirectory}""
-for /d %%i in (*) do (
-    echo Removing directory: %%i >> %LOGFILE%
-    rmdir /s /q ""%%i"" > nul 2>&1
-)
-for %%i in (*) do (
-    echo Removing file: %%i >> %LOGFILE%
-    del /f /q ""%%i"" > nul 2>&1
-)
-popd
-
-:: Copy new files to application directory
-echo Installing new version... >> %LOGFILE%
-xcopy ""{tempExtractPath}\*"" ""{appDirectory}\"" /e /i /h /y /q > nul 2>&1
-
-:: Verify installation
-if not exist ""{Path.Combine(appDirectory, appExecutableName)}"" (
-    echo ERROR: Installation failed, restoring backup... >> %LOGFILE%
-    rmdir /s /q ""{appDirectory}"" > nul 2>&1
-    xcopy ""{appDirectory}_backup\*"" ""{appDirectory}\"" /e /i /h /y /q > nul 2>&1
-    goto CLEANUP
-)
-
-echo Installation successful! >> %LOGFILE%
-
-:: Wait a moment then start the updated application
-timeout /t 2 /nobreak > nul
-echo Starting updated application... >> %LOGFILE%
-start """" ""{Path.Combine(appDirectory, appExecutableName)}""
-
-:CLEANUP
-echo Cleaning up temporary files... >> %LOGFILE%
-if exist ""{tempExtractPath}"" rmdir /s /q ""{tempExtractPath}"" > nul 2>&1
-if exist ""{updateZipPath}"" del /f /q ""{updateZipPath}"" > nul 2>&1
-
-echo Update process completed - %date% %time% >> %LOGFILE%
-
-:: Self-delete this updater script
-timeout /t 1 /nobreak > nul
-del /f /q ""%~f0"" > nul 2>&1";
-
-            await File.WriteAllTextAsync(updaterPath, script);
+            File.WriteAllText(updaterPath, script);
             return updaterPath;
         }
 
-        private async Task<string> CreateUnixBackgroundUpdater(string updateZipPath, string appDirectory, string appExecutableName)
+        private string CreateUnixUpdater(string zipPath, string appDir, string processName)
         {
-            string updaterPath = Path.Combine(Path.GetTempPath(), $"symphex_bg_updater_{Guid.NewGuid():N}.sh");
-            string tempExtractPath = Path.Combine(Path.GetTempPath(), $"symphex_extract_{Guid.NewGuid():N}");
+            string updaterPath = Path.Combine(Path.GetTempPath(), "symphex_updater.sh");
 
             string script = $@"#!/bin/bash
+sleep 5
+pkill -f {processName} 2>/dev/null
+sleep 2
 
-# Create log file for debugging
-LOGFILE=""/tmp/symphex_update.log""
-echo ""Symphex Background Updater - $(date)"" > ""$LOGFILE""
+TEMP_DIR=""/tmp/symphex_temp""
+rm -rf ""$TEMP_DIR""
+mkdir -p ""$TEMP_DIR""
 
-echo ""Waiting for Symphex to close..."" >> ""$LOGFILE""
-sleep 3
+unzip -o ""{zipPath}"" -d ""$TEMP_DIR""
+rm -rf ""{appDir}""/*
+cp -rf ""$TEMP_DIR""/* ""{appDir}/""
+rm -rf ""$TEMP_DIR""
 
-# Wait for the main application process to close
-while pgrep -f ""{appExecutableName}"" > /dev/null 2>&1; do
-    echo ""Application still running, waiting..."" >> ""$LOGFILE""
-    sleep 2
+cd ""{appDir}""
+chmod +x *.exe 2>/dev/null
+chmod +x *symphex* 2>/dev/null
+
+# Find and start executable
+for file in *.exe symphex Symphex; do
+    if [ -f ""$file"" ] && [ -x ""$file"" ]; then
+        nohup ./$file &
+        break
+    fi
 done
 
-echo ""Application closed successfully"" >> ""$LOGFILE""
+rm -- ""$0""
+";
 
-# Create backup
-echo ""Creating backup..."" >> ""$LOGFILE""
-if [ -d ""{appDirectory}_backup"" ]; then
-    echo ""Removing old backup..."" >> ""$LOGFILE""
-    rm -rf ""{appDirectory}_backup"" 2>/dev/null || true
-fi
-echo ""Copying current version to backup..."" >> ""$LOGFILE""
-cp -r ""{appDirectory}"" ""{appDirectory}_backup"" 2>/dev/null || true
+            File.WriteAllText(updaterPath, script);
 
-# Extract new version to temporary location
-echo ""Extracting update to temporary location..."" >> ""$LOGFILE""
-rm -rf ""{tempExtractPath}"" 2>/dev/null || true
-mkdir -p ""{tempExtractPath}""
-
-if command -v unzip >/dev/null 2>&1; then
-    unzip -o ""{updateZipPath}"" -d ""{tempExtractPath}"" >> ""$LOGFILE"" 2>&1
-else
-    echo ""ERROR: unzip not available, cannot extract update"" >> ""$LOGFILE""
-    exit 1
-fi
-
-# Verify extraction
-if [ ! -d ""{tempExtractPath}"" ] || [ -z ""$(ls -A {tempExtractPath} 2>/dev/null)"" ]; then
-    echo ""ERROR: Extraction failed, aborting update"" >> ""$LOGFILE""
-    exit 1
-fi
-
-# Remove all files from current application directory
-echo ""Removing old application files..."" >> ""$LOGFILE""
-rm -rf ""{appDirectory}""/*
-
-# Copy new files to application directory
-echo ""Installing new version..."" >> ""$LOGFILE""
-cp -rf ""{tempExtractPath}""/* ""{appDirectory}""/
-
-# Make executable file executable
-chmod +x ""{Path.Combine(appDirectory, appExecutableName)}"" 2>/dev/null || true
-
-# Verify installation
-if [ ! -f ""{Path.Combine(appDirectory, appExecutableName)}"" ]; then
-    echo ""ERROR: Installation failed, restoring backup..."" >> ""$LOGFILE""
-    rm -rf ""{appDirectory}""/*
-    cp -rf ""{appDirectory}_backup""/* ""{appDirectory}""/
-    chmod +x ""{Path.Combine(appDirectory, appExecutableName)}"" 2>/dev/null || true
-    exit 1
-fi
-
-echo ""Installation successful!"" >> ""$LOGFILE""
-
-# Wait a moment then start the updated application
-sleep 2
-echo ""Starting updated application..."" >> ""$LOGFILE""
-nohup ""{Path.Combine(appDirectory, appExecutableName)}"" > /dev/null 2>&1 &
-
-# Cleanup
-echo ""Cleaning up temporary files..."" >> ""$LOGFILE""
-rm -rf ""{tempExtractPath}"" 2>/dev/null || true
-rm -f ""{updateZipPath}"" 2>/dev/null || true
-
-echo ""Update process completed - $(date)"" >> ""$LOGFILE""
-
-# Self-delete this updater script
-sleep 1
-rm -- ""$0""";
-
-            await File.WriteAllTextAsync(updaterPath, script);
-
-            // Make script executable
-            var chmodProcess = new Process
+            // Make executable
+            try
             {
-                StartInfo = new ProcessStartInfo
+                var process = new Process
                 {
-                    FileName = "chmod",
-                    Arguments = $"+x \"{updaterPath}\"",
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                }
-            };
-            chmodProcess.Start();
-            await chmodProcess.WaitForExitAsync();
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = "chmod",
+                        Arguments = $"+x \"{updaterPath}\"",
+                        UseShellExecute = false,
+                        CreateNoWindow = true
+                    }
+                };
+                process.Start();
+                process.WaitForExit();
+            }
+            catch { }
 
             return updaterPath;
         }
