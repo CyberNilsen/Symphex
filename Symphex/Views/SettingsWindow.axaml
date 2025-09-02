@@ -1,0 +1,152 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Symphex.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="500" d:DesignHeight="400"
+        x:Class="Symphex.Views.SettingsWindow"
+        x:DataType="vm:SettingsViewModel"
+        Icon="/Assets/SymphexLogo.ico"
+        Title="Settings - Music Downloader"
+        Width="550" Height="450"
+        MinWidth="550" MinHeight="450"
+        Background="#000000"
+        CanResize="false"
+        WindowStartupLocation="CenterOwner">
+
+	<Design.DataContext>
+		<vm:SettingsViewModel/>
+	</Design.DataContext>
+
+	<Window.Styles>
+		<Style Selector="Button.primary">
+			<Setter Property="Background" Value="#1e40af"/>
+			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="CornerRadius" Value="8"/>
+			<Setter Property="Padding" Value="16,10"/>
+			<Setter Property="FontWeight" Value="Bold"/>
+			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="Cursor" Value="Hand"/>
+		</Style>
+		<Style Selector="Button.primary:pointerover">
+			<Setter Property="Background" Value="#1d4ed8"/>
+		</Style>
+
+		<Style Selector="Button.secondary">
+			<Setter Property="Background" Value="#1a1a1a"/>
+			<Setter Property="Foreground" Value="#ffffff"/>
+			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="BorderBrush" Value="#404040"/>
+			<Setter Property="CornerRadius" Value="8"/>
+			<Setter Property="Padding" Value="16,10"/>
+			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="FontWeight" Value="Medium"/>
+			<Setter Property="Cursor" Value="Hand"/>
+		</Style>
+		<Style Selector="Button.secondary:pointerover">
+			<Setter Property="Background" Value="#2a2a2a"/>
+			<Setter Property="BorderBrush" Value="#606060"/>
+		</Style>
+
+		<Style Selector="Border.section">
+			<Setter Property="Background" Value="#111111"/>
+			<Setter Property="CornerRadius" Value="12"/>
+			<Setter Property="Padding" Value="20"/>
+			<Setter Property="Effect">
+				<DropShadowEffect Color="Black" Opacity="0.3" BlurRadius="10" OffsetX="0" OffsetY="2"/>
+			</Setter>
+		</Style>
+
+		<Style Selector="ProgressBar">
+			<Setter Property="Background" Value="#1a1a1a"/>
+			<Setter Property="Foreground" Value="#3b82f6"/>
+			<Setter Property="CornerRadius" Value="4"/>
+			<Setter Property="Height" Value="8"/>
+		</Style>
+	</Window.Styles>
+
+	<Grid Margin="30">
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="20"/>
+			<RowDefinition Height="*"/>
+			<RowDefinition Height="20"/>
+			<RowDefinition Height="Auto"/>
+		</Grid.RowDefinitions>
+
+		<!-- Header -->
+		<StackPanel Grid.Row="0" Spacing="8" HorizontalAlignment="Center">
+			<Border Width="50" Height="50" CornerRadius="15" HorizontalAlignment="Center">
+				<Border.Background>
+					<LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+						<GradientStop Color="#3b82f6" Offset="0"/>
+						<GradientStop Color="#2563eb" Offset="1"/>
+					</LinearGradientBrush>
+				</Border.Background>
+				<TextBlock Text="⚙️" FontSize="20" Foreground="White"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+			</Border>
+			<TextBlock Text="Settings" FontSize="20" FontWeight="Bold"
+                       Foreground="#ffffff" HorizontalAlignment="Center"/>
+		</StackPanel>
+
+		<!-- Settings Content -->
+		<Border Grid.Row="2" Classes="section">
+			<StackPanel Spacing="20">
+				<!-- Updater Section -->
+				<StackPanel Spacing="12">
+					<TextBlock Text="Application Updates" FontSize="16" FontWeight="Bold" Foreground="#ffffff"/>
+
+					<StackPanel Spacing="8">
+						<TextBlock Text="{Binding CurrentVersionText}" FontSize="13" Foreground="#cccccc" HorizontalAlignment="Center"/>
+						<TextBlock Text="{Binding UpdateStatusText}" FontSize="12" Foreground="#999999" HorizontalAlignment="Center" TextWrapping="Wrap"/>
+
+						<Button Content="Check for Updates"
+                                Command="{Binding CheckForUpdatesCommand}"
+                                Classes="secondary"
+                                IsEnabled="{Binding !IsCheckingForUpdates}"
+                                HorizontalAlignment="Center"
+                                Margin="0,8,0,0"/>
+					</StackPanel>
+
+					<!-- Update Progress -->
+					<StackPanel Spacing="8" IsVisible="{Binding IsCheckingForUpdates}">
+						<TextBlock Text="Checking for updates..." FontSize="12" Foreground="#999999"/>
+						<ProgressBar IsIndeterminate="True"/>
+					</StackPanel>
+
+					<!-- Update Available -->
+					<Border Background="#10b981" CornerRadius="8" Padding="16" IsVisible="{Binding IsUpdateAvailable}">
+						<StackPanel Spacing="12">
+							<StackPanel Spacing="4" HorizontalAlignment="Center">
+								<TextBlock Text="🎉 Update Available!" FontSize="14" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
+								<TextBlock Text="{Binding LatestVersionText}" FontSize="12" Foreground="#e6fffa" HorizontalAlignment="Center"/>
+							</StackPanel>
+
+							<Button Content="🚀 Download and Install Update"
+                                    Command="{Binding UpdateCommand}"
+                                    Classes="primary"
+                                    HorizontalAlignment="Center"
+                                    IsEnabled="{Binding !IsUpdating}"
+                                    Background="White"
+                                    Foreground="#10b981"
+                                    FontWeight="Bold"/>
+						</StackPanel>
+					</Border>
+
+					<!-- Update Progress -->
+					<StackPanel Spacing="8" IsVisible="{Binding IsUpdating}">
+						<TextBlock Text="{Binding UpdateProgressText}" FontSize="12" Foreground="#999999"/>
+						<ProgressBar Value="{Binding UpdateProgress}" Maximum="100"/>
+					</StackPanel>
+				</StackPanel>
+			</StackPanel>
+		</Border>
+
+		<!-- Footer -->
+		<StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right">
+			<Button Content="Close" Command="{Binding CloseCommand}" Classes="secondary"/>
+		</StackPanel>
+	</Grid>
+</Window>

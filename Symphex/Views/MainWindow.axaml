@@ -210,9 +210,12 @@
 							<Button Content="🎵 Download My Music" Command="{Binding DownloadCommand}"
 									Classes="download" HorizontalAlignment="Center"/>
 
-							<StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
-								<Button Content="Clear" Command="{Binding ClearCommand}" Classes="simple"/>
-								<Button Content="📁 Open Downloads" Command="{Binding OpenFolderCommand}" Classes="simple"/>
+							<StackPanel Spacing="12" HorizontalAlignment="Center">
+								<StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
+									<Button Content="Clear" Command="{Binding ClearCommand}" Classes="simple"/>
+									<Button Content="📁 Open Downloads" Command="{Binding OpenFolderCommand}" Classes="simple"/>
+								</StackPanel>
+								<Button Content="⚙️ Settings" Command="{Binding OpenSettingsCommand}" Classes="simple" HorizontalAlignment="Center"/>
 							</StackPanel>
 						</StackPanel>
 					</Border>

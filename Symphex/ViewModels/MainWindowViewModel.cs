@@ -182,7 +182,35 @@ namespace Symphex.ViewModels
             });
         }
 
+        [RelayCommand]
+        private void OpenSettings()
+        {
+            try
+            {
+                var settingsWindow = new Symphex.Views.SettingsWindow
+                {
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner
+                };
 
+                // Try to set owner if possible
+                if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                {
+                    var mainWindow = desktop.MainWindow;
+                    if (mainWindow != null)
+                    {
+                        settingsWindow.ShowDialog(mainWindow);
+                        return;
+                    }
+                }
+
+                // Fallback: show without owner
+                settingsWindow.Show();
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"Error opening settings: {ex.Message}";
+            }
+        }
 
         private void SetupDownloadFolder()
         {
