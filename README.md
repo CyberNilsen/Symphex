@@ -2,6 +2,7 @@
 
 A modern, cross-platform music downloader built with Avalonia UI that extracts audio from YouTube videos and searches, with intelligent metadata detection and album artwork embedding.
 
+<img width="1111" height="839" alt="Symphex Program" src="https://github.com/user-attachments/assets/301e0b9c-1b93-478f-a3ad-b8347ccd6864" />
 ## ✨ Features
 
 - **Smart Audio Extraction**: Download high-quality MP3 audio from YouTube URLs or search terms
