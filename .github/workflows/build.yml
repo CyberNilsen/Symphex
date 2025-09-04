@@ -52,8 +52,13 @@ jobs:
         mkdir ${{ matrix.os_name }}
         cp -r ./temp/* ./${{ matrix.os_name }}/
     
-    - name: Create Archive
-      shell: bash  
+    - name: Create Archive (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        Compress-Archive -Path ./${{ matrix.os_name }} -DestinationPath ${{ matrix.os_name }}.zip
+    
+    - name: Create Archive (Linux/macOS)
+      if: matrix.os != 'windows-latest'
       run: |
         zip -r ${{ matrix.os_name }}.zip ${{ matrix.os_name }}
     
