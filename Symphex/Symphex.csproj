@@ -13,7 +13,7 @@
 		<CFBundleName>Symphex Music Downloader</CFBundleName>
 		<CFBundleDisplayName>Music Downloader</CFBundleDisplayName>
 		<CFBundleIdentifier>com.symphex.musicdownloader</CFBundleIdentifier>
-		<CFBundleVersion>1.0.0</CFBundleVersion>
+		<CFBundleVersion>1.1.0</CFBundleVersion>
 		<CFBundlePackageType>APPL</CFBundlePackageType>
 		<CFBundleSignature>????</CFBundleSignature>
 		<CFBundleExecutable>Symphex</CFBundleExecutable>
