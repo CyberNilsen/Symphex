@@ -46,22 +46,16 @@ jobs:
       run: |
         dotnet publish --configuration Release --runtime ${{ matrix.runtime }} --self-contained true --output ./build -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
     
-    - name: Create folder and move files
-      shell: bash
-      run: |
-        mkdir ${{ matrix.os_name }}
-        mv ./build/* ./${{ matrix.os_name }}/
-    
     - name: Create Archive (Windows)
       if: matrix.os == 'windows-latest'
       shell: powershell
       run: |
-        Compress-Archive -Path ${{ matrix.os_name }} -DestinationPath ${{ matrix.os_name }}.zip
+        Compress-Archive -Path ./build/* -DestinationPath ${{ matrix.os_name }}.zip
     
     - name: Create Archive (Linux/macOS)  
       if: matrix.os != 'windows-latest'
       run: |
-        zip -r ${{ matrix.os_name }}.zip ${{ matrix.os_name }}
+        cd build && zip -r ../${{ matrix.os_name }}.zip .
     
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v4
