@@ -188,61 +188,52 @@ namespace Symphex.ViewModels
             {
                 IsUpdating = true;
                 UpdateProgress = 0;
-                UpdateProgressText = "Starting update...";
+                UpdateProgressText = "Preparing update...";
 
-                // Get application info - FIXED: Use better method to get app directory
+                // Get application info
                 string currentExecutable = Assembly.GetExecutingAssembly().Location;
                 string appDirectory = Path.GetDirectoryName(currentExecutable) ?? Environment.CurrentDirectory;
                 string processName = Path.GetFileNameWithoutExtension(currentExecutable);
 
-                // Ensure we have the correct app directory
                 if (string.IsNullOrEmpty(appDirectory) || !Directory.Exists(appDirectory))
                 {
                     appDirectory = Environment.CurrentDirectory;
                 }
 
-                UpdateProgress = 10;
-                UpdateProgressText = $"App Directory: {appDirectory}";
-                await Task.Delay(1000); // Let user see the directory
-
+                UpdateProgress = 20;
                 UpdateProgressText = "Downloading update...";
 
-                // Download update with progress
+                // Download update
                 string tempUpdatePath = Path.Combine(Path.GetTempPath(), $"symphex_update_{Guid.NewGuid():N}.zip");
                 await DownloadFileWithProgress(latestDownloadUrl, tempUpdatePath);
 
-                UpdateProgress = 60;
-                UpdateProgressText = "Verifying download...";
+                UpdateProgress = 80;
+                UpdateProgressText = "Installing update...";
 
-                // Verify the download
+                // Verify download
                 if (!File.Exists(tempUpdatePath) || new FileInfo(tempUpdatePath).Length == 0)
                 {
-                    throw new Exception("Downloaded file is invalid or empty");
+                    throw new Exception("Downloaded file is invalid");
                 }
 
-                // Test if the zip file is valid
-                try
+                // Test zip validity
+                using (var archive = ZipFile.OpenRead(tempUpdatePath))
                 {
-                    using var archive = ZipFile.OpenRead(tempUpdatePath);
                     if (!archive.Entries.Any())
                     {
                         throw new Exception("Downloaded archive is empty");
                     }
                 }
-                catch (Exception ex)
-                {
-                    throw new Exception($"Downloaded archive is corrupted: {ex.Message}");
-                }
 
-                UpdateProgress = 70;
-                UpdateProgressText = "Creating update script...";
-
-                // Create and run updater with the CORRECT app directory
+                // Create updater script
                 string updaterPath = CreateUpdaterScript(tempUpdatePath, appDirectory, processName, currentExecutable);
 
-                UpdateProgress = 90;
-                UpdateProgressText = "Launching updater...";
+                UpdateProgress = 95;
+                UpdateProgressText = "Finalizing...";
 
+                await Task.Delay(500); // Brief pause for user to see progress
+
+                // Launch updater and exit silently
                 await LaunchUpdaterAndExit(updaterPath);
 
             }
@@ -253,7 +244,7 @@ namespace Symphex.ViewModels
                 IsUpdating = false;
                 UpdateProgress = 0;
 
-                // Clean up temp file on error
+                // Clean up on error
                 try
                 {
                     var tempFiles = Directory.GetFiles(Path.GetTempPath(), "symphex_update_*.zip");
@@ -315,14 +306,13 @@ namespace Symphex.ViewModels
             {
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
-                    // Use Process.Start with cmd.exe to ensure the window stays visible
+                    // Launch silently without showing command window
                     var startInfo = new ProcessStartInfo
                     {
-                        FileName = "cmd.exe",
-                        Arguments = $"/k \"{updaterPath}\"", // /k keeps window open, /c would close it
-                        UseShellExecute = true,
-                        CreateNoWindow = false,
-                        WindowStyle = ProcessWindowStyle.Normal
+                        FileName = updaterPath,
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        WindowStyle = ProcessWindowStyle.Hidden
                     };
 
                     Process.Start(startInfo);
@@ -334,23 +324,21 @@ namespace Symphex.ViewModels
                         FileName = "bash",
                         Arguments = $"\"{updaterPath}\"",
                         UseShellExecute = false,
-                        CreateNoWindow = true
+                        CreateNoWindow = true,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
                     };
 
                     Process.Start(startInfo);
                 }
 
-                UpdateProgress = 95;
-                UpdateProgressText = "Updater launched successfully...";
+                UpdateProgress = 100;
+                UpdateProgressText = "Update will complete in background...";
 
                 // Give the updater time to start
-                await Task.Delay(1500);
+                await Task.Delay(1000);
 
-                UpdateProgress = 100;
-                UpdateProgressText = "Closing application...";
-
-                // Close the application
-                await Task.Delay(500);
+                // Close the application silently
                 if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                 {
                     desktop.Shutdown();
@@ -380,13 +368,13 @@ namespace Symphex.ViewModels
             string backupDir = Path.Combine(Path.GetTempPath(), $"symphex_backup_{Guid.NewGuid():N}");
             string tempExtractDir = Path.Combine(Path.GetTempPath(), $"symphex_extract_{Guid.NewGuid():N}");
 
-            // Ensure we have a valid app directory - use the current executable's directory if appDir is empty
+            // Ensure we have a valid app directory
             if (string.IsNullOrEmpty(appDir) || !Directory.Exists(appDir))
             {
                 appDir = Path.GetDirectoryName(currentExecutable) ?? Environment.CurrentDirectory;
             }
 
-            // Ensure paths use proper Windows format and escape quotes
+            // Escape paths properly
             zipPath = zipPath.Replace("/", "\\").Replace("\"", "\"\"");
             appDir = appDir.Replace("/", "\\").Replace("\"", "\"\"");
             backupDir = backupDir.Replace("/", "\\").Replace("\"", "\"\"");
@@ -394,176 +382,100 @@ namespace Symphex.ViewModels
 
             string script = $@"@echo off
 setlocal enabledelayedexpansion
-title Symphex Updater
-echo ============================================
-echo Starting Symphex updater...
-echo ============================================
-echo.
-echo Application Directory: ""{appDir}""
-echo Backup Directory: ""{backupDir}""
-echo Extract Directory: ""{tempExtractDir}""
-echo Zip File: ""{zipPath}""
-echo.
 
 REM Wait for main application to close
-echo Waiting for application to close...
-timeout /t 5 /nobreak > nul
+timeout /t 3 /nobreak >nul 2>&1
 
-REM Forcefully close any remaining processes
-echo Closing any remaining {processName} processes...
-taskkill /f /im {processName}.exe 2>nul
-taskkill /f /im Symphex.exe 2>nul
-timeout /t 2 /nobreak > nul
+REM Close any remaining processes silently
+taskkill /f /im {processName}.exe >nul 2>&1
+taskkill /f /im Symphex.exe >nul 2>&1
+timeout /t 2 /nobreak >nul 2>&1
 
-echo Creating backup...
-if not exist ""{backupDir}"" mkdir ""{backupDir}""
+REM Create backup silently
+if not exist ""{backupDir}"" mkdir ""{backupDir}"" >nul 2>&1
 if exist ""{appDir}"" (
-    echo Backing up current installation...
-    xcopy ""{appDir}\*"" ""{backupDir}\"" /E /H /C /I /Y /Q > nul
-    echo Backup completed successfully.
+    xcopy ""{appDir}\*"" ""{backupDir}\"" /E /H /C /I /Y /Q >nul 2>&1
 ) else (
-    echo Warning: Application directory not found: ""{appDir}""
-    echo Creating application directory...
-    mkdir ""{appDir}""
+    mkdir ""{appDir}"" >nul 2>&1
 )
 
-echo.
-echo Extracting update...
-if not exist ""{tempExtractDir}"" mkdir ""{tempExtractDir}""
+REM Extract update silently
+if not exist ""{tempExtractDir}"" mkdir ""{tempExtractDir}"" >nul 2>&1
 
-echo Extracting: ""{zipPath}""
-echo To: ""{tempExtractDir}""
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ""try {{ Expand-Archive -Path '{zipPath}' -DestinationPath '{tempExtractDir}' -Force; Write-Host 'Extract SUCCESS' }} catch {{ Write-Host 'Extract ERROR:' $_.Exception.Message; exit 1 }}""
+powershell.exe -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -Command ""try {{ Expand-Archive -Path '{zipPath}' -DestinationPath '{tempExtractDir}' -Force }} catch {{ exit 1 }}"" >nul 2>&1
 
 if !errorlevel! neq 0 (
-    echo Failed to extract update
-    echo Restoring backup...
     if exist ""{backupDir}"" (
-        rmdir /s /q ""{appDir}"" 2>nul
-        xcopy ""{backupDir}\*"" ""{appDir}\"" /E /H /C /I /Y /Q > nul
+        rmdir /s /q ""{appDir}"" >nul 2>&1
+        xcopy ""{backupDir}\*"" ""{appDir}\"" /E /H /C /I /Y /Q >nul 2>&1
     )
     goto cleanup
 )
 
-echo.
-echo Installing update...
-
-REM Find the actual extracted folder (might be nested in Windows folder)
+REM Find source directory
 set ""SOURCE_DIR={tempExtractDir}""
 if exist ""{tempExtractDir}\Windows"" (
     set ""SOURCE_DIR={tempExtractDir}\Windows""
-    echo Found Windows subfolder, using as source.
 ) else (
-    REM Look for any folder containing exe files
     for /d %%d in (""{tempExtractDir}\*"") do (
         if exist ""%%d\*.exe"" (
             set ""SOURCE_DIR=%%d""
-            echo Found executable folder: %%d
             goto found_source
         )
     )
 )
 :found_source
 
-echo Source directory: ""!SOURCE_DIR!""
-echo Target directory: ""{appDir}""
+if not exist ""!SOURCE_DIR!\*"" goto cleanup
 
-REM Verify source directory has files
-if not exist ""!SOURCE_DIR!\*"" (
-    echo ERROR: No files found in source directory
-    goto cleanup
-)
-
-echo.
-echo Clearing target directory (keeping settings)...
-REM Clear application directory but preserve settings
-pushd ""{appDir}""
+REM Clear target directory silently (preserve settings)
+pushd ""{appDir}"" >nul 2>&1
 for /d %%D in (*) do (
     if /i not ""%%D""==""settings"" if /i not ""%%D""==""config"" if /i not ""%%D""==""data"" (
-        echo Removing directory: %%D
-        rmdir /s /q ""%%D"" 2>nul
+        rmdir /s /q ""%%D"" >nul 2>&1
     )
 )
 for %%F in (*) do (
     if /i not ""%%~nxF""==""settings.json"" if /i not ""%%~nxF""==""config.ini"" if /i not ""%%~nxF""==""user.config"" (
-        echo Removing file: %%F
-        del /q ""%%F"" 2>nul
+        del /q ""%%F"" >nul 2>&1
     )
 )
-popd
+popd >nul 2>&1
 
-echo.
-echo Copying new files...
-echo From: ""!SOURCE_DIR!""
-echo To: ""{appDir}""
-xcopy ""!SOURCE_DIR!\*"" ""{appDir}\"" /E /H /C /I /Y /F
+REM Copy new files silently
+xcopy ""!SOURCE_DIR!\*"" ""{appDir}\"" /E /H /C /I /Y /Q >nul 2>&1
 
 if !errorlevel! neq 0 (
-    echo.
-    echo Failed to install update - restoring backup...
     if exist ""{backupDir}"" (
-        rmdir /s /q ""{appDir}"" 2>nul
-        xcopy ""{backupDir}\*"" ""{appDir}\"" /E /H /C /I /Y /Q > nul
-        echo Backup restored successfully.
+        rmdir /s /q ""{appDir}"" >nul 2>&1
+        xcopy ""{backupDir}\*"" ""{appDir}\"" /E /H /C /I /Y /Q >nul 2>&1
     )
     goto cleanup
 )
 
-echo.
-echo Update installed successfully!
-echo.
+REM Start updated application silently
+cd /d ""{appDir}"" >nul 2>&1
 
-echo Starting updated application...
-cd /d ""{appDir}""
-
-REM Try to find and start the main executable
-set ""STARTED=0""
 if exist ""Symphex.exe"" (
-    echo Starting Symphex.exe
-    start """" ""Symphex.exe""
-    set ""STARTED=1""
+    start """" ""Symphex.exe"" >nul 2>&1
 ) else (
     for %%f in (*.exe) do (
         if /i not ""%%f""==""updater.exe"" (
-            echo Starting %%f
-            start """" ""%%f""
-            set ""STARTED=1""
+            start """" ""%%f"" >nul 2>&1
             goto cleanup
         )
     )
 )
 
-if ""!STARTED!""==""0"" (
-    echo WARNING: No executable found to start
-    echo Please manually start the application from: ""{appDir}""
-)
-
 :cleanup
-echo.
-echo Cleaning up temporary files...
-if exist ""{backupDir}"" (
-    echo Removing backup directory...
-    rmdir /s /q ""{backupDir}"" 2>nul
-)
-if exist ""{tempExtractDir}"" (
-    echo Removing extraction directory...
-    rmdir /s /q ""{tempExtractDir}"" 2>nul
-)
-if exist ""{zipPath}"" (
-    echo Removing download file...
-    del /q ""{zipPath}"" 2>nul
-)
+REM Clean up silently
+if exist ""{backupDir}"" rmdir /s /q ""{backupDir}"" >nul 2>&1
+if exist ""{tempExtractDir}"" rmdir /s /q ""{tempExtractDir}"" >nul 2>&1
+if exist ""{zipPath}"" del /q ""{zipPath}"" >nul 2>&1
 
-echo.
-echo ============================================
-echo Update process completed successfully!
-echo ============================================
-echo.
-echo Press any key to close this window...
-pause >nul
-
-REM Self-delete
-del ""%~f0"" 2>nul
+REM Wait a moment then self-delete
+timeout /t 2 /nobreak >nul 2>&1
+del ""%~f0"" >nul 2>&1
 ";
 
             File.WriteAllText(updaterPath, script);
