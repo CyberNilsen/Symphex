@@ -1,5 +1,4 @@
 name: Build and Release
-
 on:
   push:
     branches: [ main ]
@@ -18,51 +17,52 @@ jobs:
           - os: windows-latest
             runtime: win-x64
             extension: .exe
+            os_name: Windows
           - os: ubuntu-latest
             runtime: linux-x64
             extension: ""
+            os_name: Linux
           - os: macos-latest
             runtime: osx-x64
             extension: ""
-
+            os_name: Mac
     runs-on: ${{ matrix.os }}
-
+    
     steps:
     - uses: actions/checkout@v4
-
+    
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
-
+    
     - name: Restore dependencies
       run: dotnet restore
-
+    
     - name: Build
       run: dotnet build --no-restore --configuration Release
-
+    
     - name: Publish
       run: |
-        dotnet publish --configuration Release --runtime ${{ matrix.runtime }} --self-contained true --output ./publish/${{ matrix.runtime }}
-
+        dotnet publish --configuration Release --runtime ${{ matrix.runtime }} --self-contained true --output ./publish
+    
     - name: Create Archive (Windows)
       if: matrix.os == 'windows-latest'
       run: |
-        Compress-Archive -Path ./publish/${{ matrix.runtime }}/* -DestinationPath ./publish/Symphex-${{ matrix.runtime }}.zip
-
+        cd ./publish
+        Compress-Archive -Path * -DestinationPath ../${{ matrix.os_name }}.zip
+    
     - name: Create Archive (Linux/macOS)
       if: matrix.os != 'windows-latest'
       run: |
-        cd ./publish/${{ matrix.runtime }}
-        tar -czf ../Symphex-${{ matrix.runtime }}.tar.gz *
-
+        cd ./publish
+        zip -r ../${{ matrix.os_name }}.zip *
+    
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: Symphex-${{ matrix.runtime }}
-        path: |
-          ./publish/Symphex-${{ matrix.runtime }}.zip
-          ./publish/Symphex-${{ matrix.runtime }}.tar.gz
+        name: ${{ matrix.os_name }}
+        path: ${{ matrix.os_name }}.zip
 
   release:
     needs: build
@@ -72,13 +72,15 @@ jobs:
     steps:
     - name: Download all artifacts
       uses: actions/download-artifact@v4
-
+      with:
+        merge-multiple: true
+    
     - name: Upload Release Assets
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          Windows/Windows.zip
-          Linux/Linux.zip
-          Mac/Mac.zip
+          Windows.zip
+          Linux.zip
+          Mac.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
