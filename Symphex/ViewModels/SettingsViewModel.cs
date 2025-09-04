@@ -367,6 +367,7 @@ namespace Symphex.ViewModels
             string updaterPath = Path.Combine(Path.GetTempPath(), $"symphex_updater_{Guid.NewGuid():N}.bat");
             string backupDir = Path.Combine(Path.GetTempPath(), $"symphex_backup_{Guid.NewGuid():N}");
             string tempExtractDir = Path.Combine(Path.GetTempPath(), $"symphex_extract_{Guid.NewGuid():N}");
+            string tempExtractDir2 = Path.Combine(Path.GetTempPath(), $"symphex_extract2_{Guid.NewGuid():N}");
 
             // Ensure we have a valid app directory
             if (string.IsNullOrEmpty(appDir) || !Directory.Exists(appDir))
@@ -379,6 +380,7 @@ namespace Symphex.ViewModels
             appDir = appDir.Replace("/", "\\").Replace("\"", "\"\"");
             backupDir = backupDir.Replace("/", "\\").Replace("\"", "\"\"");
             tempExtractDir = tempExtractDir.Replace("/", "\\").Replace("\"", "\"\"");
+            tempExtractDir2 = tempExtractDir2.Replace("/", "\\").Replace("\"", "\"\"");
 
             string script = $@"@echo off
 setlocal enabledelayedexpansion
@@ -399,7 +401,7 @@ if exist ""{appDir}"" (
     mkdir ""{appDir}"" >nul 2>&1
 )
 
-REM Extract update silently
+REM Extract first level (GitHub artifact zip)
 if not exist ""{tempExtractDir}"" mkdir ""{tempExtractDir}"" >nul 2>&1
 
 powershell.exe -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -Command ""try {{ Expand-Archive -Path '{zipPath}' -DestinationPath '{tempExtractDir}' -Force }} catch {{ exit 1 }}"" >nul 2>&1
@@ -412,20 +414,65 @@ if !errorlevel! neq 0 (
     goto cleanup
 )
 
-REM Find source directory
-set ""SOURCE_DIR={tempExtractDir}""
-if exist ""{tempExtractDir}\Windows"" (
-    set ""SOURCE_DIR={tempExtractDir}\Windows""
+REM Look for nested zip files (Windows.zip inside Windows folder)
+set ""NESTED_ZIP=""
+if exist ""{tempExtractDir}\Windows\Windows.zip"" (
+    set ""NESTED_ZIP={tempExtractDir}\Windows\Windows.zip""
+) else if exist ""{tempExtractDir}\Windows.zip"" (
+    set ""NESTED_ZIP={tempExtractDir}\Windows.zip""
+)
+
+REM If we found a nested zip, extract it
+if not ""!NESTED_ZIP!""=="""" (
+    if not exist ""{tempExtractDir2}"" mkdir ""{tempExtractDir2}"" >nul 2>&1
+    powershell.exe -WindowStyle Hidden -NoProfile -ExecutionPolicy Bypass -Command ""try {{ Expand-Archive -Path '!NESTED_ZIP!' -DestinationPath '{tempExtractDir2}' -Force }} catch {{ exit 1 }}"" >nul 2>&1
+    if !errorlevel! equ 0 (
+        set ""SEARCH_DIR={tempExtractDir2}""
+    ) else (
+        set ""SEARCH_DIR={tempExtractDir}""
+    )
 ) else (
-    for /d %%d in (""{tempExtractDir}\*"") do (
-        if exist ""%%d\*.exe"" (
-            set ""SOURCE_DIR=%%d""
+    set ""SEARCH_DIR={tempExtractDir}""
+)
+
+REM Find source directory with executable files
+set ""SOURCE_DIR=""
+
+REM First check if executables are directly in search dir
+if exist ""!SEARCH_DIR!\*.exe"" (
+    set ""SOURCE_DIR=!SEARCH_DIR!""
+    goto found_source
+)
+
+REM Check Windows folder
+if exist ""!SEARCH_DIR!\Windows\*.exe"" (
+    set ""SOURCE_DIR=!SEARCH_DIR!\Windows""
+    goto found_source
+)
+
+REM Check nested Windows folder
+if exist ""!SEARCH_DIR!\Windows\Windows\*.exe"" (
+    set ""SOURCE_DIR=!SEARCH_DIR!\Windows\Windows""
+    goto found_source
+)
+
+REM Look in any subdirectory for exe files
+for /d %%d in (""!SEARCH_DIR!\*"") do (
+    if exist ""%%d\*.exe"" (
+        set ""SOURCE_DIR=%%d""
+        goto found_source
+    )
+    REM Check one level deeper
+    for /d %%e in (""%%d\*"") do (
+        if exist ""%%e\*.exe"" (
+            set ""SOURCE_DIR=%%e""
             goto found_source
         )
     )
 )
-:found_source
 
+:found_source
+if ""!SOURCE_DIR!""=="""" goto cleanup
 if not exist ""!SOURCE_DIR!\*"" goto cleanup
 
 REM Clear target directory silently (preserve settings)
@@ -471,6 +518,7 @@ if exist ""Symphex.exe"" (
 REM Clean up silently
 if exist ""{backupDir}"" rmdir /s /q ""{backupDir}"" >nul 2>&1
 if exist ""{tempExtractDir}"" rmdir /s /q ""{tempExtractDir}"" >nul 2>&1
+if exist ""{tempExtractDir2}"" rmdir /s /q ""{tempExtractDir2}"" >nul 2>&1
 if exist ""{zipPath}"" del /q ""{zipPath}"" >nul 2>&1
 
 REM Wait a moment then self-delete
@@ -578,7 +626,6 @@ rm -- ""$0"" 2>/dev/null || true
 
             return updaterPath;
         }
-
 
         [RelayCommand]
         private void Close()
