@@ -44,7 +44,7 @@ jobs:
     
     - name: Publish
       run: |
-        dotnet publish --configuration Release --runtime ${{ matrix.runtime }} --self-contained true --output ./publish
+        dotnet publish --configuration Release --runtime ${{ matrix.runtime }} --self-contained true --output ./publish -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
     
     - name: Create Archive (Windows)
       if: matrix.os == 'windows-latest'
