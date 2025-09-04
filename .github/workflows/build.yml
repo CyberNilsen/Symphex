@@ -1,0 +1,83 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  release:
+    types: [ published ]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        include:
+          - os: windows-latest
+            runtime: win-x64
+            extension: .exe
+          - os: ubuntu-latest
+            runtime: linux-x64
+            extension: ""
+          - os: macos-latest
+            runtime: osx-x64
+            extension: ""
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 6.0.x
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build
+      run: dotnet build --no-restore --configuration Release
+
+    - name: Publish
+      run: |
+        dotnet publish --configuration Release --runtime ${{ matrix.runtime }} --self-contained true --output ./publish/${{ matrix.runtime }}
+
+    - name: Create Archive (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        Compress-Archive -Path ./publish/${{ matrix.runtime }}/* -DestinationPath ./publish/Symphex-${{ matrix.runtime }}.zip
+
+    - name: Create Archive (Linux/macOS)
+      if: matrix.os != 'windows-latest'
+      run: |
+        cd ./publish/${{ matrix.runtime }}
+        tar -czf ../Symphex-${{ matrix.runtime }}.tar.gz *
+
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: Symphex-${{ matrix.runtime }}
+        path: |
+          ./publish/Symphex-${{ matrix.runtime }}.zip
+          ./publish/Symphex-${{ matrix.runtime }}.tar.gz
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v4
+
+    - name: Upload Release Assets
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          Symphex-win-x64/Symphex-win-x64.zip
+          Symphex-linux-x64/Symphex-linux-x64.tar.gz
+          Symphex-osx-x64/Symphex-osx-x64.tar.gz
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
