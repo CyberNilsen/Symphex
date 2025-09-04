@@ -44,15 +44,16 @@ jobs:
     
     - name: Publish
       run: |
-        dotnet publish --configuration Release --runtime ${{ matrix.runtime }} --self-contained true --output ./${{ matrix.os_name }} -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+        dotnet publish --configuration Release --runtime ${{ matrix.runtime }} --self-contained true --output ./temp -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
     
-    - name: Create Archive (Windows)
-      if: matrix.os == 'windows-latest'
+    - name: Create folder structure
+      shell: bash
       run: |
-        Compress-Archive -Path ./${{ matrix.os_name }} -DestinationPath ${{ matrix.os_name }}.zip
+        mkdir ${{ matrix.os_name }}
+        cp -r ./temp/* ./${{ matrix.os_name }}/
     
-    - name: Create Archive (Linux/macOS)
-      if: matrix.os != 'windows-latest'
+    - name: Create Archive
+      shell: bash  
       run: |
         zip -r ${{ matrix.os_name }}.zip ${{ matrix.os_name }}
     
