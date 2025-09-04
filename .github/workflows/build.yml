@@ -77,8 +77,8 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          Symphex-win-x64/Symphex-win-x64.zip
-          Symphex-linux-x64/Symphex-linux-x64.tar.gz
-          Symphex-osx-x64/Symphex-osx-x64.tar.gz
+          Windows/Windows.zip
+          Linux/Linux.zip
+          Mac/Mac.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
