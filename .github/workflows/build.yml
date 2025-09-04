@@ -62,14 +62,3 @@ jobs:
       with:
         name: ${{ matrix.os_name }}
         path: ./${{ matrix.os_name }}.zip
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.event_name == 'release'
-    
-    steps:
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
-      with:
-        merge-multiple: true
