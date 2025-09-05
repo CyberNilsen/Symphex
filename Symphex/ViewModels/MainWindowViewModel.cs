@@ -3953,15 +3953,29 @@ namespace Symphex.ViewModels
                 }
                 else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
-                    Process.Start("open", DownloadFolder);
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = "open",
+                        Arguments = DownloadFolder,
+                        UseShellExecute = true
+                    };
+                    Process.Start(psi);
                 }
                 else
                 {
-                    Process.Start("xdg-open", DownloadFolder);
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = "xdg-open",
+                        Arguments = DownloadFolder,
+                        UseShellExecute = true
+                    };
+                    Process.Start(psi);
                 }
             }
             catch (Exception ex)
             {
+                // Consider logging the exception or showing a user-friendly message
+                Console.WriteLine($"Failed to open folder: {ex.Message}");
             }
         }
     }
