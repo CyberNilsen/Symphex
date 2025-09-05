@@ -41,42 +41,46 @@ jobs:
     - name: Build
       run: dotnet build --no-restore --configuration Release
     
-    # Different publish approaches for each platform
-    - name: Publish Windows
-      if: matrix.os == 'windows-latest'
+    # Windows and Linux - single file
+    - name: Publish (Windows/Linux)
+      if: matrix.os != 'macos-latest'
       run: |
         dotnet publish --configuration Release --runtime ${{ matrix.runtime }} --self-contained true --output ./build -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
     
-    - name: Publish Linux
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        dotnet publish --configuration Release --runtime ${{ matrix.runtime }} --self-contained true --output ./build -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
-        chmod +x ./build/Symphex
-    
-    - name: Publish macOS
+    # macOS - framework dependent to avoid native lib issues
+    - name: Publish macOS (Framework Dependent)
       if: matrix.os == 'macos-latest'
       run: |
-        # Publish without single file for macOS to avoid native library issues
-        dotnet publish --configuration Release --runtime ${{ matrix.runtime }} --self-contained true --output ./build-temp -p:IncludeNativeLibrariesForSelfExtract=true -p:UseAppHost=true
+        dotnet publish --configuration Release --runtime ${{ matrix.runtime }} --output ./build-temp
         
-        # Create proper macOS app bundle
+        # Create app bundle
         APP_NAME="Symphex"
         BUNDLE_NAME="$APP_NAME.app"
         
         mkdir -p "./build/$BUNDLE_NAME/Contents/MacOS"
         mkdir -p "./build/$BUNDLE_NAME/Contents/Resources"
         
-        # Copy all files to app bundle
+        # Copy published files
         cp -r ./build-temp/* "./build/$BUNDLE_NAME/Contents/MacOS/"
         
-        # Create Info.plist with proper permissions
+        # Create launcher script to handle library paths
+        cat > "./build/$BUNDLE_NAME/Contents/MacOS/launch.sh" << 'EOF'
+        #!/bin/bash
+        cd "$(dirname "$0")"
+        export DYLD_LIBRARY_PATH="$PWD:$DYLD_LIBRARY_PATH"
+        ./Symphex "$@"
+        EOF
+        
+        chmod +x "./build/$BUNDLE_NAME/Contents/MacOS/launch.sh"
+        
+        # Create Info.plist
         cat > "./build/$BUNDLE_NAME/Contents/Info.plist" << 'EOF'
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
         <plist version="1.0">
         <dict>
             <key>CFBundleExecutable</key>
-            <string>Symphex</string>
+            <string>launch.sh</string>
             <key>CFBundleIdentifier</key>
             <string>com.symphex.app</string>
             <key>CFBundleName</key>
@@ -89,30 +93,29 @@ jobs:
             <string>1.0.0</string>
             <key>CFBundlePackageType</key>
             <string>APPL</string>
-            <key>CFBundleSignature</key>
-            <string>????</string>
             <key>LSMinimumSystemVersion</key>
             <string>10.15</string>
             <key>NSHighResolutionCapable</key>
             <true/>
-            <key>NSAppTransportSecurity</key>
-            <dict>
-                <key>NSAllowsArbitraryLoads</key>
-                <true/>
-            </dict>
+            <key>LSUIElement</key>
+            <false/>
         </dict>
         </plist>
         EOF
         
-        # Set executable permissions
-        chmod +x "./build/$BUNDLE_NAME/Contents/MacOS/$APP_NAME"
+        # Set permissions
+        chmod +x "./build/$BUNDLE_NAME/Contents/MacOS/Symphex"
         find "./build/$BUNDLE_NAME/Contents/MacOS" -name "*.dylib" -exec chmod +x {} \;
         
-        # Remove extended attributes that cause Gatekeeper issues
-        find "./build/$BUNDLE_NAME" -exec xattr -c {} \; 2>/dev/null || true
+        # Self-sign the app to avoid Gatekeeper issues
+        codesign --force --deep --sign - "./build/$BUNDLE_NAME" || true
         
-        # Clean up temp directory
         rm -rf ./build-temp
+    
+    - name: Set executable permissions (Linux)
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        chmod +x ./build/Symphex
     
     - name: Create Archive (Windows)
       if: matrix.os == 'windows-latest'
