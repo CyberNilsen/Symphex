@@ -930,67 +930,7 @@ namespace Symphex.ViewModels
                 @"(\d)([a-zA-Z])", "$1 $2");
 
             return spaced;
-        }
-
-        // ADD: Process the search term as a YouTube search
-        private async Task ProcessAsYouTubeSearch(string searchTerm)
-        {
-            try
-            {
-                IsDownloading = true;
-                DownloadProgress = 0;
-                ShowMetadata = false;
-                CurrentTrack = new TrackInfo();
-
-                StatusText = $"Searching YouTube for: {searchTerm}";
-                CliOutput += $"YouTube search initiated: {searchTerm}\n";
-
-                DownloadProgress = 5;
-
-                var extractedTrack = await ExtractMetadata(searchTerm);
-
-                if (extractedTrack != null)
-                {
-                    CurrentTrack = extractedTrack;
-                    ShowMetadata = true;
-                    StatusText = $"Found: {CurrentTrack.Title} by {CurrentTrack.Artist}";
-                    CliOutput += $"Match found: {CurrentTrack.Title} by {CurrentTrack.Artist}\n";
-                    DownloadProgress = 15;
-
-                    await RealDownload();
-                }
-                else
-                {
-                    StatusText = "No results found. Try refining your search.";
-                    CliOutput += "No YouTube results found for search term.\n";
-                }
-            }
-            catch (Exception ex)
-            {
-                StatusText = $"Search failed: {ex.Message}";
-                CliOutput += $"YouTube search error: {ex.Message}\n";
-            }
-            finally
-            {
-                IsDownloading = false;
-                DownloadProgress = 0;
-            }
-        }
-
-        // ADD: Show instructions to user when auto-extraction fails
-        private async Task ShowSpotifyInstructions()
-        {
-            CliOutput += "\n=== SPOTIFY HELP ===\n";
-            CliOutput += "Since Spotify blocks automatic extraction, please:\n";
-            CliOutput += "1. Go to your Spotify link\n";
-            CliOutput += "2. Copy the track name and artist\n";
-            CliOutput += "3. Clear the URL field\n";
-            CliOutput += "4. Paste the track name (e.g., 'Artist Name - Song Title')\n";
-            CliOutput += "5. Click Download\n";
-            CliOutput += "===================\n\n";
-
-            StatusText = "See instructions in log. Copy track name manually from Spotify.";
-        }
+        }        
 
         private async Task<TrackInfo?> ExtractMetadata(string url)
         {
@@ -3330,22 +3270,6 @@ namespace Symphex.ViewModels
         }
 
 
-
-        // Add these new methods
-        private int CountOccurrences(string text, string pattern)
-        {
-            int count = 0;
-            int index = 0;
-            while ((index = text.IndexOf(pattern, index)) != -1)
-            {
-                count++;
-                index += pattern.Length;
-            }
-            return count;
-        }
-
-
-
         private async Task ProcessNextBatchUrl()
         {
             try
@@ -3498,72 +3422,6 @@ namespace Symphex.ViewModels
             {
                 CliOutput += $"Error processing URL {url}: {ex.Message}\n";
                 throw; // Re-throw so the batch processor can handle it
-            }
-        }
-
-        private async Task ProcessSingleUrl(string url)
-        {
-            try
-            {
-                CliOutput += $"Processing URL: {url}\n";
-
-                if (IsSpotifyUrl(url))
-                {
-                    CliOutput += $"Detected as Spotify URL, converting...\n";
-                    await ProcessSpotifyDownload(url);
-                    CliOutput += $"Spotify URL processing completed.\n";
-                    return;
-                }
-
-                // For non-Spotify URLs
-                CliOutput += $"Processing as direct URL: {url}\n";
-
-                if (!IsBatchProcessing)
-                {
-                    IsDownloading = true;
-                }
-
-                DownloadProgress = 0;
-                ShowMetadata = false;
-                CurrentTrack = new TrackInfo();
-
-                StatusText = $"Starting download for: {url}";
-
-                try
-                {
-                    DownloadProgress = 5;
-
-                    var extractedTrack = await ExtractMetadata(url);
-
-                    if (extractedTrack != null)
-                    {
-                        CurrentTrack = extractedTrack;
-                        ShowMetadata = true;
-                        StatusText = $"Found: {CurrentTrack.Title} by {CurrentTrack.Artist}";
-                        DownloadProgress = 15;
-                    }
-                    else
-                    {
-                        StatusText = "Could not extract metadata, proceeding with download...";
-                        DownloadProgress = 10;
-                    }
-
-                    await RealDownload();
-                    CliOutput += $"Direct URL download completed.\n";
-                }
-                finally
-                {
-                    if (!IsBatchProcessing)
-                    {
-                        IsDownloading = false;
-                        DownloadProgress = 0;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                CliOutput += $"Error processing URL {url}: {ex.Message}\n";
-                throw;
             }
         }
 
