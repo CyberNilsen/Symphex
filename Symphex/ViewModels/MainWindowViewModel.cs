@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia.Threading;
 using CliWrap;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -19,6 +20,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Symphex.ViewModels
@@ -155,6 +157,21 @@ namespace Symphex.ViewModels
 
         [ObservableProperty]
         private string currentBatchFilePath = "";
+
+        [ObservableProperty]
+        private int maxConcurrentDownloads = 3; // Adjustable based on system capability
+
+        [ObservableProperty]
+        private int activeDownloads = 0;
+
+        [ObservableProperty]
+        private List<Task> runningTasks = new List<Task>();
+
+        [ObservableProperty]
+        private TrackInfo? lastProcessedTrack;
+
+        [ObservableProperty]
+        private string currentProcessingUrl = "";
 
         private string YtDlpPath { get; set; } = "";
         private string FfmpegPath { get; set; } = "";
@@ -2480,8 +2497,6 @@ namespace Symphex.ViewModels
                 string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
                 string batchFilePath = Path.Combine(DownloadFolder, $"batch_urls_{timestamp}.txt");
                 await File.WriteAllLinesAsync(batchFilePath, urls);
-
-                // STORE THE BATCH FILE PATH FOR LATER DELETION
                 CurrentBatchFilePath = batchFilePath;
 
                 CliOutput += $"Created batch file: {Path.GetFileName(batchFilePath)}\n\n";
@@ -2492,21 +2507,825 @@ namespace Symphex.ViewModels
                 CurrentBatchIndex = 0;
                 TotalBatchCount = urls.Count;
                 IsDownloading = true;
+                ActiveDownloads = 0;
+                RunningTasks.Clear();
 
-                StatusText = $"Starting batch download: {urls.Count} songs queued...";
-                CliOutput += "Starting batch processing in 2 seconds...\n";
-
-                await Task.Delay(2000);
-
-                // Start processing the first URL
-                await ProcessNextBatchUrl();
+                // Determine processing strategy based on URL types
+                if (spotifyUrls > 1 && spotifyUrls >= otherUrls)
+                {
+                    StatusText = $"Starting parallel Spotify processing: {spotifyUrls} Spotify URLs...";
+                    CliOutput += $"Multiple Spotify URLs detected - using parallel processing (max {MaxConcurrentDownloads} concurrent)\n\n";
+                    await ProcessUrlsInParallel(urls);
+                }
+                else
+                {
+                    StatusText = $"Starting sequential processing: {urls.Count} URLs...";
+                    CliOutput += "Mixed URLs or few Spotify URLs - using sequential processing\n\n";
+                    await ProcessUrlsSequentially(urls);
+                }
             }
             catch (Exception ex)
             {
                 StatusText = $"Error setting up batch processing: {ex.Message}";
                 CliOutput += $"Batch setup error: {ex.Message}\n";
+                await CleanupBatchProcessing();
+            }
+        }
+
+        private async Task ProcessUrlsInParallel(List<string> urls)
+        {
+            try
+            {
+                var semaphore = new SemaphoreSlim(MaxConcurrentDownloads, MaxConcurrentDownloads);
+                var tasks = new List<Task>();
+                var completedCount = 0;
+                var lockObject = new object();
+
+                foreach (var (url, index) in urls.Select((url, i) => (url, i)))
+                {
+                    var task = ProcessUrlWithSemaphore(url, index, semaphore, () =>
+                    {
+                        lock (lockObject)
+                        {
+                            completedCount++;
+                            StatusText = $"Completed {completedCount}/{urls.Count} downloads...";
+                        }
+                    });
+
+                    tasks.Add(task);
+                }
+
+                // Wait for all downloads to complete
+                await Task.WhenAll(tasks);
+
+                // Final cleanup
+                await CleanupBatchProcessing();
+                StatusText = $"Batch download complete! Downloaded {urls.Count} songs in parallel.";
+                CliOutput += $"\n=== PARALLEL BATCH PROCESSING COMPLETE ===\n";
+                CliOutput += $"Successfully processed {urls.Count} URLs in parallel.\n";
+            }
+            catch (Exception ex)
+            {
+                CliOutput += $"Parallel processing error: {ex.Message}\n";
+                await CleanupBatchProcessing();
+            }
+        }
+
+        // New method for sequential processing (fallback)
+        private async Task ProcessUrlsSequentially(List<string> urls)
+        {
+            try
+            {
+                for (int i = 0; i < urls.Count; i++)
+                {
+                    CurrentBatchIndex = i;
+                    StatusText = $"Processing {i + 1}/{urls.Count}: {Path.GetFileName(urls[i])}";
+
+                    try
+                    {
+                        await ProcessSingleUrlForBatch(urls[i], i);
+                        CliOutput += $"✅ Completed {i + 1}/{urls.Count}\n";
+                    }
+                    catch (Exception urlEx)
+                    {
+                        CliOutput += $"❌ Failed {i + 1}/{urls.Count}: {urlEx.Message}\n";
+                    }
+
+                    // Brief pause between sequential downloads
+                    if (i < urls.Count - 1)
+                    {
+                        await Task.Delay(1000);
+                    }
+                }
+
+                await CleanupBatchProcessing();
+                StatusText = $"Batch download complete! Downloaded {urls.Count} songs sequentially.";
+            }
+            catch (Exception ex)
+            {
+                CliOutput += $"Sequential processing error: {ex.Message}\n";
+                await CleanupBatchProcessing();
+            }
+        }
+
+        // Helper method for parallel processing with semaphore
+        private async Task ProcessUrlWithSemaphore(string url, int index, SemaphoreSlim semaphore, Action onComplete)
+        {
+            await semaphore.WaitAsync();
+
+            try
+            {
+                Interlocked.Increment(ref activeDownloads);
+                CliOutput += $"[{DateTime.Now:HH:mm:ss}] Starting download {index + 1}: {url}\n";
+
+                await ProcessSingleUrlForBatch(url, index);
+
+                CliOutput += $"[{DateTime.Now:HH:mm:ss}] ✅ Completed download {index + 1}\n";
+                onComplete?.Invoke();
+            }
+            catch (Exception ex)
+            {
+                CliOutput += $"[{DateTime.Now:HH:mm:ss}] ❌ Failed download {index + 1}: {ex.Message}\n";
+            }
+            finally
+            {
+                Interlocked.Decrement(ref activeDownloads);
+                semaphore.Release();
+            }
+        }
+
+        private async Task ProcessSingleUrlForBatch(string url, int index)
+        {
+            try
+            {
+                // Create a new track info for this specific download
+                var trackInfo = new TrackInfo();
+
+                CliOutput += $"\n--- Processing {index + 1}/{TotalBatchCount} ---\n";
+                CliOutput += $"URL: {url}\n";
+
+                // Update UI to show current processing URL (thread-safe)
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    CurrentProcessingUrl = url;
+                });
+
+                if (IsSpotifyUrl(url))
+                {
+                    CliOutput += "Type: Spotify URL - Converting to search...\n";
+                    await ProcessSpotifyDownloadForBatch(url, trackInfo, index);
+                }
+                else
+                {
+                    CliOutput += "Type: Direct URL - Processing...\n";
+                    await ProcessDirectUrlForBatch(url, trackInfo, index);
+                }
+
+                // Update UI with the completed track info (thread-safe)
+                if (!string.IsNullOrEmpty(trackInfo.Title))
+                {
+                    await Dispatcher.UIThread.InvokeAsync(() =>
+                    {
+                        LastProcessedTrack = trackInfo;
+                        // Update main CurrentTrack for UI display of the latest completed download
+                        CurrentTrack = trackInfo;
+                        ShowMetadata = true;
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                CliOutput += $"Error processing URL {url}: {ex.Message}\n";
+                throw;
+            }
+        }
+
+        private async Task ProcessSpotifyDownloadForBatch(string spotifyUrl, TrackInfo trackInfo, int index)
+        {
+            try
+            {
+                CliOutput += $"[Thread {index}] Spotify URL detected: {spotifyUrl}\n";
+                CliOutput += $"[Thread {index}] Converting to YouTube search...\n";
+
+                string searchTerm = await ConvertSpotifyUrlToSearchTerm(spotifyUrl);
+
+                if (!string.IsNullOrEmpty(searchTerm))
+                {
+                    CliOutput += $"[Thread {index}] Converted to search: {searchTerm}\n";
+
+                    // Extract metadata for this specific track WITH ALBUM ART
+                    var extractedTrack = await ExtractMetadataWithAlbumArt(searchTerm, index);
+
+                    if (extractedTrack != null)
+                    {
+                        // Copy extracted data to our local track info
+                        CopyTrackInfo(extractedTrack, trackInfo);
+                        CliOutput += $"[Thread {index}] Match found: {trackInfo.Title} by {trackInfo.Artist}\n";
+
+                        // Ensure album art is preserved
+                        if (extractedTrack.AlbumArt != null)
+                        {
+                            trackInfo.AlbumArt = extractedTrack.AlbumArt;
+                            trackInfo.HasRealAlbumArt = extractedTrack.HasRealAlbumArt;
+                            CliOutput += $"[Thread {index}] Album art retrieved and preserved\n";
+                        }
+
+                        // Download with the converted search term
+                        await RealDownloadForBatch(searchTerm, trackInfo, index);
+                    }
+                    else
+                    {
+                        CliOutput += $"[Thread {index}] No YouTube results found for converted Spotify term.\n";
+                    }
+                }
+                else
+                {
+                    CliOutput += $"[Thread {index}] Conversion failed. Skipping this URL.\n";
+                }
+            }
+            catch (Exception ex)
+            {
+                CliOutput += $"[Thread {index}] Spotify processing error: {ex.Message}\n";
+                throw;
+            }
+        }
+
+
+        // Direct URL processing method for batch operations
+        private async Task ProcessDirectUrlForBatch(string url, TrackInfo trackInfo, int index)
+        {
+            try
+            {
+                CliOutput += $"[Thread {index}] Extracting metadata...\n";
+
+                var extractedTrack = await ExtractMetadataWithAlbumArt(url, index);
+
+                if (extractedTrack != null)
+                {
+                    CopyTrackInfo(extractedTrack, trackInfo);
+                    CliOutput += $"[Thread {index}] Found: {trackInfo.Title} by {trackInfo.Artist}\n";
+
+                    // Ensure album art is preserved
+                    if (extractedTrack.AlbumArt != null)
+                    {
+                        trackInfo.AlbumArt = extractedTrack.AlbumArt;
+                        trackInfo.HasRealAlbumArt = extractedTrack.HasRealAlbumArt;
+                        CliOutput += $"[Thread {index}] Album art retrieved and preserved\n";
+                    }
+                }
+                else
+                {
+                    CliOutput += $"[Thread {index}] Could not extract metadata, proceeding with download...\n";
+                }
+
+                await RealDownloadForBatch(url, trackInfo, index);
+            }
+            catch (Exception ex)
+            {
+                CliOutput += $"[Thread {index}] Direct URL processing error: {ex.Message}\n";
+                throw;
+            }
+        }
+
+        private async Task<TrackInfo?> ExtractMetadataWithAlbumArt(string url, int threadIndex)
+        {
+            try
+            {
+                CliOutput += $"[Thread {threadIndex}] Starting metadata extraction...\n";
+
+                // Use the existing ExtractMetadata method
+                var trackInfo = await ExtractMetadata(url);
+
+                if (trackInfo == null) return null;
+
+                CliOutput += $"[Thread {threadIndex}] Basic metadata extracted, searching for album art...\n";
+
+                // Now find real album art (this was the missing piece!)
+                await FindRealAlbumArtForBatch(trackInfo, threadIndex);
+
+                CliOutput += $"[Thread {threadIndex}] Album art search completed\n";
+
+                return trackInfo;
+            }
+            catch (Exception ex)
+            {
+                CliOutput += $"[Thread {threadIndex}] Metadata extraction error: {ex.Message}\n";
+                return null;
+            }
+        }
+
+        private async Task FindRealAlbumArtForBatch(TrackInfo trackInfo, int threadIndex)
+        {
+            try
+            {
+                // Skip if we don't have basic info
+                if (string.IsNullOrEmpty(trackInfo.Title) || string.IsNullOrEmpty(trackInfo.Artist) ||
+                    trackInfo.Title == "Unknown" || trackInfo.Artist == "Unknown")
+                {
+                    trackInfo.AlbumArt = trackInfo.Thumbnail;
+                    trackInfo.HasRealAlbumArt = false;
+                    CliOutput += $"[Thread {threadIndex}] Using thumbnail as album art (insufficient metadata)\n";
+                    return;
+                }
+
+                CliOutput += $"[Thread {threadIndex}] Searching for real album art: {trackInfo.Artist} - {trackInfo.Title}\n";
+
+                // Generate search variations
+                var searchVariations = GenerateComprehensiveSearchVariations(trackInfo.Title, trackInfo.Artist);
+
+                // Try multiple APIs with timeout for batch processing
+                var searchMethods = new[]
+                {
+            () => SearchITunesComprehensiveWithTimeout(searchVariations, threadIndex),
+            () => SearchDeezerComprehensiveWithTimeout(searchVariations, threadIndex),
+            () => SearchMusicBrainzComprehensiveWithTimeout(searchVariations, threadIndex)
+        };
+
+                foreach (var searchMethod in searchMethods)
+                {
+                    try
+                    {
+                        var result = await searchMethod();
+                        if (result.HasValue && result.Value.albumArt != null && IsHighQualityAlbumArt(result.Value.albumArt))
+                        {
+                            trackInfo.AlbumArt = result.Value.albumArt;
+                            trackInfo.HasRealAlbumArt = true;
+                            UpdateMetadataFromSource(trackInfo, result.Value.album, result.Value.genre, result.Value.year, result.Value.trackNumber);
+                            CliOutput += $"[Thread {threadIndex}] High-quality album art found and applied\n";
+                            return;
+                        }
+                    }
+                    catch
+                    {
+                        continue; // Silently continue to next API
+                    }
+                }
+
+                // Fallback: use thumbnail
+                trackInfo.AlbumArt = trackInfo.Thumbnail;
+                trackInfo.HasRealAlbumArt = false;
+                CliOutput += $"[Thread {threadIndex}] Using thumbnail as fallback album art\n";
+            }
+            catch (Exception ex)
+            {
+                trackInfo.AlbumArt = trackInfo.Thumbnail;
+                trackInfo.HasRealAlbumArt = false;
+                CliOutput += $"[Thread {threadIndex}] Album art search failed, using thumbnail: {ex.Message}\n";
+            }
+        }
+
+        private async Task<(Bitmap? albumArt, string album, string genre, string year, int trackNumber)?> SearchITunesComprehensiveWithTimeout(List<(string query, double weight)> searchVariations, int threadIndex)
+        {
+            foreach (var (query, weight) in searchVariations.Take(5)) // Reduced for batch processing
+            {
+                try
+                {
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10)); // 10 second timeout
+
+                    string searchUrl = $"https://itunes.apple.com/search?term={Uri.EscapeDataString(query)}&media=music&entity=song&limit=25";
+
+                    using var response = await httpClient.GetAsync(searchUrl, cts.Token);
+                    if (!response.IsSuccessStatusCode) continue;
+
+                    var jsonResponse = await response.Content.ReadAsStringAsync(cts.Token);
+                    using var doc = JsonDocument.Parse(jsonResponse);
+
+                    if (!doc.RootElement.TryGetProperty("results", out var results)) continue;
+
+                    var matches = ScoreAndFilterMatches(results, query, weight * 0.15); // Slightly higher threshold for batch
+
+                    foreach (var match in matches.Take(3)) // Reduced for performance
+                    {
+                        if (!match.TryGetProperty("artworkUrl100", out var artworkUrl)) continue;
+
+                        // Try high-res version first
+                        var imageUrls = new[]
+                        {
+                    artworkUrl.GetString()?.Replace("100x100", "600x600"),
+                    artworkUrl.GetString()?.Replace("100x100", "400x400")
+                };
+
+                        foreach (var imageUrl in imageUrls.Where(url => !string.IsNullOrEmpty(url)))
+                        {
+                            var albumArt = await LoadImageWithRetryAndValidation(imageUrl, 2); // Reduced retries for batch
+                            if (albumArt != null && IsHighQualityAlbumArt(albumArt))
+                            {
+                                var metadata = ExtractITunesMetadata(match);
+                                CliOutput += $"[Thread {threadIndex}] iTunes album art found\n";
+                                return (albumArt, metadata.album, metadata.genre, metadata.year, metadata.trackNumber);
+                            }
+                        }
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    CliOutput += $"[Thread {threadIndex}] iTunes search timeout\n";
+                    continue;
+                }
+                catch
+                {
+                    continue;
+                }
+
+                await Task.Delay(100, CancellationToken.None); // Reduced delay for batch processing
+            }
+
+            return null;
+        }
+
+        // Similar timeout-enhanced methods for other services
+        private async Task<(Bitmap? albumArt, string album, string genre, string year, int trackNumber)?> SearchDeezerComprehensiveWithTimeout(List<(string query, double weight)> searchVariations, int threadIndex)
+        {
+            foreach (var (query, weight) in searchVariations.Take(5))
+            {
+                try
+                {
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+                    string searchUrl = $"https://api.deezer.com/search/track?q={Uri.EscapeDataString(query)}&limit=25";
+
+                    using var request = new HttpRequestMessage(HttpMethod.Get, searchUrl);
+                    request.Headers.Add("User-Agent", "Symphex/1.0");
+
+                    var response = await httpClient.SendAsync(request, cts.Token);
+                    if (!response.IsSuccessStatusCode) continue;
+
+                    var jsonResponse = await response.Content.ReadAsStringAsync(cts.Token);
+                    using var doc = JsonDocument.Parse(jsonResponse);
+
+                    if (!doc.RootElement.TryGetProperty("data", out var data)) continue;
+
+                    var matches = ScoreDeezerMatches(data, query, weight * 0.15);
+
+                    foreach (var match in matches.Take(3))
+                    {
+                        if (!match.TryGetProperty("album", out var album)) continue;
+
+                        var imageUrls = new[]
+                        {
+                    album.TryGetProperty("cover_big", out var big) ? big.GetString() : null,
+                    album.TryGetProperty("cover_medium", out var med) ? med.GetString() : null
+                };
+
+                        foreach (var imageUrl in imageUrls.Where(url => !string.IsNullOrEmpty(url)))
+                        {
+                            var albumArt = await LoadImageWithRetryAndValidation(imageUrl, 2);
+                            if (albumArt != null && IsHighQualityAlbumArt(albumArt))
+                            {
+                                var metadata = ExtractDeezerMetadata(match);
+                                CliOutput += $"[Thread {threadIndex}] Deezer album art found\n";
+                                return (albumArt, metadata.album, metadata.genre, metadata.year, 0);
+                            }
+                        }
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    CliOutput += $"[Thread {threadIndex}] Deezer search timeout\n";
+                    continue;
+                }
+                catch
+                {
+                    continue;
+                }
+
+                await Task.Delay(150, CancellationToken.None);
+            }
+
+            return null;
+        }
+
+        private async Task<(Bitmap? albumArt, string album, string genre, string year, int trackNumber)?> SearchMusicBrainzComprehensiveWithTimeout(List<(string query, double weight)> searchVariations, int threadIndex)
+        {
+            foreach (var (query, weight) in searchVariations.Take(3)) // Even fewer for MusicBrainz due to stricter rate limits
+            {
+                try
+                {
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+
+                    string searchUrl = $"https://musicbrainz.org/ws/2/recording/?query={Uri.EscapeDataString($"recording:{query}")}&fmt=json&limit=15";
+
+                    using var request = new HttpRequestMessage(HttpMethod.Get, searchUrl);
+                    request.Headers.Add("User-Agent", "Symphex/1.0");
+
+                    var response = await httpClient.SendAsync(request, cts.Token);
+                    if (!response.IsSuccessStatusCode) continue;
+
+                    var jsonResponse = await response.Content.ReadAsStringAsync(cts.Token);
+                    using var doc = JsonDocument.Parse(jsonResponse);
+
+                    if (!doc.RootElement.TryGetProperty("recordings", out var recordings)) continue;
+
+                    foreach (var recording in recordings.EnumerateArray().Take(5))
+                    {
+                        if (!recording.TryGetProperty("releases", out var releases)) continue;
+
+                        foreach (var release in releases.EnumerateArray().Take(3))
+                        {
+                            if (!release.TryGetProperty("id", out var releaseId)) continue;
+
+                            string mbid = releaseId.GetString();
+                            if (string.IsNullOrEmpty(mbid)) continue;
+
+                            var coverResult = await GetCoverArtFromArchiveRobustWithTimeout(mbid, cts.Token);
+                            if (coverResult.HasValue && coverResult.Value.albumArt != null && IsHighQualityAlbumArt(coverResult.Value.albumArt))
+                            {
+                                CliOutput += $"[Thread {threadIndex}] MusicBrainz album art found\n";
+                                return (coverResult.Value.albumArt, coverResult.Value.album, "", coverResult.Value.year, 0);
+                            }
+                        }
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    CliOutput += $"[Thread {threadIndex}] MusicBrainz search timeout\n";
+                    continue;
+                }
+                catch
+                {
+                    continue;
+                }
+
+                await Task.Delay(1500, CancellationToken.None); // Longer delay for MusicBrainz rate limiting
+            }
+
+            return null;
+        }
+
+        private async Task<(Bitmap? albumArt, string album, string year)?> GetCoverArtFromArchiveRobustWithTimeout(string mbid, CancellationToken cancellationToken)
+        {
+            try
+            {
+                string coverArtUrl = $"https://coverartarchive.org/release/{mbid}";
+
+                using var request = new HttpRequestMessage(HttpMethod.Get, coverArtUrl);
+                request.Headers.Add("User-Agent", "Symphex/1.0");
+
+                var response = await httpClient.SendAsync(request, cancellationToken);
+                if (!response.IsSuccessStatusCode) return null;
+
+                var jsonResponse = await response.Content.ReadAsStringAsync(cancellationToken);
+                using var doc = JsonDocument.Parse(jsonResponse);
+
+                if (!doc.RootElement.TryGetProperty("images", out var images)) return null;
+
+                var imagesToTry = images.EnumerateArray()
+                    .OrderByDescending(img => img.TryGetProperty("front", out var front) && front.GetBoolean())
+                    .Take(2) // Only try top 2 for batch processing
+                    .ToList();
+
+                foreach (var image in imagesToTry)
+                {
+                    if (!image.TryGetProperty("image", out var imageUrl)) continue;
+
+                    string artUrl = imageUrl.GetString();
+                    if (string.IsNullOrEmpty(artUrl)) continue;
+
+                    var albumArt = await LoadImageWithRetryAndValidation(artUrl, 1);
+                    if (albumArt != null && IsHighQualityAlbumArt(albumArt))
+                    {
+                        var releaseInfo = await GetMusicBrainzReleaseInfoRobust(mbid);
+                        return (albumArt, releaseInfo.album, releaseInfo.year);
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                throw; // Re-throw cancellation
+            }
+            catch
+            {
+                // Silent failure
+            }
+
+            return null;
+        }
+
+        private async Task RealDownloadForBatch(string url, TrackInfo trackInfo, int index)
+        {
+            try
+            {
+                bool isDirectUrl = url.StartsWith("http://") || url.StartsWith("https://");
+                string fullUrl = isDirectUrl ? url : $"ytsearch1:{url}";
+
+                var output = new StringBuilder();
+                var error = new StringBuilder();
+
+                // Create filename based on track info
+                string filenameTemplate;
+                if (!string.IsNullOrEmpty(trackInfo.Title) && !string.IsNullOrEmpty(trackInfo.Artist))
+                {
+                    string cleanTitle = SanitizeFilename(trackInfo.Title);
+                    string cleanArtist = SanitizeFilename(trackInfo.Artist);
+                    filenameTemplate = Path.Combine(DownloadFolder, $"{cleanArtist} - {cleanTitle}.%(ext)s");
+                }
+                else
+                {
+                    filenameTemplate = Path.Combine(DownloadFolder, "%(uploader)s - %(title)s.%(ext)s");
+                }
+
+                List<string> argsList = new List<string>
+        {
+            $"\"{fullUrl}\"",
+            "--extract-audio",
+            "--audio-format", "mp3",
+            "--audio-quality", "0",
+            "--no-playlist",
+            "--embed-thumbnail",
+            "--add-metadata",
+            "-o", $"\"{filenameTemplate}\""
+        };
+
+                // Add FFmpeg location if available
+                if (!string.IsNullOrEmpty(FfmpegPath) && File.Exists(FfmpegPath))
+                {
+                    string ffmpegDir = Path.GetDirectoryName(FfmpegPath) ?? "";
+                    argsList.AddRange(new[] { "--ffmpeg-location", $"\"{ffmpegDir}\"" });
+                }
+
+                string args = string.Join(" ", argsList);
+
+                var result = await Cli.Wrap(YtDlpPath)
+                    .WithArguments(args)
+                    .WithStandardOutputPipe(PipeTarget.ToStringBuilder(output))
+                    .WithStandardErrorPipe(PipeTarget.ToStringBuilder(error))
+                    .WithValidation(CommandResultValidation.None)
+                    .ExecuteAsync();
+
+                if (result.ExitCode == 0)
+                {
+                    string actualFilePath = await FindDownloadedFile(output.ToString());
+                    if (!string.IsNullOrEmpty(actualFilePath))
+                    {
+                        trackInfo.FileName = Path.GetFileName(actualFilePath);
+                        // Apply metadata if available
+                        await ApplyProperMetadataForBatch(trackInfo, actualFilePath);
+                    }
+                }
+                else
+                {
+                    throw new Exception($"Download failed with exit code {result.ExitCode}");
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Batch download failed: {ex.Message}");
+            }
+        }
+
+        // Helper method to copy track information
+        private void CopyTrackInfo(TrackInfo source, TrackInfo destination)
+        {
+            destination.Title = source.Title;
+            destination.Artist = source.Artist;
+            destination.Album = source.Album;
+            destination.Duration = source.Duration;
+            destination.Url = source.Url;
+            destination.Uploader = source.Uploader;
+            destination.UploadDate = source.UploadDate;
+            destination.ViewCount = source.ViewCount;
+            destination.Thumbnail = source.Thumbnail;
+            destination.AlbumArt = source.AlbumArt;
+            destination.HasRealAlbumArt = source.HasRealAlbumArt;
+            destination.Genre = source.Genre;
+            destination.Year = source.Year;
+            destination.TrackNumber = source.TrackNumber;
+            destination.AlbumArtist = source.AlbumArtist;
+            destination.Comment = source.Comment;
+            destination.Encoder = source.Encoder;
+        }
+
+        // Metadata application for batch processing
+        private async Task ApplyProperMetadataForBatch(TrackInfo trackInfo, string audioFilePath)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(FfmpegPath) || !File.Exists(audioFilePath))
+                    return;
+
+                string tempOutput = Path.Combine(DownloadFolder, $"temp_{Guid.NewGuid():N}.mp3");
+                var argsList = new List<string>();
+                argsList.AddRange(new[] { "-i", audioFilePath });
+
+                // Handle album art embedding
+                Bitmap? artworkToUse = trackInfo.AlbumArt ?? trackInfo.Thumbnail;
+                string? tempArtwork = null;
+
+                if (artworkToUse != null)
+                {
+                    tempArtwork = Path.Combine(Path.GetTempPath(), $"temp_artwork_{Guid.NewGuid():N}.jpg");
+
+                    try
+                    {
+                        using (var fileStream = new FileStream(tempArtwork, FileMode.Create))
+                        {
+                            artworkToUse.Save(fileStream);
+                        }
+
+                        argsList.AddRange(new[] { "-i", tempArtwork });
+                        argsList.AddRange(new[] { "-map", "0:a", "-map", "1:0" });
+                        argsList.AddRange(new[] { "-c:a", "copy", "-c:v", "mjpeg" });
+                        argsList.AddRange(new[] { "-disposition:v", "attached_pic" });
+                    }
+                    catch
+                    {
+                        tempArtwork = null;
+                        argsList.AddRange(new[] { "-c", "copy" });
+                    }
+                }
+                else
+                {
+                    argsList.AddRange(new[] { "-c", "copy" });
+                }
+
+                // Apply comprehensive metadata
+                argsList.AddRange(new[] { "-id3v2_version", "3" });
+
+                if (!string.IsNullOrEmpty(trackInfo.Title) && trackInfo.Title != "Unknown")
+                {
+                    argsList.AddRange(new[] { "-metadata", $"title={trackInfo.Title}" });
+                }
+
+                if (!string.IsNullOrEmpty(trackInfo.Artist) && trackInfo.Artist != "Unknown")
+                {
+                    argsList.AddRange(new[] { "-metadata", $"artist={trackInfo.Artist}" });
+                }
+
+                if (!string.IsNullOrEmpty(trackInfo.Album))
+                {
+                    argsList.AddRange(new[] { "-metadata", $"album={trackInfo.Album}" });
+                }
+
+                if (!string.IsNullOrEmpty(trackInfo.AlbumArtist))
+                {
+                    argsList.AddRange(new[] { "-metadata", $"albumartist={trackInfo.AlbumArtist}" });
+                }
+
+                if (!string.IsNullOrEmpty(trackInfo.Genre))
+                {
+                    argsList.AddRange(new[] { "-metadata", $"genre={trackInfo.Genre}" });
+                }
+
+                if (!string.IsNullOrEmpty(trackInfo.Year))
+                {
+                    argsList.AddRange(new[] { "-metadata", $"date={trackInfo.Year}" });
+                }
+
+                if (trackInfo.TrackNumber > 0)
+                {
+                    argsList.AddRange(new[] { "-metadata", $"track={trackInfo.TrackNumber}" });
+                }
+
+                argsList.Add(tempOutput);
+
+                var result = await Cli.Wrap(FfmpegPath)
+                    .WithArguments(argsList)
+                    .WithValidation(CommandResultValidation.None)
+                    .ExecuteAsync();
+
+                try
+                {
+                    if (result.ExitCode == 0 && File.Exists(tempOutput))
+                    {
+                        File.Delete(audioFilePath);
+                        File.Move(tempOutput, audioFilePath);
+                    }
+                    else if (File.Exists(tempOutput))
+                    {
+                        File.Delete(tempOutput);
+                    }
+                }
+                finally
+                {
+                    if (tempArtwork != null && File.Exists(tempArtwork))
+                    {
+                        File.Delete(tempArtwork);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Silent fail for metadata application in batch mode
+            }
+        }
+
+        // Cleanup method for batch processing
+        private async Task CleanupBatchProcessing()
+        {
+            try
+            {
+                // Delete batch file
+                if (!string.IsNullOrEmpty(CurrentBatchFilePath) && File.Exists(CurrentBatchFilePath))
+                {
+                    try
+                    {
+                        File.Delete(CurrentBatchFilePath);
+                        CliOutput += $"Batch file deleted: {Path.GetFileName(CurrentBatchFilePath)}\n";
+                    }
+                    catch (Exception deleteEx)
+                    {
+                        CliOutput += $"Could not delete batch file: {deleteEx.Message}\n";
+                    }
+                }
+
+                // Reset all batch-related state
                 IsBatchProcessing = false;
                 IsDownloading = false;
+                CurrentBatchIndex = 0;
+                TotalBatchCount = 0;
+                CurrentBatchFilePath = "";
+                ActiveDownloads = 0;
+                PendingUrls?.Clear();
+                RunningTasks.Clear();
+                DownloadProgress = 0;
+                ShowMetadata = false;
+                CurrentTrack = new TrackInfo();
+
+                CliOutput += $"Check your download folder: {DownloadFolder}\n\n";
+            }
+            catch (Exception ex)
+            {
+                CliOutput += $"Cleanup error: {ex.Message}\n";
             }
         }
 
