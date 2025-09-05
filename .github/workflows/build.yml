@@ -7,7 +7,6 @@ on:
   release:
     types: [ published ]
   workflow_dispatch:
-
 jobs:
   build:
     strategy:
@@ -44,7 +43,15 @@ jobs:
     
     - name: Publish
       run: |
-        dotnet publish --configuration Release --runtime ${{ matrix.runtime }} --self-contained true --output ./build -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+        dotnet publish --configuration Release --runtime ${{ matrix.runtime }} --self-contained true --output ./build -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishReadyToRun=false
+    
+    # Special handling for macOS to ensure executable permissions
+    - name: Set executable permissions (macOS/Linux)
+      if: matrix.os != 'windows-latest'
+      run: |
+        chmod +x ./build/Symphex${{ matrix.extension }}
+        # Also set permissions for any .dylib files
+        find ./build -name "*.dylib" -exec chmod +x {} \;
     
     - name: Create Archive (Windows)
       if: matrix.os == 'windows-latest'
