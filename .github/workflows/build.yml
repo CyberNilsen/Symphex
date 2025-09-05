@@ -7,6 +7,7 @@ on:
   release:
     types: [ published ]
   workflow_dispatch:
+
 jobs:
   build:
     strategy:
@@ -41,103 +42,9 @@ jobs:
     - name: Build
       run: dotnet build --no-restore --configuration Release
     
-    # Windows and Linux - single file
-    - name: Publish (Windows/Linux)
-      if: matrix.os != 'macos-latest'
+    - name: Publish
       run: |
-        dotnet publish ./Symphex/Symphex.csproj --configuration Release --runtime ${{ matrix.runtime }} --self-contained true --output ./build -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
-    
-    # macOS - self-contained but NOT single file to avoid native lib issues
-    - name: Publish macOS (Self-Contained Multi-File)
-      if: matrix.os == 'macos-latest'
-      run: |
-        dotnet publish ./Symphex/Symphex.csproj --configuration Release --runtime ${{ matrix.runtime }} --self-contained true --output ./build-temp -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false
-        
-        # Create app bundle
-        APP_NAME="Symphex"
-        BUNDLE_NAME="$APP_NAME.app"
-        
-        mkdir -p "./build/$BUNDLE_NAME/Contents/MacOS"
-        mkdir -p "./build/$BUNDLE_NAME/Contents/Resources"
-        
-        # Copy all published files
-        cp -r ./build-temp/* "./build/$BUNDLE_NAME/Contents/MacOS/"
-        
-        # Create Info.plist
-        cat > "./build/$BUNDLE_NAME/Contents/Info.plist" << 'EOF'
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-            <key>CFBundleExecutable</key>
-            <string>Symphex</string>
-            <key>CFBundleIdentifier</key>
-            <string>com.symphex.app</string>
-            <key>CFBundleName</key>
-            <string>Symphex</string>
-            <key>CFBundleDisplayName</key>
-            <string>Symphex</string>
-            <key>CFBundleVersion</key>
-            <string>1.0.0</string>
-            <key>CFBundleShortVersionString</key>
-            <string>1.0.0</string>
-            <key>CFBundlePackageType</key>
-            <string>APPL</string>
-            <key>LSMinimumSystemVersion</key>
-            <string>10.15</string>
-            <key>NSHighResolutionCapable</key>
-            <true/>
-            <key>LSUIElement</key>
-            <false/>
-            <key>NSAppTransportSecurity</key>
-            <dict>
-                <key>NSAllowsArbitraryLoads</key>
-                <true/>
-            </dict>
-        </dict>
-        </plist>
-        EOF
-        
-        # Set permissions for everything
-        chmod +x "./build/$BUNDLE_NAME/Contents/MacOS/Symphex"
-        find "./build/$BUNDLE_NAME/Contents/MacOS" -name "*.dylib" -exec chmod +x {} \;
-        find "./build/$BUNDLE_NAME/Contents/MacOS" -name "*.so" -exec chmod +x {} \;
-        
-        # Create entitlements file for proper signing
-        cat > "./entitlements.plist" << 'EOF'
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-            <key>com.apple.security.cs.allow-jit</key>
-            <true/>
-            <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
-            <true/>
-            <key>com.apple.security.cs.allow-dyld-environment-variables</key>
-            <true/>
-            <key>com.apple.security.cs.disable-library-validation</key>
-            <true/>
-        </dict>
-        </plist>
-        EOF
-        
-        # Ad-hoc sign everything individually first
-        find "./build/$BUNDLE_NAME/Contents/MacOS" -name "*.dylib" -exec codesign --force --sign - --options=runtime --entitlements ./entitlements.plist {} \;
-        codesign --force --sign - --options=runtime --entitlements ./entitlements.plist "./build/$BUNDLE_NAME/Contents/MacOS/Symphex"
-        
-        # Then sign the entire app bundle
-        codesign --force --deep --sign - --options=runtime --entitlements ./entitlements.plist "./build/$BUNDLE_NAME"
-        
-        # Remove quarantine attributes just in case
-        xattr -cr "./build/$BUNDLE_NAME" 2>/dev/null || true
-        
-        rm -rf ./build-temp
-        rm ./entitlements.plist
-    
-    - name: Set executable permissions (Linux)
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        chmod +x ./build/Symphex
+        dotnet publish --configuration Release --runtime ${{ matrix.runtime }} --self-contained true --output ./build -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
     
     - name: Create Archive (Windows)
       if: matrix.os == 'windows-latest'
@@ -145,15 +52,10 @@ jobs:
       run: |
         Compress-Archive -Path ./build/* -DestinationPath ${{ matrix.os_name }}.zip
     
-    - name: Create Archive (Linux)
-      if: matrix.os == 'ubuntu-latest'
+    - name: Create Archive (Linux/macOS)  
+      if: matrix.os != 'windows-latest'
       run: |
         cd build && zip -r ../${{ matrix.os_name }}.zip .
-        
-    - name: Create Archive (macOS)
-      if: matrix.os == 'macos-latest'
-      run: |
-        cd build && zip -r ../${{ matrix.os_name }}.zip Symphex.app
     
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v4
