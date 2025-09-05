@@ -47,11 +47,11 @@ jobs:
       run: |
         dotnet publish --configuration Release --runtime ${{ matrix.runtime }} --self-contained true --output ./build -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
     
-    # macOS - framework dependent to avoid native lib issues
-    - name: Publish macOS (Framework Dependent)
+    # macOS - self-contained but NOT single file to avoid native lib issues
+    - name: Publish macOS (Self-Contained Multi-File)
       if: matrix.os == 'macos-latest'
       run: |
-        dotnet publish --configuration Release --runtime ${{ matrix.runtime }} --output ./build-temp
+        dotnet publish --configuration Release --runtime ${{ matrix.runtime }} --self-contained true --output ./build-temp -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false
         
         # Create app bundle
         APP_NAME="Symphex"
@@ -60,18 +60,8 @@ jobs:
         mkdir -p "./build/$BUNDLE_NAME/Contents/MacOS"
         mkdir -p "./build/$BUNDLE_NAME/Contents/Resources"
         
-        # Copy published files
+        # Copy all published files
         cp -r ./build-temp/* "./build/$BUNDLE_NAME/Contents/MacOS/"
-        
-        # Create launcher script to handle library paths
-        cat > "./build/$BUNDLE_NAME/Contents/MacOS/launch.sh" << 'EOF'
-        #!/bin/bash
-        cd "$(dirname "$0")"
-        export DYLD_LIBRARY_PATH="$PWD:$DYLD_LIBRARY_PATH"
-        ./Symphex "$@"
-        EOF
-        
-        chmod +x "./build/$BUNDLE_NAME/Contents/MacOS/launch.sh"
         
         # Create Info.plist
         cat > "./build/$BUNDLE_NAME/Contents/Info.plist" << 'EOF'
@@ -80,7 +70,7 @@ jobs:
         <plist version="1.0">
         <dict>
             <key>CFBundleExecutable</key>
-            <string>launch.sh</string>
+            <string>Symphex</string>
             <key>CFBundleIdentifier</key>
             <string>com.symphex.app</string>
             <key>CFBundleName</key>
@@ -99,18 +89,50 @@ jobs:
             <true/>
             <key>LSUIElement</key>
             <false/>
+            <key>NSAppTransportSecurity</key>
+            <dict>
+                <key>NSAllowsArbitraryLoads</key>
+                <true/>
+            </dict>
         </dict>
         </plist>
         EOF
         
-        # Set permissions
+        # Set permissions for everything
         chmod +x "./build/$BUNDLE_NAME/Contents/MacOS/Symphex"
         find "./build/$BUNDLE_NAME/Contents/MacOS" -name "*.dylib" -exec chmod +x {} \;
+        find "./build/$BUNDLE_NAME/Contents/MacOS" -name "*.so" -exec chmod +x {} \;
         
-        # Self-sign the app to avoid Gatekeeper issues
-        codesign --force --deep --sign - "./build/$BUNDLE_NAME" || true
+        # Create entitlements file for proper signing
+        cat > "./entitlements.plist" << 'EOF'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>com.apple.security.cs.allow-jit</key>
+            <true/>
+            <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+            <true/>
+            <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+            <true/>
+            <key>com.apple.security.cs.disable-library-validation</key>
+            <true/>
+        </dict>
+        </plist>
+        EOF
+        
+        # Ad-hoc sign everything individually first
+        find "./build/$BUNDLE_NAME/Contents/MacOS" -name "*.dylib" -exec codesign --force --sign - --options=runtime --entitlements ./entitlements.plist {} \;
+        codesign --force --sign - --options=runtime --entitlements ./entitlements.plist "./build/$BUNDLE_NAME/Contents/MacOS/Symphex"
+        
+        # Then sign the entire app bundle
+        codesign --force --deep --sign - --options=runtime --entitlements ./entitlements.plist "./build/$BUNDLE_NAME"
+        
+        # Remove quarantine attributes just in case
+        xattr -cr "./build/$BUNDLE_NAME" 2>/dev/null || true
         
         rm -rf ./build-temp
+        rm ./entitlements.plist
     
     - name: Set executable permissions (Linux)
       if: matrix.os == 'ubuntu-latest'
