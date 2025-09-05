@@ -41,41 +41,36 @@ jobs:
     - name: Build
       run: dotnet build --no-restore --configuration Release
     
-    - name: Publish
-      run: |
-        dotnet publish --configuration Release --runtime ${{ matrix.runtime }} --self-contained true --output ./build -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishReadyToRun=false
-    
-    # Special handling for macOS to ensure executable permissions
-    - name: Set executable permissions (macOS/Linux)
-      if: matrix.os != 'windows-latest'
-      run: |
-        chmod +x ./build/Symphex${{ matrix.extension }}
-        # Also set permissions for any .dylib files
-        find ./build -name "*.dylib" -exec chmod +x {} \;
-    
-    - name: Create Archive (Windows)
+    # Different publish approaches for each platform
+    - name: Publish Windows
       if: matrix.os == 'windows-latest'
-      shell: powershell
       run: |
-        Compress-Archive -Path ./build/* -DestinationPath ${{ matrix.os_name }}.zip
+        dotnet publish --configuration Release --runtime ${{ matrix.runtime }} --self-contained true --output ./build -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
     
-    - name: Create macOS App Bundle
+    - name: Publish Linux
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        dotnet publish --configuration Release --runtime ${{ matrix.runtime }} --self-contained true --output ./build -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+        chmod +x ./build/Symphex
+    
+    - name: Publish macOS
       if: matrix.os == 'macos-latest'
       run: |
-        # Create app bundle structure
+        # Publish without single file for macOS to avoid native library issues
+        dotnet publish --configuration Release --runtime ${{ matrix.runtime }} --self-contained true --output ./build-temp -p:IncludeNativeLibrariesForSelfExtract=true -p:UseAppHost=true
+        
+        # Create proper macOS app bundle
         APP_NAME="Symphex"
         BUNDLE_NAME="$APP_NAME.app"
-        BUILD_DIR="./build"
         
-        mkdir -p "$BUILD_DIR/$BUNDLE_NAME/Contents/MacOS"
-        mkdir -p "$BUILD_DIR/$BUNDLE_NAME/Contents/Resources"
+        mkdir -p "./build/$BUNDLE_NAME/Contents/MacOS"
+        mkdir -p "./build/$BUNDLE_NAME/Contents/Resources"
         
-        # Copy executable and libraries
-        cp "$BUILD_DIR/$APP_NAME" "$BUILD_DIR/$BUNDLE_NAME/Contents/MacOS/"
-        find "$BUILD_DIR" -name "*.dylib" -exec cp {} "$BUILD_DIR/$BUNDLE_NAME/Contents/MacOS/" \;
+        # Copy all files to app bundle
+        cp -r ./build-temp/* "./build/$BUNDLE_NAME/Contents/MacOS/"
         
-        # Create Info.plist
-        cat > "$BUILD_DIR/$BUNDLE_NAME/Contents/Info.plist" << 'EOF'
+        # Create Info.plist with proper permissions
+        cat > "./build/$BUNDLE_NAME/Contents/Info.plist" << 'EOF'
         <?xml version="1.0" encoding="UTF-8"?>
         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
         <plist version="1.0">
@@ -86,28 +81,46 @@ jobs:
             <string>com.symphex.app</string>
             <key>CFBundleName</key>
             <string>Symphex</string>
+            <key>CFBundleDisplayName</key>
+            <string>Symphex</string>
             <key>CFBundleVersion</key>
-            <string>1.0</string>
+            <string>1.0.0</string>
             <key>CFBundleShortVersionString</key>
-            <string>1.0</string>
+            <string>1.0.0</string>
             <key>CFBundlePackageType</key>
             <string>APPL</string>
+            <key>CFBundleSignature</key>
+            <string>????</string>
             <key>LSMinimumSystemVersion</key>
             <string>10.15</string>
             <key>NSHighResolutionCapable</key>
             <true/>
+            <key>NSAppTransportSecurity</key>
+            <dict>
+                <key>NSAllowsArbitraryLoads</key>
+                <true/>
+            </dict>
         </dict>
         </plist>
         EOF
         
-        # Set proper permissions
-        chmod +x "$BUILD_DIR/$BUNDLE_NAME/Contents/MacOS/$APP_NAME"
-        find "$BUILD_DIR/$BUNDLE_NAME/Contents/MacOS" -name "*.dylib" -exec chmod +x {} \;
+        # Set executable permissions
+        chmod +x "./build/$BUNDLE_NAME/Contents/MacOS/$APP_NAME"
+        find "./build/$BUNDLE_NAME/Contents/MacOS" -name "*.dylib" -exec chmod +x {} \;
         
-        # Remove quarantine attributes
-        xattr -cr "$BUILD_DIR/$BUNDLE_NAME" 2>/dev/null || true
+        # Remove extended attributes that cause Gatekeeper issues
+        find "./build/$BUNDLE_NAME" -exec xattr -c {} \; 2>/dev/null || true
+        
+        # Clean up temp directory
+        rm -rf ./build-temp
     
-    - name: Create Archive (Linux)  
+    - name: Create Archive (Windows)
+      if: matrix.os == 'windows-latest'
+      shell: powershell
+      run: |
+        Compress-Archive -Path ./build/* -DestinationPath ${{ matrix.os_name }}.zip
+    
+    - name: Create Archive (Linux)
       if: matrix.os == 'ubuntu-latest'
       run: |
         cd build && zip -r ../${{ matrix.os_name }}.zip .
