@@ -159,7 +159,7 @@ namespace Symphex.ViewModels
         private string currentBatchFilePath = "";
 
         [ObservableProperty]
-        private int maxConcurrentDownloads = 3; // Adjustable based on system capability
+        private int maxConcurrentDownloads = 8; // Adjustable based on system capability
 
         [ObservableProperty]
         private int activeDownloads = 0;
