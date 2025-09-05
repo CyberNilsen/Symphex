@@ -59,10 +59,63 @@ jobs:
       run: |
         Compress-Archive -Path ./build/* -DestinationPath ${{ matrix.os_name }}.zip
     
-    - name: Create Archive (Linux/macOS)  
-      if: matrix.os != 'windows-latest'
+    - name: Create macOS App Bundle
+      if: matrix.os == 'macos-latest'
+      run: |
+        # Create app bundle structure
+        APP_NAME="Symphex"
+        BUNDLE_NAME="$APP_NAME.app"
+        BUILD_DIR="./build"
+        
+        mkdir -p "$BUILD_DIR/$BUNDLE_NAME/Contents/MacOS"
+        mkdir -p "$BUILD_DIR/$BUNDLE_NAME/Contents/Resources"
+        
+        # Copy executable and libraries
+        cp "$BUILD_DIR/$APP_NAME" "$BUILD_DIR/$BUNDLE_NAME/Contents/MacOS/"
+        find "$BUILD_DIR" -name "*.dylib" -exec cp {} "$BUILD_DIR/$BUNDLE_NAME/Contents/MacOS/" \;
+        
+        # Create Info.plist
+        cat > "$BUILD_DIR/$BUNDLE_NAME/Contents/Info.plist" << 'EOF'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+            <key>CFBundleExecutable</key>
+            <string>Symphex</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.symphex.app</string>
+            <key>CFBundleName</key>
+            <string>Symphex</string>
+            <key>CFBundleVersion</key>
+            <string>1.0</string>
+            <key>CFBundleShortVersionString</key>
+            <string>1.0</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>LSMinimumSystemVersion</key>
+            <string>10.15</string>
+            <key>NSHighResolutionCapable</key>
+            <true/>
+        </dict>
+        </plist>
+        EOF
+        
+        # Set proper permissions
+        chmod +x "$BUILD_DIR/$BUNDLE_NAME/Contents/MacOS/$APP_NAME"
+        find "$BUILD_DIR/$BUNDLE_NAME/Contents/MacOS" -name "*.dylib" -exec chmod +x {} \;
+        
+        # Remove quarantine attributes
+        xattr -cr "$BUILD_DIR/$BUNDLE_NAME" 2>/dev/null || true
+    
+    - name: Create Archive (Linux)  
+      if: matrix.os == 'ubuntu-latest'
       run: |
         cd build && zip -r ../${{ matrix.os_name }}.zip .
+        
+    - name: Create Archive (macOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        cd build && zip -r ../${{ matrix.os_name }}.zip Symphex.app
     
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v4
