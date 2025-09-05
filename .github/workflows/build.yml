@@ -45,13 +45,13 @@ jobs:
     - name: Publish (Windows/Linux)
       if: matrix.os != 'macos-latest'
       run: |
-        dotnet publish --configuration Release --runtime ${{ matrix.runtime }} --self-contained true --output ./build -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+        dotnet publish ./Symphex/Symphex.csproj --configuration Release --runtime ${{ matrix.runtime }} --self-contained true --output ./build -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
     
     # macOS - self-contained but NOT single file to avoid native lib issues
     - name: Publish macOS (Self-Contained Multi-File)
       if: matrix.os == 'macos-latest'
       run: |
-        dotnet publish --configuration Release --runtime ${{ matrix.runtime }} --self-contained true --output ./build-temp -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false
+        dotnet publish ./Symphex/Symphex.csproj --configuration Release --runtime ${{ matrix.runtime }} --self-contained true --output ./build-temp -p:IncludeNativeLibrariesForSelfExtract=true -p:PublishTrimmed=false
         
         # Create app bundle
         APP_NAME="Symphex"
