@@ -8,8 +8,6 @@
         x:DataType="vm:SettingsViewModel"
         Icon="/Assets/SymphexLogo.ico"
         Title="Settings - Music Downloader"
-        Width="550" Height="550"
-        MinWidth="550" MinHeight="550"
         Background="#000000"
         CanResize="false"
         WindowStartupLocation="CenterOwner">
