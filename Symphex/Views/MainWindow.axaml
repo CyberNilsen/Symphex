@@ -9,8 +9,7 @@
 		x:DataType="vm:MainWindowViewModel"
 		Icon="/Assets/SymphexLogo.ico"
 		Title="Music Downloader - Simple and Easy"
-		MinWidth="900" MinHeight="650"
-		Width="900" Height="650"
+		
 		Background="#000000">
 
 	<Design.DataContext>

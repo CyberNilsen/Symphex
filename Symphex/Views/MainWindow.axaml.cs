@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Platform;
 using System;
 
 namespace Symphex.Views
@@ -13,7 +14,60 @@ namespace Symphex.Views
             // Center the window when it starts
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
+            // Size window based on screen dimensions
+            SetWindowSizeBasedOnScreen();
+
             this.Loaded += MainWindow_Loaded;
+        }
+
+        private void SetWindowSizeBasedOnScreen()
+        {
+            try
+            {
+                // Get the primary screen
+                var screen = Screens.Primary;
+
+                if (screen != null)
+                {
+                    // Get screen working area (excludes taskbar)
+                    var workingArea = screen.WorkingArea;
+
+                    // Calculate window size as percentage of screen
+                    // Use smaller percentages: 50% width and 60% height
+                    double targetWidth = workingArea.Width * 0.50;
+                    double targetHeight = workingArea.Height * 0.60;
+
+                    // Set constraints to match your current XAML values
+                    const double MIN_WIDTH = 900;
+                    const double MIN_HEIGHT = 650;
+                    const double MAX_WIDTH = 1100;  // Slightly larger than minimum
+                    const double MAX_HEIGHT = 800;   // Slightly larger than minimum
+
+                    // Apply constraints
+                    Width = Math.Max(MIN_WIDTH, Math.Min(MAX_WIDTH, targetWidth));
+                    Height = Math.Max(MIN_HEIGHT, Math.Min(MAX_HEIGHT, targetHeight));
+
+                    // Set minimum window size to match your XAML
+                    MinWidth = MIN_WIDTH;
+                    MinHeight = MIN_HEIGHT;
+                }
+                else
+                {
+                    // Fallback to your current XAML dimensions
+                    Width = 900;
+                    Height = 650;
+                    MinWidth = 900;
+                    MinHeight = 650;
+                }
+            }
+            catch (Exception)
+            {
+                // Fallback to your current XAML dimensions
+                Width = 900;
+                Height = 650;
+                MinWidth = 900;
+                MinHeight = 650;
+            }
         }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
