@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Symphex - Free YouTube & Spotify Music Downloader | Cross-Platform MP3 Converter</title>
+    <meta name="description" content="Download high-quality music from YouTube and Spotify for free. Cross-platform desktop app with automatic metadata, album art, and batch processing. Works on Windows, macOS, and Linux.">
+    <meta name="keywords" content="youtube downloader, spotify downloader, mp3 converter, free music downloader, cross platform, batch download, album art, metadata, open source">
+    <meta name="author" content="CyberNilsen">
+    <meta property="og:title" content="Symphex - Free Music Downloader">
+    <meta property="og:description" content="Download high-quality music from YouTube and Spotify with automatic metadata and album art">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://cybernilsen.github.io/Symphex/">
+    <meta property="og:image" content="https://github.com/user-attachments/assets/301e0b9c-1b93-478f-a3ad-b8347ccd6864">
+    <link rel="canonical" href="https://cybernilsen.github.io/Symphex/">
+    
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Symphex Music Downloader",
+        "applicationCategory": "MultimediaApplication",
+        "operatingSystem": "Windows, macOS, Linux",
+        "downloadUrl": "https://github.com/CyberNilsen/Symphex/releases",
+        "license": "MIT",
+        "description": "Free open-source YouTube and Spotify music downloader with album art and metadata",
+        "author": {
+            "@type": "Person",
+            "name": "CyberNilsen"
+        },
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+        }
+    }
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #ec4899;
+            --accent: #06b6d4;
+            --success: #10b981;
+            --dark: #0f172a;
+            --dark-light: #1e293b;
+            --gray: #64748b;
+            --gray-light: #f1f5f9;
+            --white: #ffffff;
+            --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --gradient-2: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --gradient-3: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            --gradient-hero: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            line-height: 1.6;
+            color: var(--white);
+            background: var(--dark);
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* Animated Background */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: var(--gradient-hero);
+            opacity: 0.95;
+        }
+
+        .bg-animation::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 25% 25%, rgba(99, 102, 241, 0.3) 0%, transparent 50%),
+                        radial-gradient(circle at 75% 75%, rgba(236, 72, 153, 0.3) 0%, transparent 50%),
+                        radial-gradient(circle at 50% 50%, rgba(6, 182, 212, 0.2) 0%, transparent 50%);
+            animation: float 20s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0px, 0px) rotate(0deg); }
+            33% { transform: translate(30px, -50px) rotate(120deg); }
+            66% { transform: translate(-20px, 20px) rotate(240deg); }
+        }
+
+        /* Header */
+        header {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+
+        header.scrolled {
+            background: rgba(15, 23, 42, 0.95);
+            box-shadow: var(--shadow-lg);
+        }
+
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+        }
+
+        .logo {
+            font-size: 1.75rem;
+            font-weight: 800;
+            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: var(--white);
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 2px;
+            bottom: -4px;
+            left: 50%;
+            background: var(--primary);
+            transition: all 0.3s ease;
+            transform: translateX(-50%);
+        }
+
+        .nav-links a:hover::after {
+            width: 100%;
+        }
+
+        .nav-links a:hover {
+            color: var(--primary);
+            transform: translateY(-2px);
+        }
+
+        .mobile-menu {
+            display: none;
+            background: none;
+            border: none;
+            color: var(--white);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-content {
+            text-align: center;
+            z-index: 2;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem 0;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            margin-bottom: 2rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .hero-badge .badge-icon {
+            width: 20px;
+            height: 20px;
+            background: var(--success);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+        }
+
+        .hero h1 {
+            font-size: clamp(2.5rem, 8vw, 5rem);
+            font-weight: 800;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 50%, #e2e8f0 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.02em;
+        }
+
+        .hero-subtitle {
+            font-size: 1.25rem;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 3rem;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.6;
+        }
+
+        /* Download Section */
+        .download-section {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            padding: 2.5rem;
+            margin: 2rem auto;
+            max-width: 700px;
+            box-shadow: var(--shadow-xl);
+        }
+
+        .os-detection {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .os-info {
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 0.5rem;
+        }
+
+        .detected-os {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .download-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .download-btn {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.5rem;
+            border: none;
+            border-radius: 16px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .download-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transition: left 0.5s;
+        }
+
+        .download-btn:hover::before {
+            left: 100%;
+        }
+
+        .download-btn.primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            color: var(--white);
+            box-shadow: 0 8px 32px rgba(99, 102, 241, 0.3);
+            transform: scale(1.02);
+        }
+
+        .download-btn.primary:hover {
+            transform: scale(1.05) translateY(-2px);
+            box-shadow: 0 12px 40px rgba(99, 102, 241, 0.4);
+        }
+
+        .download-btn.secondary {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--white);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .download-btn.secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .btn-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .btn-icon {
+            font-size: 1.5rem;
+        }
+
+        .btn-info {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .btn-platform {
+            font-weight: 600;
+        }
+
+        .btn-size {
+            font-size: 0.875rem;
+            opacity: 0.7;
+        }
+
+        .btn-right {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            opacity: 0.8;
+        }
+
+        .version-info {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            flex-wrap: wrap;
+            font-size: 0.875rem;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .version-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Features Section */
+        .features {
+            padding: 6rem 0;
+            position: relative;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+
+        .section-title {
+            font-size: clamp(2rem, 5vw, 3rem);
+            font-weight: 700;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .section-subtitle {
+            font-size: 1.125rem;
+            color: rgba(255, 255, 255, 0.7);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 2rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(236, 72, 153, 0.1));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .feature-card:hover::before {
+            opacity: 1;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-8px);
+            box-shadow: var(--shadow-xl);
+            border-color: rgba(99, 102, 241, 0.3);
+        }
+
+        .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .feature-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--white);
+        }
+
+        .feature-description {
+            color: rgba(255, 255, 255, 0.8);
+            line-height: 1.6;
+        }
+
+        /* Stats Section */
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 2rem;
+            margin: 4rem 0;
+        }
+
+        .stat-card {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 2rem;
+            transition: all 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            display: block;
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: rgba(255, 255, 255, 0.8);
+            font-weight: 500;
+        }
+
+        /* Footer */
+        footer {
+            background: var(--dark-light);
+            padding: 4rem 0 2rem;
+            margin-top: 6rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .footer-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 3rem;
+            margin-bottom: 3rem;
+        }
+
+        .footer-section h3 {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--primary);
+        }
+
+        .footer-section a {
+            display: block;
+            color: rgba(255, 255, 255, 0.7);
+            text-decoration: none;
+            margin-bottom: 0.75rem;
+            transition: all 0.3s ease;
+            font-weight: 400;
+        }
+
+        .footer-section a:hover {
+            color: var(--primary);
+            transform: translateX(4px);
+        }
+
+        .footer-bottom {
+            text-align: center;
+            padding-top: 2rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .footer-bottom p {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Loading Animation */
+        .loading {
+            display: inline-block;
+            width: 32px;
+            height: 32px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s ease-in-out infinite;
+            margin: 2rem auto;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .mobile-menu {
+                display: block;
+            }
+
+            .hero h1 {
+                font-size: 2.5rem;
+                line-height: 1.2;
+            }
+
+            .hero-subtitle {
+                font-size: 1.1rem;
+                padding: 0 1rem;
+            }
+
+            .download-section {
+                margin: 1rem;
+                padding: 1.5rem;
+                max-width: none;
+            }
+
+            .download-buttons {
+                gap: 0.75rem;
+            }
+
+            .download-btn {
+                padding: 1rem;
+                font-size: 0.9rem;
+            }
+
+            .btn-icon {
+                font-size: 1.25rem;
+            }
+
+            .features-grid {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+
+            .feature-card {
+                padding: 1.5rem;
+            }
+
+            .stats {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 1rem;
+            }
+
+            .stat-card {
+                padding: 1.5rem;
+            }
+
+            .stat-number {
+                font-size: 2rem;
+            }
+
+            .version-info {
+                flex-direction: column;
+                gap: 0.5rem;
+                align-items: center;
+                font-size: 0.8rem;
+            }
+
+            .container {
+                padding: 0 16px;
+            }
+
+            .section-title {
+                font-size: 2rem;
+            }
+
+            .footer-content {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 2rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .hero h1 {
+                font-size: 2rem;
+            }
+
+            .stats {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+
+            .footer-content {
+                grid-template-columns: 1fr;
+                gap: 2rem;
+            }
+
+            .download-btn {
+                flex-direction: column;
+                text-align: center;
+                gap: 0.5rem;
+                padding: 1rem;
+            }
+
+            .btn-left {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .btn-right {
+                display: none;
+            }
+        }
+
+        /* Prevent horizontal scroll */
+        body {
+            overflow-x: hidden;
+            width: 100%;
+        }
+
+        /* Ensure all containers stay within viewport */
+        * {
+            box-sizing: border-box;
+        }
+
+        img, video {
+            max-width: 100%;
+            height: auto;
+        }
+
+        /* Smooth Reveal Animation */
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s ease;
+        }
+
+        .reveal.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animation"></div>
+    
+    <header id="header">
+        <nav class="container">
+            <a href="#" class="logo">
+                🎵 Symphex
+            </a>
+            <ul class="nav-links">
+                <li><a href="#features">Features</a></li>
+                <li><a href="#download">Download</a></li>
+                <li><a href="https://github.com/CyberNilsen/Symphex" target="_blank">GitHub</a></li>
+                <li><a href="https://github.com/CyberNilsen/Symphex/discussions" target="_blank">Community</a></li>
+            </ul>
+            <button class="mobile-menu">☰</button>
+        </nav>
+    </header>
+
+    <main>
+        <section class="hero" id="home">
+            <div class="container">
+                <div class="hero-content reveal">
+                    <div class="hero-badge">
+                        <div class="badge-icon">✓</div>
+                        100% Free & Open Source
+                    </div>
+                    
+                    <h1>Download Music.<br>Keep Forever.</h1>
+                    <p class="hero-subtitle">
+                        The most beautiful way to download high-quality music from YouTube and Spotify. 
+                        Cross-platform, privacy-focused, and completely free.
+                    </p>
+                    
+                    <div class="download-section" id="download">
+                        <div class="os-detection">
+                            <p class="os-info">
+                                🖥️ We detected you're using: <span class="detected-os" id="detected-os">Detecting...</span>
+                            </p>
+                        </div>
+                        
+                        <div class="download-buttons" id="download-buttons">
+                            <div class="loading"></div>
+                        </div>
+                        
+                        <div class="version-info">
+                            <div class="version-item">
+                                <span>✨</span>
+                                <span>Latest Version</span>
+                            </div>
+                            <div class="version-item">
+                                <span>🔒</span>
+                                <span>No Tracking</span>
+                            </div>
+                            <div class="version-item">
+                                <span>💎</span>
+                                <span>Premium Quality</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="stats reveal">
+                        <div class="stat-card">
+                            <span class="stat-number">∞</span>
+                            <span class="stat-label">Downloads</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-number">3</span>
+                            <span class="stat-label">Platforms</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-number">320</span>
+                            <span class="stat-label">kbps Max</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-number">8x</span>
+                            <span class="stat-label">Batch Speed</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="features" id="features">
+            <div class="container">
+                <div class="section-header reveal">
+                    <h2 class="section-title">Everything You Need</h2>
+                    <p class="section-subtitle">
+                        Symphex combines powerful functionality with beautiful design to create the ultimate music downloading experience.
+                    </p>
+                </div>
+                
+                <div class="features-grid">
+                    <div class="feature-card reveal">
+                        <span class="feature-icon">🎵</span>
+                        <h3 class="feature-title">Multi-Platform Magic</h3>
+                        <p class="feature-description">
+                            Download from YouTube, Spotify, and more. Smart matching finds the highest quality audio and converts to perfect MP3 files with zero quality loss.
+                        </p>
+                    </div>
+                    
+                    <div class="feature-card reveal">
+                        <span class="feature-icon">🎨</span>
+                        <h3 class="feature-title">Perfect Metadata</h3>
+                        <p class="feature-description">
+                            Automatic song detection with stunning album artwork from iTunes and Deezer. Every track gets proper ID3 tags and clean, organized filenames.
+                        </p>
+                    </div>
+                    
+                    <div class="feature-card reveal">
+                        <span class="feature-icon">⚡</span>
+                        <h3 class="feature-title">Lightning Fast</h3>
+                        <p class="feature-description">
+                            Batch process entire playlists with 8 simultaneous downloads. Paste multiple links and watch Symphex work its magic in parallel.
+                        </p>
+                    </div>
+                    
+                    <div class="feature-card reveal">
+                        <span class="feature-icon">🔐</span>
+                        <h3 class="feature-title">Privacy First</h3>
+                        <p class="feature-description">
+                            100% offline after setup. Zero data collection, no tracking, no ads. Your music downloads stay completely private on your device.
+                        </p>
+                    </div>
+                    
+                    <div class="feature-card reveal">
+                        <span class="feature-icon">💻</span>
+                        <h3 class="feature-title">Cross-Platform Beauty</h3>
+                        <p class="feature-description">
+                            Native apps for Windows, macOS, and Linux. Stunning, responsive interface that feels at home on any operating system.
+                        </p>
+                    </div>
+                    
+                    <div class="feature-card reveal">
+                        <span class="feature-icon">🚀</span>
+                        <h3 class="feature-title">Zero Setup</h3>
+                        <p class="feature-description">
+                            Portable dependencies included. Auto-downloads yt-dlp and FFmpeg. Extract, run, and start downloading music in seconds.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>Download</h3>
+                    <a href="https://github.com/CyberNilsen/Symphex/releases" target="_blank">Latest Release</a>
+                    <a href="https://github.com/CyberNilsen/Symphex/releases/tag/v1.2.0" target="_blank">v1.2.0 (Current)</a>
+                    <a href="https://github.com/CyberNilsen/Symphex/archive/refs/heads/main.zip" target="_blank">Source Code</a>
+                </div>
+                <div class="footer-section">
+                    <h3>Support</h3>
+                    <a href="https://github.com/CyberNilsen/Symphex/discussions" target="_blank">Community</a>
+                    <a href="https://github.com/CyberNilsen/Symphex/issues" target="_blank">Report Issues</a>
+                    <a href="https://github.com/CyberNilsen/Symphex/wiki" target="_blank">Documentation</a>
+                </div>
+                <div class="footer-section">
+                    <h3>Project</h3>
+                    <a href="https://github.com/CyberNilsen/Symphex" target="_blank">GitHub Repo</a>
+                    <a href="https://github.com/CyberNilsen/Symphex/blob/main/LICENSE" target="_blank">MIT License</a>
+                    <a href="https://github.com/CyberNilsen/Symphex/blob/main/CHANGELOG.md" target="_blank">Changelog</a>
+                </div>
+                <div class="footer-section">
+                    <h3>Connect</h3>
+                    <a href="https://github.com/CyberNilsen" target="_blank">Developer</a>
+                    <a href="https://github.com/CyberNilsen/Symphex/stargazers" target="_blank">Star on GitHub</a>
+                    <a href="https://github.com/CyberNilsen/Symphex/network/members" target="_blank">Fork Project</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 Symphex. Open source under MIT License.</p>
+                <p><small>This software is for personal use only. Please respect copyright laws and platform terms of service.</small></p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // OS Detection
+        function detectOS() {
+            const userAgent = navigator.userAgent.toLowerCase();
+            if (userAgent.includes('win')) return 'Windows';
+            if (userAgent.includes('mac')) return 'macOS';
+            if (userAgent.includes('linux')) return 'Linux';
+            return 'Unknown';
+        }
+
+        // GitHub API to get latest release
+        async function getLatestRelease() {
+            try {
+                const response = await fetch('https://api.github.com/repos/CyberNilsen/Symphex/releases/latest');
+                const release = await response.json();
+                return release;
+            } catch (error) {
+                console.error('Error fetching release data:', error);
+                return null;
+            }
+        }
+
+        // Create download buttons
+        function createDownloadButtons(release, detectedOS) {
+            const buttonsContainer = document.getElementById('download-buttons');
+            
+            if (!release || !release.assets) {
+                buttonsContainer.innerHTML = `
+                    <div style="text-align: center; padding: 2rem;">
+                        <p style="margin-bottom: 1rem; color: rgba(255, 255, 255, 0.8);">
+                            Download links temporarily unavailable.
+                        </p>
+                        <a href="https://github.com/CyberNilsen/Symphex/releases" 
+                           class="download-btn secondary" 
+                           target="_blank" 
+                           style="display: inline-flex; text-decoration: none;">
+                            <div class="btn-left">
+                                <span class="btn-icon">📦</span>
+                                <div class="btn-info">
+                                    <span class="btn-platform">Visit GitHub Releases</span>
+                                    <span class="btn-size">All versions available</span>
+                                </div>
+                            </div>
+                            <div class="btn-right">
+                                <span>→</span>
+                            </div>
+                        </a>
+                    </div>
+                `;
+                return;
+            }
+
+            const assets = release.assets;
+            const platforms = [
+                { 
+                    name: 'Windows', 
+                    keywords: ['win', 'windows'], 
+                    icon: '🪟', 
+                    description: 'Windows 10/11'
+                },
+                { 
+                    name: 'macOS', 
+                    keywords: ['mac', 'osx', 'darwin'], 
+                    icon: '🍎', 
+                    description: 'Intel & Apple Silicon'
+                },
+                { 
+                    name: 'Linux', 
+                    keywords: ['linux'], 
+                    icon: '🐧', 
+                    description: 'Most distributions'
+                }
+            ];
+
+            let buttons = [];
+            let primaryButton = null;
+
+            // Find assets for each platform
+            platforms.forEach(platform => {
+                const asset = assets.find(asset => 
+                    platform.keywords.some(keyword => 
+                        asset.name.toLowerCase().includes(keyword)
+                    )
+                );
+
+                if (asset) {
+                    const isPrimary = platform.name === detectedOS;
+                    const button = {
+                        platform: platform.name,
+                        description: platform.description,
+                        icon: platform.icon,
+                        url: asset.browser_download_url,
+                        size: Math.round(asset.size / 1024 / 1024 * 10) / 10,
+                        isPrimary
+                    };
+
+                    if (isPrimary) {
+                        primaryButton = button;
+                    } else {
+                        buttons.push(button);
+                    }
+                }
+            });
+
+            // Sort: primary first, then others
+            if (primaryButton) {
+                buttons.unshift(primaryButton);
+            }
+
+            // Fallback if no buttons found
+            if (buttons.length === 0) {
+                buttonsContainer.innerHTML = `
+                    <div style="text-align: center; padding: 2rem;">
+                        <a href="https://github.com/CyberNilsen/Symphex/releases/latest" 
+                           class="download-btn primary" 
+                           target="_blank" 
+                           style="display: inline-flex; text-decoration: none; margin: 0 auto;">
+                            <div class="btn-left">
+                                <span class="btn-icon">⬇️</span>
+                                <div class="btn-info">
+                                    <span class="btn-platform">Download Latest Release</span>
+                                    <span class="btn-size">Choose your platform</span>
+                                </div>
+                            </div>
+                            <div class="btn-right">
+                                <span>→</span>
+                            </div>
+                        </a>
+                    </div>
+                `;
+                return;
+            }
+
+            // Create HTML
+            const buttonsHTML = buttons.map(btn => `
+                <a href="${btn.url}" 
+                   class="download-btn ${btn.isPrimary ? 'primary' : 'secondary'}"
+                   onclick="trackDownload('${btn.platform}');"
+                   target="_blank"
+                   rel="noopener noreferrer">
+                    <div class="btn-left">
+                        <span class="btn-icon">${btn.icon}</span>
+                        <div class="btn-info">
+                            <span class="btn-platform">Download for ${btn.platform}</span>
+                            <span class="btn-size">${btn.description} • ${btn.size}MB</span>
+                        </div>
+                    </div>
+                    <div class="btn-right">
+                        <span>${btn.isPrimary ? '⭐' : '⬇️'}</span>
+                    </div>
+                </a>
+            `).join('');
+
+            buttonsContainer.innerHTML = buttonsHTML;
+        }
+
+        // Track downloads (for analytics if you add them later)
+        function trackDownload(platform) {
+            console.log(`Download started for ${platform}`);
+            // Add Google Analytics or other tracking here if needed
+        }
+
+        // Initialize
+        async function init() {
+            const detectedOS = detectOS();
+            document.getElementById('detected-os').textContent = detectedOS;
+
+            const release = await getLatestRelease();
+            createDownloadButtons(release, detectedOS);
+        }
+
+        // Smooth scrolling for navigation
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    const headerOffset = 80;
+                    const elementPosition = target.getBoundingClientRect().top;
+                    const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+                    window.scrollTo({
+                        top: offsetPosition,
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
+
+        // Header scroll effect
+        window.addEventListener('scroll', () => {
+            const header = document.getElementById('header');
+            if (window.scrollY > 100) {
+                header.classList.add('scrolled');
+            } else {
+                header.classList.remove('scrolled');
+            }
+        });
+
+        // Reveal animation on scroll
+        function revealOnScroll() {
+            const reveals = document.querySelectorAll('.reveal');
+            
+            reveals.forEach(reveal => {
+                const windowHeight = window.innerHeight;
+                const elementTop = reveal.getBoundingClientRect().top;
+                const elementVisible = 150;
+                
+                if (elementTop < windowHeight - elementVisible) {
+                    reveal.classList.add('active');
+                }
+            });
+        }
+
+        window.addEventListener('scroll', revealOnScroll);
+
+        // Initialize reveal for elements already in view
+        setTimeout(revealOnScroll, 100);
+
+        // Run when page loads
+        document.addEventListener('DOMContentLoaded', init);
+
+        // Mobile menu (basic implementation)
+        document.querySelector('.mobile-menu')?.addEventListener('click', function() {
+            const navLinks = document.querySelector('.nav-links');
+            navLinks.style.display = navLinks.style.display === 'flex' ? 'none' : 'flex';
+        });
+
+        // Prevent layout shift while loading
+        window.addEventListener('load', function() {
+            document.body.style.opacity = '1';
+        });
+    </script>
+</body>
+</html>
