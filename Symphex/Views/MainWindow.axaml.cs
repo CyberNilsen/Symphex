@@ -9,6 +9,10 @@ namespace Symphex.Views
         public MainWindow()
         {
             InitializeComponent();
+
+            // Center the window when it starts
+            WindowStartupLocation = WindowStartupLocation.CenterScreen;
+
             this.Loaded += MainWindow_Loaded;
         }
 
