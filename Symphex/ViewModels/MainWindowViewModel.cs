@@ -348,7 +348,7 @@ namespace Symphex.ViewModels
 
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                 {
-                 
+
                     FfmpegPath = "";
                 }
                 else
@@ -398,7 +398,7 @@ namespace Symphex.ViewModels
             }
             catch (Exception ex)
             {
-             
+
                 YtDlpPath = "";
             }
         }
@@ -456,7 +456,7 @@ namespace Symphex.ViewModels
             }
             catch (Exception ex)
             {
-              
+
                 FfmpegPath = "";
             }
         }
@@ -490,7 +490,7 @@ namespace Symphex.ViewModels
             else
                 return "";
         }
-        
+
         private async Task<bool> IsExecutableInPath(string executableName)
         {
             try
@@ -930,7 +930,7 @@ namespace Symphex.ViewModels
                 @"(\d)([a-zA-Z])", "$1 $2");
 
             return spaced;
-        }        
+        }
 
         private async Task<TrackInfo?> ExtractMetadata(string url)
         {
@@ -3727,7 +3727,7 @@ namespace Symphex.ViewModels
                 string ytDlpPath = Path.Combine(toolsDir, YtDlpExecutableName);
                 string downloadUrl = GetYtDlpDownloadUrl();
 
-               
+
 
                 using (var localHttpClient = new HttpClient())
                 {
@@ -3771,7 +3771,7 @@ namespace Symphex.ViewModels
                 if (string.IsNullOrEmpty(downloadUrl))
                 {
                     StatusText = "ℹ️ Linux users should install FFmpeg via package manager (apt install ffmpeg)";
-                   
+
                     return;
                 }
 
@@ -3826,7 +3826,7 @@ namespace Symphex.ViewModels
             catch (Exception ex)
             {
                 StatusText = $"❌ Failed to download FFmpeg: {ex.Message}";
-                
+
             }
             finally
             {
@@ -3943,25 +3943,64 @@ namespace Symphex.ViewModels
         }
 
         [RelayCommand]
-        private void OpenFolder()
+        private async void OpenFolder()
         {
             try
             {
+                // Ensure the directory exists first
+                if (!Directory.Exists(DownloadFolder))
+                {
+                    Directory.CreateDirectory(DownloadFolder);
+                }
+
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
                     Process.Start("explorer.exe", DownloadFolder);
                 }
                 else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
-                    var psi = new ProcessStartInfo
+                    // Method 1: Try the simple approach first
+                    try
                     {
-                        FileName = "open",
-                        Arguments = DownloadFolder,
-                        UseShellExecute = true
-                    };
-                    Process.Start(psi);
+                        var psi = new ProcessStartInfo
+                        {
+                            FileName = "open",
+                            Arguments = $"\"{DownloadFolder}\"", // Quote the path
+                            UseShellExecute = false,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            CreateNoWindow = true
+                        };
+
+                        var process = Process.Start(psi);
+                        await process.WaitForExitAsync();
+
+                        if (process.ExitCode != 0)
+                        {
+                            // If that failed, try method 2
+                            var psi2 = new ProcessStartInfo
+                            {
+                                FileName = "/usr/bin/open",
+                                Arguments = DownloadFolder,
+                                UseShellExecute = true
+                            };
+                            Process.Start(psi2);
+                        }
+                    }
+                    catch
+                    {
+                        // Fallback method using shell
+                        var psi = new ProcessStartInfo
+                        {
+                            FileName = "/bin/bash",
+                            Arguments = $"-c \"open '{DownloadFolder.Replace("'", "\\'")}'\"",
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        };
+                        Process.Start(psi);
+                    }
                 }
-                else
+                else // Linux
                 {
                     var psi = new ProcessStartInfo
                     {
@@ -3974,9 +4013,16 @@ namespace Symphex.ViewModels
             }
             catch (Exception ex)
             {
-                // Consider logging the exception or showing a user-friendly message
+                // Show user-friendly message instead of just console logging
                 Console.WriteLine($"Failed to open folder: {ex.Message}");
+
+                // Optional: Show a toast notification or dialog
+                // You could also copy the path to clipboard as fallback
+                // Clipboard.SetTextAsync(DownloadFolder);
+
+                // Show toast with the path so user can navigate manually
             }
         }
+
     }
 }
