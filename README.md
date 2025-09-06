@@ -6,8 +6,6 @@
 
 [![GitHub release](https://img.shields.io/github/v/release/CyberNilsen/Symphex?style=for-the-badge)](https://github.com/CyberNilsen/Symphex/releases)
 [![GitHub stars](https://img.shields.io/github/stars/CyberNilsen/Symphex?style=for-the-badge)](https://github.com/CyberNilsen/Symphex/stargazers)
-![GitHub repo views](https://img.shields.io/github/views/CyberNilsen/Symphex?style=for-the-badge)
-![GitHub repo clones](https://img.shields.io/github/clones/CyberNilsen/Symphex?style=for-the-badge)
 [![License](https://img.shields.io/github/license/CyberNilsen/Symphex?style=for-the-badge)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue?style=for-the-badge)](https://github.com/CyberNilsen/Symphex/releases)
 [![Website](https://img.shields.io/badge/website-online-brightgreen?style=for-the-badge)](https://cybernilsen.github.io/Symphex/)
