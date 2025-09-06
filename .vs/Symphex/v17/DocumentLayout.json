@@ -1,0 +1,170 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\ander\\source\\repos\\CyberNilsen\\Symphex\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{78804B02-9157-4542-93DB-0CED6C05EBFB}|Symphex\\Symphex.csproj|c:\\users\\ander\\source\\repos\\cybernilsen\\symphex\\symphex\\viewmodels\\settingsviewmodel.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{78804B02-9157-4542-93DB-0CED6C05EBFB}|Symphex\\Symphex.csproj|solutionrelative:symphex\\viewmodels\\settingsviewmodel.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{78804B02-9157-4542-93DB-0CED6C05EBFB}|Symphex\\Symphex.csproj|c:\\users\\ander\\source\\repos\\cybernilsen\\symphex\\symphex\\viewmodels\\mainwindowviewmodel.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{78804B02-9157-4542-93DB-0CED6C05EBFB}|Symphex\\Symphex.csproj|solutionrelative:symphex\\viewmodels\\mainwindowviewmodel.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{78804B02-9157-4542-93DB-0CED6C05EBFB}|Symphex\\Symphex.csproj|c:\\users\\ander\\source\\repos\\cybernilsen\\symphex\\symphex\\viewmodels\\viewmodelbase.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{78804B02-9157-4542-93DB-0CED6C05EBFB}|Symphex\\Symphex.csproj|solutionrelative:symphex\\viewmodels\\viewmodelbase.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{78804B02-9157-4542-93DB-0CED6C05EBFB}|Symphex\\Symphex.csproj|c:\\users\\ander\\source\\repos\\cybernilsen\\symphex\\symphex\\views\\mainwindow.axaml||{6D5344A2-2FCD-49DE-A09D-6A14FD1B1224}",
+      "RelativeMoniker": "D:0:0:{78804B02-9157-4542-93DB-0CED6C05EBFB}|Symphex\\Symphex.csproj|solutionrelative:symphex\\views\\mainwindow.axaml||{6D5344A2-2FCD-49DE-A09D-6A14FD1B1224}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{78804B02-9157-4542-93DB-0CED6C05EBFB}|Symphex\\Symphex.csproj|c:\\users\\ander\\source\\repos\\cybernilsen\\symphex\\symphex\\views\\settingswindow.axaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}",
+      "RelativeMoniker": "D:0:0:{78804B02-9157-4542-93DB-0CED6C05EBFB}|Symphex\\Symphex.csproj|solutionrelative:symphex\\views\\settingswindow.axaml.cs||{A6C744A8-0E4A-4FC6-886A-064283054674}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{78804B02-9157-4542-93DB-0CED6C05EBFB}|Symphex\\Symphex.csproj|c:\\users\\ander\\source\\repos\\cybernilsen\\symphex\\symphex\\views\\settingswindow.axaml||{6D5344A2-2FCD-49DE-A09D-6A14FD1B1224}",
+      "RelativeMoniker": "D:0:0:{78804B02-9157-4542-93DB-0CED6C05EBFB}|Symphex\\Symphex.csproj|solutionrelative:symphex\\views\\settingswindow.axaml||{6D5344A2-2FCD-49DE-A09D-6A14FD1B1224}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{78804B02-9157-4542-93DB-0CED6C05EBFB}|Symphex\\Symphex.csproj|c:\\users\\ander\\source\\repos\\cybernilsen\\symphex\\symphex\\app.axaml||{6D5344A2-2FCD-49DE-A09D-6A14FD1B1224}",
+      "RelativeMoniker": "D:0:0:{78804B02-9157-4542-93DB-0CED6C05EBFB}|Symphex\\Symphex.csproj|solutionrelative:symphex\\app.axaml||{6D5344A2-2FCD-49DE-A09D-6A14FD1B1224}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{78804B02-9157-4542-93DB-0CED6C05EBFB}|Symphex\\Symphex.csproj|c:\\users\\ander\\source\\repos\\cybernilsen\\symphex\\symphex\\symphex.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|",
+      "RelativeMoniker": "D:0:0:{78804B02-9157-4542-93DB-0CED6C05EBFB}|Symphex\\Symphex.csproj|solutionrelative:symphex\\symphex.csproj||{FA3CD31E-987B-443A-9B81-186104E8DAC1}|"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{78804B02-9157-4542-93DB-0CED6C05EBFB}|Symphex\\Symphex.csproj|c:\\users\\ander\\source\\repos\\cybernilsen\\symphex\\symphex\\views\\mainwindow.axaml||{FA3CD31E-987B-443A-9B81-186104E8DAC1}",
+      "RelativeMoniker": "D:0:0:{78804B02-9157-4542-93DB-0CED6C05EBFB}|Symphex\\Symphex.csproj|solutionrelative:symphex\\views\\mainwindow.axaml||{FA3CD31E-987B-443A-9B81-186104E8DAC1}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 7,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{aa2115a1-9712-457b-9047-dbb71ca2cdd2}"
+            },
+            {
+              "$type": "Bookmark",
+              "Name": "ST:0:0:{1c4feeaa-4718-4aa9-859d-94ce25d182ba}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "SettingsWindow.axaml.cs",
+              "DocumentMoniker": "C:\\Users\\ander\\source\\repos\\CyberNilsen\\Symphex\\Symphex\\Views\\SettingsWindow.axaml.cs",
+              "RelativeDocumentMoniker": "Symphex\\Views\\SettingsWindow.axaml.cs",
+              "ToolTip": "C:\\Users\\ander\\source\\repos\\CyberNilsen\\Symphex\\Symphex\\Views\\SettingsWindow.axaml.cs",
+              "RelativeToolTip": "Symphex\\Views\\SettingsWindow.axaml.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-09-04T17:14:23.79Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "MainWindow.axaml",
+              "DocumentMoniker": "C:\\Users\\ander\\source\\repos\\CyberNilsen\\Symphex\\Symphex\\Views\\MainWindow.axaml",
+              "RelativeDocumentMoniker": "Symphex\\Views\\MainWindow.axaml",
+              "ToolTip": "C:\\Users\\ander\\source\\repos\\CyberNilsen\\Symphex\\Symphex\\Views\\MainWindow.axaml",
+              "RelativeToolTip": "Symphex\\Views\\MainWindow.axaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2025-09-04T17:14:01.673Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "App.axaml",
+              "DocumentMoniker": "C:\\Users\\ander\\source\\repos\\CyberNilsen\\Symphex\\Symphex\\App.axaml",
+              "RelativeDocumentMoniker": "Symphex\\App.axaml",
+              "ToolTip": "C:\\Users\\ander\\source\\repos\\CyberNilsen\\Symphex\\Symphex\\App.axaml",
+              "RelativeToolTip": "Symphex\\App.axaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2025-09-04T17:13:58.642Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "MainWindowViewModel.cs",
+              "DocumentMoniker": "C:\\Users\\ander\\source\\repos\\CyberNilsen\\Symphex\\Symphex\\ViewModels\\MainWindowViewModel.cs",
+              "RelativeDocumentMoniker": "Symphex\\ViewModels\\MainWindowViewModel.cs",
+              "ToolTip": "C:\\Users\\ander\\source\\repos\\CyberNilsen\\Symphex\\Symphex\\ViewModels\\MainWindowViewModel.cs",
+              "RelativeToolTip": "Symphex\\ViewModels\\MainWindowViewModel.cs",
+              "ViewState": "AgIAAGoPAAAAAAAAAAAQwIsPAAAJAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-09-04T17:08:41.597Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "ViewModelBase.cs",
+              "DocumentMoniker": "C:\\Users\\ander\\source\\repos\\CyberNilsen\\Symphex\\Symphex\\ViewModels\\ViewModelBase.cs",
+              "RelativeDocumentMoniker": "Symphex\\ViewModels\\ViewModelBase.cs",
+              "ToolTip": "C:\\Users\\ander\\source\\repos\\CyberNilsen\\Symphex\\Symphex\\ViewModels\\ViewModelBase.cs",
+              "RelativeToolTip": "Symphex\\ViewModels\\ViewModelBase.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-09-04T16:44:05.677Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "SettingsViewModel.cs",
+              "DocumentMoniker": "C:\\Users\\ander\\source\\repos\\CyberNilsen\\Symphex\\Symphex\\ViewModels\\SettingsViewModel.cs",
+              "RelativeDocumentMoniker": "Symphex\\ViewModels\\SettingsViewModel.cs",
+              "ToolTip": "C:\\Users\\ander\\source\\repos\\CyberNilsen\\Symphex\\Symphex\\ViewModels\\SettingsViewModel.cs",
+              "RelativeToolTip": "Symphex\\ViewModels\\SettingsViewModel.cs",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAABUAAAAzAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000738|",
+              "WhenOpened": "2025-09-04T14:21:43.46Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "SettingsWindow.axaml",
+              "DocumentMoniker": "C:\\Users\\ander\\source\\repos\\CyberNilsen\\Symphex\\Symphex\\Views\\SettingsWindow.axaml",
+              "RelativeDocumentMoniker": "Symphex\\Views\\SettingsWindow.axaml",
+              "ToolTip": "C:\\Users\\ander\\source\\repos\\CyberNilsen\\Symphex\\Symphex\\Views\\SettingsWindow.axaml",
+              "RelativeToolTip": "Symphex\\Views\\SettingsWindow.axaml",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2025-09-03T19:51:25.692Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "MainWindow.axaml",
+              "DocumentMoniker": "C:\\Users\\ander\\source\\repos\\CyberNilsen\\Symphex\\Symphex\\Views\\MainWindow.axaml",
+              "RelativeDocumentMoniker": "Symphex\\Views\\MainWindow.axaml",
+              "ToolTip": "C:\\Users\\ander\\source\\repos\\CyberNilsen\\Symphex\\Symphex\\Views\\MainWindow.axaml",
+              "RelativeToolTip": "Symphex\\Views\\MainWindow.axaml",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003549|",
+              "WhenOpened": "2025-09-03T19:47:59.816Z"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "Symphex.csproj",
+              "DocumentMoniker": "C:\\Users\\ander\\source\\repos\\CyberNilsen\\Symphex\\Symphex\\Symphex.csproj",
+              "RelativeDocumentMoniker": "Symphex\\Symphex.csproj",
+              "ToolTip": "C:\\Users\\ander\\source\\repos\\CyberNilsen\\Symphex\\Symphex\\Symphex.csproj",
+              "RelativeToolTip": "Symphex\\Symphex.csproj",
+              "ViewState": "AgIAAAAAAAAAAAAAAAAAAA8AAAAWAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000758|",
+              "WhenOpened": "2025-09-03T19:47:53.615Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
