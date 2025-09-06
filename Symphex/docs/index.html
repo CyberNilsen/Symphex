@@ -53,7 +53,7 @@
             --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             --gradient-2: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
             --gradient-3: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-            --gradient-hero: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            --gradient-hero: linear-gradient(135deg, #374275 0%, #363393 50%, #00000084 100%);
             --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
             --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
             --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
@@ -142,7 +142,7 @@
         .logo {
             font-size: 1.75rem;
             font-weight: 800;
-            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            background: linear-gradient(45deg, var(--white), var(--white));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -199,6 +199,7 @@
 
         /* Hero Section */
         .hero {
+            
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -215,6 +216,7 @@
         }
 
         .hero-badge {
+            margin-top: 10%;
             display: inline-flex;
             align-items: center;
             gap: 0.5rem;
@@ -596,20 +598,35 @@
                 display: block;
             }
 
+            .hero {
+                padding-top: 80px;
+                min-height: auto;
+                padding-bottom: 2rem;
+            }
+
             .hero h1 {
-                font-size: 2.5rem;
+                font-size: 2.2rem;
                 line-height: 1.2;
+                margin-bottom: 1rem;
             }
 
             .hero-subtitle {
-                font-size: 1.1rem;
-                padding: 0 1rem;
+                font-size: 1rem;
+                padding: 0;
+                margin-bottom: 2rem;
+            }
+
+            .hero-badge {
+                font-size: 0.8rem;
+                padding: 0.4rem 0.8rem;
+                margin-bottom: 1.5rem;
             }
 
             .download-section {
-                margin: 1rem;
-                padding: 1.5rem;
+                margin: 1rem auto 2rem auto;
+                padding: 1.5rem 1rem;
                 max-width: none;
+                width: calc(100% - 2rem);
             }
 
             .download-buttons {
@@ -617,34 +634,51 @@
             }
 
             .download-btn {
-                padding: 1rem;
+                padding: 0.8rem 1rem;
                 font-size: 0.9rem;
             }
 
             .btn-icon {
-                font-size: 1.25rem;
+                font-size: 1.2rem;
+            }
+
+            .btn-platform {
+                font-size: 0.9rem;
+            }
+
+            .btn-size {
+                font-size: 0.8rem;
             }
 
             .features-grid {
                 grid-template-columns: 1fr;
-                gap: 1.5rem;
+                gap: 1rem;
             }
 
             .feature-card {
-                padding: 1.5rem;
+                padding: 1.25rem;
+            }
+
+            .feature-icon {
+                font-size: 2rem;
+            }
+
+            .feature-title {
+                font-size: 1.1rem;
             }
 
             .stats {
                 grid-template-columns: repeat(2, 1fr);
-                gap: 1rem;
+                gap: 0.75rem;
+                margin: 2rem 0;
             }
 
             .stat-card {
-                padding: 1.5rem;
+                padding: 1.25rem 1rem;
             }
 
             .stat-number {
-                font-size: 2rem;
+                font-size: 1.8rem;
             }
 
             .version-info {
@@ -655,65 +689,74 @@
             }
 
             .container {
-                padding: 0 16px;
+                padding: 0 12px;
             }
 
             .section-title {
-                font-size: 2rem;
+                font-size: 1.8rem;
+            }
+
+            .section-subtitle {
+                font-size: 1rem;
             }
 
             .footer-content {
                 grid-template-columns: repeat(2, 1fr);
-                gap: 2rem;
+                gap: 1.5rem;
             }
         }
 
         @media (max-width: 480px) {
             .hero h1 {
-                font-size: 2rem;
+                font-size: 1.8rem;
+            }
+
+            .hero-subtitle {
+                font-size: 0.95rem;
             }
 
             .stats {
                 grid-template-columns: 1fr;
-                gap: 1rem;
+                gap: 0.75rem;
             }
 
             .footer-content {
                 grid-template-columns: 1fr;
-                gap: 2rem;
+                gap: 1.5rem;
             }
 
             .download-btn {
-                flex-direction: column;
-                text-align: center;
-                gap: 0.5rem;
                 padding: 1rem;
             }
 
             .btn-left {
-                flex-direction: column;
-                gap: 0.5rem;
+                gap: 0.75rem;
             }
 
-            .btn-right {
-                display: none;
+            .container {
+                padding: 0 10px;
+            }
+
+            .download-section {
+                width: calc(100% - 1.5rem);
+                margin: 1rem auto;
             }
         }
 
-        /* Prevent horizontal scroll */
-        body {
+        /* Prevent any overflow */
+        html, body {
+            max-width: 100vw;
             overflow-x: hidden;
-            width: 100%;
         }
 
-        /* Ensure all containers stay within viewport */
         * {
             box-sizing: border-box;
+            max-width: 100%;
         }
 
-        img, video {
+        /* Ensure no element extends beyond viewport */
+        .hero-content, .features, .stats, .download-section, .feature-card, .stat-card {
             max-width: 100%;
-            height: auto;
         }
 
         /* Smooth Reveal Animation */
@@ -880,7 +923,6 @@
                     <h3>Download</h3>
                     <a href="https://github.com/CyberNilsen/Symphex/releases" target="_blank">Latest Release</a>
                     <a href="https://github.com/CyberNilsen/Symphex/releases/tag/v1.2.0" target="_blank">v1.2.0 (Current)</a>
-                    <a href="https://github.com/CyberNilsen/Symphex/archive/refs/heads/main.zip" target="_blank">Source Code</a>
                 </div>
                 <div class="footer-section">
                     <h3>Support</h3>
@@ -891,8 +933,8 @@
                 <div class="footer-section">
                     <h3>Project</h3>
                     <a href="https://github.com/CyberNilsen/Symphex" target="_blank">GitHub Repo</a>
-                    <a href="https://github.com/CyberNilsen/Symphex/blob/main/LICENSE" target="_blank">MIT License</a>
-                    <a href="https://github.com/CyberNilsen/Symphex/blob/main/CHANGELOG.md" target="_blank">Changelog</a>
+                    <a href="https://github.com/CyberNilsen/Symphex/blob/master/LICENSE" target="_blank">MIT License</a>
+                    <a href="https://github.com/CyberNilsen/Symphex/blob/master/CHANGELOG.md" target="_blank">Changelog</a>
                 </div>
                 <div class="footer-section">
                     <h3>Connect</h3>
