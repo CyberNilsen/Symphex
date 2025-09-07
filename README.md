@@ -187,7 +187,7 @@ Downloads saved to:
 
 **Poor Audio Quality**
 - Check source video quality - Symphex can't enhance beyond original
-- Verify yt-dlp is latest version (auto-updated by app)
+- Verify yt-dlp is latest version
 - Some videos only available in lower quality formats
 
 ### Getting Help
