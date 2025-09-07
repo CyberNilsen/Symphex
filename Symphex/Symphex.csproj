@@ -9,22 +9,38 @@
 		<PackageIcon>SymphexLogo.png</PackageIcon>
 		<ApplicationIcon>Assets\SymphexLogo.ico</ApplicationIcon>
 
+		<!-- Version Information -->
+		<AssemblyVersion>1.2.1.0</AssemblyVersion>
+		<FileVersion>1.2.1.0</FileVersion>
+		<Version>1.2.1</Version>
+
+		<!-- Application Information -->
+		<AssemblyTitle>Symphex Music Downloader</AssemblyTitle>
+		<AssemblyDescription>Cross-platform music downloader for YouTube and Spotify with smart metadata detection</AssemblyDescription>
+		<AssemblyCompany>CyberNilsen</AssemblyCompany>
+		<AssemblyProduct>Symphex</AssemblyProduct>
+		<AssemblyCopyright>Copyright © 2025 CyberNilsen. All rights reserved.</AssemblyCopyright>
+		<AssemblyTrademark>Symphex™</AssemblyTrademark>
+
+		<!-- Additional Windows Properties -->
+		<AssemblyOriginalFilename>Symphex.exe</AssemblyOriginalFilename>
+		<AssemblyInternalName>Symphex</AssemblyInternalName>
+
 		<!-- macOS specific properties -->
 		<CFBundleName>Symphex Music Downloader</CFBundleName>
 		<CFBundleDisplayName>Music Downloader</CFBundleDisplayName>
 		<CFBundleIdentifier>com.symphex.musicdownloader</CFBundleIdentifier>
-		<CFBundleVersion>1.1.0</CFBundleVersion>
+		<CFBundleVersion>1.2.1</CFBundleVersion>
+		<CFBundleShortVersionString>1.2.1</CFBundleShortVersionString>
 		<CFBundlePackageType>APPL</CFBundlePackageType>
 		<CFBundleSignature>????</CFBundleSignature>
 		<CFBundleExecutable>Symphex</CFBundleExecutable>
 		<CFBundleIconFile>SymphexLogo.icns</CFBundleIconFile>
 	</PropertyGroup>
-
 	<ItemGroup>
 		<Folder Include="Models\" />
 		<AvaloniaResource Include="Assets\**" />
 	</ItemGroup>
-
 	<ItemGroup>
 		<PackageReference Include="Avalonia" Version="11.3.4" />
 		<PackageReference Include="Avalonia.Desktop" Version="11.3.4" />
@@ -39,7 +55,6 @@
 		<PackageReference Include="System.IO.Compression" Version="4.3.0" />
 		<PackageReference Include="System.IO.Compression.ZipFile" Version="4.3.0" />
 	</ItemGroup>
-
 	<ItemGroup>
 		<AvaloniaResource Update="Assets\SymphexLogo.png">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
@@ -52,7 +67,6 @@
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</AvaloniaResource>
 	</ItemGroup>
-
 	<ItemGroup>
 		<None Update="Assets\SymphexLogo.png">
 			<Pack>True</Pack>
