@@ -285,7 +285,7 @@ Symphex developers assume no responsibility for misuse of this software.
 
 ## 🔗 Links & Resources
 
-- **🏠 Homepage**: [Coming Soon]
+- **🏠 Homepage**: [Website](https://cybernilsen.github.io/Symphex/)
 - **📱 Download**: [Latest Releases](https://github.com/CyberNilsen/Symphex/releases)
 - **🐛 Bug Reports**: [GitHub Issues](https://github.com/CyberNilsen/Symphex/issues)
 - **💬 Discussions**: [GitHub Discussions](https://github.com/CyberNilsen/Symphex/discussions)  
