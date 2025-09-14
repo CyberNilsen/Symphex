@@ -9,6 +9,8 @@ using Avalonia.Threading;
 using CliWrap;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Symphex.Models;
+using Symphex.Services;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -22,12 +24,9 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Symphex.Models;
 
 namespace Symphex.ViewModels
 {
-    
-
     public partial class MainWindowViewModel : ViewModelBase
     {
         private ScrollViewer? _cliScrollViewer;
@@ -100,16 +99,16 @@ namespace Symphex.ViewModels
         [ObservableProperty]
         private string currentProcessingUrl = "";
 
-        private string YtDlpPath { get; set; } = "";
-        private string FfmpegPath { get; set; } = "";
-        private string YtDlpExecutableName => GetYtDlpExecutableName();
-        private string FfmpegExecutableName => GetFfmpegExecutableName();
         private readonly HttpClient httpClient = new();
+
+        private readonly DependencyManager dependencyManager = new();
+
+        private string YtDlpPath => dependencyManager.YtDlpPath;
+        private string FfmpegPath => dependencyManager.FfmpegPath;
 
         public MainWindowViewModel()
         {
             CurrentTrack = new TrackInfo();
-
             SetupDownloadFolder();
 
             if (!Directory.Exists(DownloadFolder))
@@ -120,7 +119,7 @@ namespace Symphex.ViewModels
             // Start auto-installation in background
             _ = Task.Run(async () =>
             {
-                await AutoInstallDependencies();
+                await dependencyManager.AutoInstallDependencies();
             });
         }
 
@@ -170,330 +169,6 @@ namespace Symphex.ViewModels
             }
         }
 
-        private async Task AutoInstallDependencies()
-        {
-            try
-            {
-                // Check and auto-install yt-dlp
-                await SetupOrDownloadYtDlp();
-
-                // Check and auto-install FFmpeg
-                await SetupOrDownloadFfmpeg();
-            }
-            catch (Exception ex)
-            {
-            }
-        }
-
-        private async Task SetupOrDownloadYtDlp()
-        {
-            try
-            {
-                string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
-
-                string[] possiblePaths = {
-            Path.Combine(appDirectory, "tools", YtDlpExecutableName),
-            Path.Combine(appDirectory, YtDlpExecutableName)
-        };
-
-                // First check local paths
-                foreach (string path in possiblePaths)
-                {
-                    if (File.Exists(path))
-                    {
-                        YtDlpPath = path;
-
-                        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                        {
-                            MakeExecutable(path);
-                        }
-
-                        return;
-                    }
-                }
-
-                // Then check system PATH
-                if (await IsExecutableInPath(YtDlpExecutableName))
-                {
-                    YtDlpPath = YtDlpExecutableName;
-                    return;
-                }
-
-                // If not found, auto-download
-                string os = GetCurrentOS();
-
-                await AutoDownloadYtDlp();
-            }
-            catch (Exception ex)
-            {
-                YtDlpPath = "";
-            }
-        }
-
-        private async Task SetupOrDownloadFfmpeg()
-        {
-            try
-            {
-                string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
-
-                string[] possiblePaths = {
-            Path.Combine(appDirectory, "tools", FfmpegExecutableName),
-            Path.Combine(appDirectory, "tools", "ffmpeg", "bin", FfmpegExecutableName),
-            Path.Combine(appDirectory, "tools", "bin", FfmpegExecutableName),
-            Path.Combine(appDirectory, FfmpegExecutableName)
-        };
-
-                // First check local paths
-                foreach (string path in possiblePaths)
-                {
-                    if (File.Exists(path))
-                    {
-                        FfmpegPath = path;
-
-                        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                        {
-                            MakeExecutable(path);
-                        }
-
-                        return;
-                    }
-                }
-
-                // Check system PATH
-                if (await IsExecutableInPath(FfmpegExecutableName))
-                {
-                    FfmpegPath = FfmpegExecutableName;
-                    return;
-                }
-
-                // If not found, auto-download (except for Linux)
-                string os = GetCurrentOS();
-
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                {
-                    FfmpegPath = "";
-                }
-                else
-                {
-                    await AutoDownloadFfmpeg();
-                }
-            }
-            catch (Exception ex)
-            {
-                FfmpegPath = "";
-            }
-        }
-
-        private async Task AutoDownloadYtDlp()
-        {
-            try
-            {
-                string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
-                string toolsDir = Path.Combine(appDirectory, "tools");
-
-                if (!Directory.Exists(toolsDir))
-                {
-                    Directory.CreateDirectory(toolsDir);
-                }
-
-                string ytDlpPath = Path.Combine(toolsDir, YtDlpExecutableName);
-                string downloadUrl = GetYtDlpDownloadUrl();
-
-                using (var localHttpClient = new HttpClient())
-                {
-                    localHttpClient.Timeout = TimeSpan.FromMinutes(5);
-
-                    var response = await localHttpClient.GetAsync(downloadUrl);
-                    response.EnsureSuccessStatusCode();
-
-                    await File.WriteAllBytesAsync(ytDlpPath, await response.Content.ReadAsByteArrayAsync());
-
-                    if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                    {
-                        MakeExecutable(ytDlpPath);
-                    }
-
-                    YtDlpPath = ytDlpPath;
-                }
-            }
-            catch (Exception ex)
-            {
-                YtDlpPath = "";
-            }
-        }
-
-        private async Task AutoDownloadFfmpeg()
-        {
-            try
-            {
-                string os = GetCurrentOS();
-                string downloadUrl = GetFfmpegDownloadUrl();
-
-                if (string.IsNullOrEmpty(downloadUrl))
-                {
-                    return;
-                }
-
-                string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
-                string toolsDir = Path.Combine(appDirectory, "tools");
-
-                if (!Directory.Exists(toolsDir))
-                {
-                    Directory.CreateDirectory(toolsDir);
-                }
-
-                using (var localHttpClient = new HttpClient())
-                {
-                    localHttpClient.Timeout = TimeSpan.FromMinutes(10); // FFmpeg is larger
-
-                    var response = await localHttpClient.GetAsync(downloadUrl);
-                    response.EnsureSuccessStatusCode();
-
-                    var zipBytes = await response.Content.ReadAsByteArrayAsync();
-
-                    string zipPath = Path.Combine(toolsDir, "ffmpeg.zip");
-                    await File.WriteAllBytesAsync(zipPath, zipBytes);
-
-                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                    {
-                        await ExtractFfmpegWindows(zipPath, toolsDir);
-                    }
-                    else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                    {
-                        await ExtractFfmpegMacOS(zipPath, toolsDir);
-                    }
-
-                    File.Delete(zipPath);
-
-                    // Re-run setup to find the extracted executable
-                    await SetupOrDownloadFfmpeg();
-                }
-            }
-            catch (Exception ex)
-            {
-                FfmpegPath = "";
-            }
-        }
-
-        private string GetYtDlpExecutableName()
-        {
-            return RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "yt-dlp.exe" : "yt-dlp";
-        }
-
-        private string GetFfmpegExecutableName()
-        {
-            return RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "ffmpeg.exe" : "ffmpeg";
-        }
-
-        private string GetYtDlpDownloadUrl()
-        {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                return "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe";
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                return "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos";
-            else
-                return "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux";
-        }
-
-        private string GetFfmpegDownloadUrl()
-        {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                return "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip";
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                return "https://evermeet.cx/ffmpeg/getrelease/zip";
-            else
-                return "";
-        }
-
-        private async Task<bool> IsExecutableInPath(string executableName)
-        {
-            try
-            {
-                var result = await Cli.Wrap(executableName)
-                    .WithArguments("--version")
-                    .WithValidation(CommandResultValidation.None)
-                    .ExecuteAsync();
-
-                return result.ExitCode == 0;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private async void SetupPortableFfmpeg()
-        {
-            try
-            {
-                string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
-
-                string[] possiblePaths = {
-            Path.Combine(appDirectory, "tools", FfmpegExecutableName),
-            Path.Combine(appDirectory, "tools", "ffmpeg", "bin", FfmpegExecutableName),
-            Path.Combine(appDirectory, "tools", "bin", FfmpegExecutableName),
-            Path.Combine(appDirectory, FfmpegExecutableName)
-        };
-
-                // First check local paths
-                foreach (string path in possiblePaths)
-                {
-                    if (File.Exists(path))
-                    {
-                        FfmpegPath = path;
-
-                        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                        {
-                            MakeExecutable(path);
-                        }
-
-                        return;
-                    }
-                }
-
-                if (await IsExecutableInPath(FfmpegExecutableName))
-                {
-                    FfmpegPath = FfmpegExecutableName;
-                    return;
-                }
-
-                string os = GetCurrentOS();
-                FfmpegPath = "";
-            }
-            catch (Exception ex)
-            {
-                FfmpegPath = "";
-            }
-        }
-
-        private string GetCurrentOS()
-        {
-            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                return "Windows";
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                return "macOS";
-            else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
-                return "Linux";
-            else
-                return "Unknown OS";
-        }
-
-        private void MakeExecutable(string filePath)
-        {
-            try
-            {
-                var result = Process.Start(new ProcessStartInfo
-                {
-                    FileName = "chmod",
-                    Arguments = $"+x \"{filePath}\"",
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                });
-                result?.WaitForExit();
-            }
-            catch { }
-        }
-
         private bool IsSpotifyUrl(string url)
         {
             if (string.IsNullOrWhiteSpace(url)) return false;
@@ -504,7 +179,6 @@ namespace Symphex.ViewModels
                    url.StartsWith("spotify:") ||
                    url.Contains("spotify://");
         }
-
 
         [ObservableProperty]
         private bool isProcessingSpotify = false;
@@ -3611,40 +3285,15 @@ namespace Symphex.ViewModels
         {
             try
             {
-                StatusText = $"⬇️ Downloading yt-dlp for {GetCurrentOS()}...";
+                StatusText = $"⬇️ Downloading yt-dlp for {dependencyManager.GetCurrentOS()}...";
                 IsDownloading = true;
                 DownloadProgress = 0;
 
-                string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
-                string toolsDir = Path.Combine(appDirectory, "tools");
+                DownloadProgress = 30;
+                await dependencyManager.DownloadYtDlp();
 
-                if (!Directory.Exists(toolsDir))
-                {
-                    Directory.CreateDirectory(toolsDir);
-                }
-
-                string ytDlpPath = Path.Combine(toolsDir, YtDlpExecutableName);
-                string downloadUrl = GetYtDlpDownloadUrl();
-
-                using (var localHttpClient = new HttpClient())
-                {
-                    DownloadProgress = 30;
-                    var response = await localHttpClient.GetAsync(downloadUrl);
-                    response.EnsureSuccessStatusCode();
-
-                    DownloadProgress = 60;
-                    await File.WriteAllBytesAsync(ytDlpPath, await response.Content.ReadAsByteArrayAsync());
-
-                    if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                    {
-                        MakeExecutable(ytDlpPath);
-                    }
-
-                    DownloadProgress = 100;
-                    StatusText = $"✅ yt-dlp downloaded successfully for {GetCurrentOS()}!";
-
-                    YtDlpPath = ytDlpPath;
-                }
+                DownloadProgress = 100;
+                StatusText = $"✅ yt-dlp downloaded successfully for {dependencyManager.GetCurrentOS()}!";
             }
             catch (Exception ex)
             {
@@ -3662,63 +3311,20 @@ namespace Symphex.ViewModels
         {
             try
             {
-                string os = GetCurrentOS();
-                string downloadUrl = GetFfmpegDownloadUrl();
-
-                if (string.IsNullOrEmpty(downloadUrl))
-                {
-                    StatusText = "ℹ️ Linux users should install FFmpeg via package manager (apt install ffmpeg)";
-
-                    return;
-                }
-
+                string os = dependencyManager.GetCurrentOS();
                 StatusText = $"⬇️ Downloading FFmpeg for {os}...";
                 IsDownloading = true;
                 DownloadProgress = 0;
 
-                string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
-                string toolsDir = Path.Combine(appDirectory, "tools");
-
-                if (!Directory.Exists(toolsDir))
-                {
-                    Directory.CreateDirectory(toolsDir);
-                }
-
                 DownloadProgress = 10;
+                await dependencyManager.DownloadFfmpeg();
 
-                using (var localHttpClient = new HttpClient())
-                {
-                    localHttpClient.Timeout = TimeSpan.FromMinutes(10);
-
-                    var response = await localHttpClient.GetAsync(downloadUrl);
-                    response.EnsureSuccessStatusCode();
-
-                    DownloadProgress = 40;
-                    var zipBytes = await response.Content.ReadAsByteArrayAsync();
-
-                    string zipPath = Path.Combine(toolsDir, "ffmpeg.zip");
-                    await File.WriteAllBytesAsync(zipPath, zipBytes);
-
-                    DownloadProgress = 60;
-
-                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                    {
-                        await ExtractFfmpegWindows(zipPath, toolsDir);
-                    }
-                    else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
-                    {
-                        await ExtractFfmpegMacOS(zipPath, toolsDir);
-                    }
-
-                    File.Delete(zipPath);
-
-                    DownloadProgress = 90;
-
-                    SetupPortableFfmpeg();
-
-                    DownloadProgress = 100;
-                    StatusText = $"✅ FFmpeg downloaded and extracted for {os}!";
-                }
+                DownloadProgress = 100;
+                StatusText = $"✅ FFmpeg downloaded and extracted for {os}!";
+            }
+            catch (InvalidOperationException ex)
+            {
+                StatusText = $"ℹ️ {ex.Message}";
             }
             catch (Exception ex)
             {
@@ -3731,59 +3337,6 @@ namespace Symphex.ViewModels
             }
         }
 
-        private Task ExtractFfmpegWindows(string zipPath, string toolsDir)
-        {
-            using (var archive = ZipFile.OpenRead(zipPath))
-            {
-                var ffmpegEntry = archive.Entries.FirstOrDefault(e =>
-                    e.FullName.EndsWith("ffmpeg.exe", StringComparison.OrdinalIgnoreCase));
-
-                if (ffmpegEntry != null)
-                {
-                    string extractPath = Path.Combine(toolsDir, "ffmpeg.exe");
-                    ffmpegEntry.ExtractToFile(extractPath, true);
-                }
-                else
-                {
-                    string extractDir = Path.Combine(toolsDir, "ffmpeg_temp");
-
-                    if (Directory.Exists(extractDir))
-                    {
-                        Directory.Delete(extractDir, true);
-                    }
-
-                    archive.ExtractToDirectory(extractDir);
-
-                    var ffmpegFiles = Directory.GetFiles(extractDir, "ffmpeg.exe", SearchOption.AllDirectories);
-                    if (ffmpegFiles.Length > 0)
-                    {
-                        string sourcePath = ffmpegFiles[0];
-                        string destPath = Path.Combine(toolsDir, "ffmpeg.exe");
-                        File.Copy(sourcePath, destPath, true);
-                    }
-
-                    Directory.Delete(extractDir, true);
-                }
-            }
-            return Task.CompletedTask;
-        }
-
-        private Task ExtractFfmpegMacOS(string zipPath, string toolsDir)
-        {
-            using (var archive = ZipFile.OpenRead(zipPath))
-            {
-                var ffmpegEntry = archive.Entries.FirstOrDefault(e =>
-                    e.FullName.EndsWith("ffmpeg", StringComparison.OrdinalIgnoreCase) && !e.FullName.Contains("/"));
-
-                if (ffmpegEntry != null)
-                {
-                    string extractPath = Path.Combine(toolsDir, "ffmpeg");
-                    ffmpegEntry.ExtractToFile(extractPath, true);
-                    MakeExecutable(extractPath);
-                }
-            }
-            return Task.CompletedTask;
-        }
 
         [RelayCommand]
         private async Task CopyOutput()
