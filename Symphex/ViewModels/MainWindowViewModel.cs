@@ -108,6 +108,8 @@ namespace Symphex.ViewModels
 
         private readonly AlbumArtSearchService albumArtSearchService;
 
+        private DownloadService? _downloadService;
+
         public MainWindowViewModel()
         {
             CurrentTrack = new TrackInfo();
@@ -125,7 +127,20 @@ namespace Symphex.ViewModels
             _ = Task.Run(async () =>
             {
                 await dependencyManager.AutoInstallDependencies();
+
+                // Initialize download service after dependencies are ready
+                InitializeDownloadService();
             });
+        }
+
+        private void InitializeDownloadService()
+        {
+            _downloadService = new DownloadService(
+                DownloadFolder,
+                YtDlpPath,
+                FfmpegPath,
+                albumArtSearchService
+            );
         }
 
         [RelayCommand]
@@ -519,580 +534,24 @@ namespace Symphex.ViewModels
 
         private async Task<TrackInfo?> ExtractMetadata(string url)
         {
-            try
+            if (_downloadService == null)
             {
-                // Always treat direct URLs as URLs, don't add search prefix
-                bool isDirectUrl = url.StartsWith("http://") || url.StartsWith("https://");
-                string fullUrl = isDirectUrl ? url : $"ytsearch1:{url}";
-
-                var output = new StringBuilder();
-                var error = new StringBuilder();
-
-                // Use simpler arguments for better compatibility
-                var args = new List<string>
-        {
-            $"\"{fullUrl}\"",
-            "--dump-json",
-            "--no-playlist",
-            "--no-warnings",
-            "--quiet"
-        };
-
-                var result = await Cli.Wrap(YtDlpPath)
-                    .WithArguments(string.Join(" ", args))
-                    .WithStandardOutputPipe(PipeTarget.ToStringBuilder(output))
-                    .WithStandardErrorPipe(PipeTarget.ToStringBuilder(error))
-                    .WithValidation(CommandResultValidation.None)
-                    .ExecuteAsync();
-
-                var outputText = output.ToString().Trim();
-                var errorText = error.ToString();
-
-                if (result.ExitCode != 0)
-                {
-                    StatusText = $"Failed to extract metadata. Exit code: {result.ExitCode}";
-                    if (!string.IsNullOrEmpty(errorText))
-                    {
-                        StatusText += $" Error: {errorText.Split('\n').FirstOrDefault()}";
-                    }
-                    return null;
-                }
-
-                if (string.IsNullOrEmpty(outputText))
-                {
-                    StatusText = "No metadata output received from yt-dlp";
-                    return null;
-                }
-
-                // Parse the JSON response
-                var lines = outputText.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-                var jsonLine = lines.FirstOrDefault(line => line.Trim().StartsWith("{"));
-
-                if (string.IsNullOrEmpty(jsonLine))
-                {
-                    StatusText = "No valid JSON found in yt-dlp output";
-                    return null;
-                }
-
-                using var doc = JsonDocument.Parse(jsonLine);
-                var root = doc.RootElement;
-
-                // Extract basic info
-                string rawTitle = root.TryGetProperty("title", out var title) ? title.GetString() ?? "Unknown" : "Unknown";
-                string rawUploader = root.TryGetProperty("uploader", out var uploader) ? uploader.GetString() ?? "Unknown" : "Unknown";
-
-                // Clean up title and extract artist
-                string finalArtist = "Unknown";
-                string finalTitle = rawTitle;
-
-                // Try to parse artist - title format
-                if (rawTitle.Contains(" - "))
-                {
-                    var parts = rawTitle.Split(new[] { " - " }, 2, StringSplitOptions.RemoveEmptyEntries);
-                    if (parts.Length == 2)
-                    {
-                        finalArtist = CleanArtistName(parts[0]);
-                        finalTitle = CleanSongTitle(parts[1]);
-                    }
-                }
-                else
-                {
-                    // Fallback to using uploader as artist
-                    finalArtist = CleanArtistName(rawUploader);
-                    finalTitle = CleanSongTitle(rawTitle);
-                }
-
-                // Extract additional metadata
-                string albumInfo = root.TryGetProperty("album", out var album) ? album.GetString() ?? "" : "";
-
-                string yearInfo = "";
-                if (root.TryGetProperty("upload_date", out var uploadDate))
-                {
-                    string dateStr = uploadDate.GetString() ?? "";
-                    if (dateStr.Length >= 4)
-                    {
-                        yearInfo = dateStr.Substring(0, 4);
-                    }
-                }
-
-                var trackInfo = new TrackInfo
-                {
-                    Title = finalTitle,
-                    Artist = finalArtist,
-                    Album = albumInfo,
-                    Duration = FormatDuration(root.TryGetProperty("duration", out var duration) ? duration.GetDouble() : 0),
-                    Url = root.TryGetProperty("webpage_url", out var webUrl) ? webUrl.GetString() ?? url : url,
-                    Uploader = rawUploader,
-                    UploadDate = root.TryGetProperty("upload_date", out var uploadDateProp) ? FormatUploadDate(uploadDateProp.GetString()) : "",
-                    ViewCount = root.TryGetProperty("view_count", out var viewCount) ? viewCount.GetInt64() : 0,
-                    AlbumArtist = finalArtist,
-                    Comment = $"Downloaded from {rawUploader}",
-                    Encoder = "Symphex",
-                    Year = yearInfo
-                };
-
-                // Load thumbnail
-                string? thumbnailUrl = GetBestThumbnailUrl(root);
-                if (!string.IsNullOrEmpty(thumbnailUrl))
-                {
-                    trackInfo.Thumbnail = await LoadImageAsync(thumbnailUrl);
-                }
-
-                // Find real album art and additional metadata
-                await albumArtSearchService.FindRealAlbumArt(trackInfo);
-
-                return trackInfo;
-            }
-            catch (Exception ex)
-            {
-                StatusText = $"Error extracting metadata: {ex.Message}";
-                return null;
-            }
-        }
-
-        private string CleanSongTitle(string title)
-        {
-            if (string.IsNullOrEmpty(title))
-                return "Unknown";
-
-            string cleaned = title;
-
-            // More comprehensive cleaning patterns
-            var patterns = new[]
-            {
-        @"\s*\(Official\s*Video\)",
-        @"\s*\(Official\s*Audio\)",
-        @"\s*\(Official\s*Music\s*Video\)",
-        @"\s*\(Official\)",
-        @"\s*\(Lyrics?\)",
-        @"\s*\(Lyric\s*Video\)",
-        @"\s*\(HD\)",
-        @"\s*\(4K\)",
-        @"\s*\[Official\s*Video\]",
-        @"\s*\[Official\s*Audio\]",
-        @"\s*\[Official\s*Music\s*Video\]",
-        @"\s*\[Lyrics?\]",
-        @"\s*\[HD\]",
-        @"\s*\[4K\]",
-        @"\s*\(Music\s*Video\)",
-        @"\s*\[Music\s*Video\]",
-        @"\s*\(Visualizer\)",
-        @"\s*\[Visualizer\]",
-        @"\s*\(Live\)",
-        @"\s*\[Live\]"
-    };
-
-            foreach (var pattern in patterns)
-            {
-                cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, pattern, "",
-                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                InitializeDownloadService();
             }
 
-            // Clean up quotes and special characters
-            cleaned = cleaned
-                .Replace("\"", "")
-                .Replace("'", "")
-                .Replace("\u201C", "") // Left double quote
-                .Replace("\u201D", "") // Right double quote
-                .Replace("\u2018", "") // Left single quote
-                .Replace("\u2019", "") // Right single quote
-                .Replace("_", " ")
-                .Replace("  ", " ")
-                .Trim();
-
-            return string.IsNullOrEmpty(cleaned) ? title : cleaned;
-        }
-
-        private string CleanArtistName(string artist)
-        {
-            if (string.IsNullOrEmpty(artist))
-                return "Unknown";
-
-            string cleaned = artist;
-
-            // Clean common channel suffixes and patterns
-            var patterns = new[]
-            {
-        @"\s*-\s*Topic",
-        @"\s*VEVO",
-        @"\s*Records",
-        @"\s*Music",
-        @"\s*Official",
-        @"\s*Channel",
-        @"\s*TV"
-    };
-
-            foreach (var pattern in patterns)
-            {
-                cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, pattern, "",
-                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            }
-
-            cleaned = cleaned
-                .Replace("\"", "")
-                .Replace("'", "")
-                .Replace("\u201C", "")
-                .Replace("\u201D", "")
-                .Replace("\u2018", "")
-                .Replace("\u2019", "")
-                .Replace("_", " ")
-                .Replace("  ", " ")
-                .Trim();
-
-            return string.IsNullOrEmpty(cleaned) ? artist : cleaned;
-        }
-
-        private string GetBestThumbnailUrl(JsonElement root)
-        {
-            if (root.TryGetProperty("thumbnail", out var thumbnailProp))
-            {
-                return thumbnailProp.GetString() ?? "";
-            }
-
-            if (root.TryGetProperty("thumbnails", out var thumbnailsProp))
-            {
-                var thumbnails = thumbnailsProp.EnumerateArray().ToList();
-                if (thumbnails.Count > 0)
-                {
-                    var bestThumbnail = thumbnails.LastOrDefault();
-                    if (bestThumbnail.TryGetProperty("url", out var urlProp))
-                    {
-                        return urlProp.GetString() ?? "";
-                    }
-                }
-            }
-
-            return "";
-        }
-
-        private List<(string query, double weight)> GenerateComprehensiveSearchVariations(string title, string artist)
-        {
-            var variations = new List<(string query, double weight)>();
-
-            // Normalize inputs
-            string cleanTitle = SmartCleanText(title);
-            string cleanArtist = SmartCleanText(artist);
-
-            // High priority - exact matches
-            variations.Add(($"{cleanArtist} {cleanTitle}", 1.0));
-            variations.Add(($"\"{cleanArtist}\" \"{cleanTitle}\"", 0.95));
-            variations.Add(($"{cleanArtist} - {cleanTitle}", 0.9));
-
-            // Medium priority - reordered
-            variations.Add(($"{cleanTitle} {cleanArtist}", 0.8));
-            variations.Add(($"{cleanTitle} - {cleanArtist}", 0.75));
-
-            // Lower priority - partial matches
-            variations.Add((cleanTitle, 0.6));
-            variations.Add((cleanArtist, 0.5));
-
-            // Alternative formats
-            variations.Add(($"{cleanArtist}: {cleanTitle}", 0.7));
-            variations.Add(($"{cleanArtist} {cleanTitle} song", 0.65));
-
-            // Remove duplicates and sort by weight
-            return variations
-                .Where(v => !string.IsNullOrWhiteSpace(v.query))
-                .GroupBy(v => v.query.ToLowerInvariant())
-                .Select(g => g.OrderByDescending(v => v.weight).First())
-                .OrderByDescending(v => v.weight)
-                .ToList();
-        }
-
-        private string SmartCleanText(string text)
-        {
-            if (string.IsNullOrEmpty(text)) return "";
-
-            // Remove common patterns that interfere with search
-            var patterns = new[]
-            {
-        @"\s*\([^)]*official[^)]*\)",
-        @"\s*\[[^\]]*official[^\]]*\]",
-        @"\s*\([^)]*video[^)]*\)",
-        @"\s*\[[^\]]*video[^\]]*\]",
-        @"\s*\([^)]*audio[^)]*\)",
-        @"\s*\[[^\]]*audio[^\]]*\]",
-        @"\s*\([^)]*lyric[^)]*\)",
-        @"\s*\[[^\]]*lyric[^\]]*\]",
-        @"\s*\([^)]*hd[^)]*\)",
-        @"\s*\[[^\]]*hd[^\]]*\]",
-        @"\s*\([^)]*4k[^)]*\)",
-        @"\s*\[[^\]]*4k[^\]]*\]",
-        @"\s*\bfeat\.?\s+.*$",
-        @"\s*\bft\.?\s+.*$",
-        @"\s*\bfeaturing\s+.*$",
-        @"\s*\bremix\b.*$",
-        @"\s*\bremaster\b.*$",
-        @"\s*\bdeluxe\b.*$",
-        @"\s*\bextended\b.*$",
-        @"\s*\bradio\s+edit\b.*$",
-        @"\s*\bclean\b.*$",
-        @"\s*\bexplicit\b.*$"
-    };
-
-            string cleaned = text;
-            foreach (var pattern in patterns)
-            {
-                cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, pattern, "",
-                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-            }
-
-            // Clean up special characters and normalize spacing
-            cleaned = cleaned
-                .Replace("\"", "")
-                .Replace("'", "")
-                .Replace("\u201C", "") // Smart quotes
-                .Replace("\u201D", "")
-                .Replace("\u2018", "")
-                .Replace("\u2019", "")
-                .Replace("_", " ")
-                .Replace("  ", " ")
-                .Trim();
-
-            return string.IsNullOrEmpty(cleaned) ? text : cleaned;
-        }
-
-        private async Task<(Bitmap? albumArt, string album, string genre, string year, int trackNumber)?> SearchLastFmComprehensive(List<(string query, double weight)> searchVariations)
-        {
-            // Note: Last.fm requires API key for most functionality, but we can try some public endpoints
-            foreach (var (query, weight) in searchVariations.Take(5))
-            {
-                try
-                {
-                    // Try to use Last.fm's search without auth (limited functionality)
-                    string searchUrl = $"https://ws.audioscrobbler.com/2.0/?method=track.search&track={Uri.EscapeDataString(query)}&format=json&limit=30";
-
-                    using var request = new HttpRequestMessage(HttpMethod.Get, searchUrl);
-                    request.Headers.Add("User-Agent", "Symphex/1.0");
-
-                    var response = await httpClient.SendAsync(request);
-                    if (!response.IsSuccessStatusCode) continue;
-
-                    var jsonResponse = await response.Content.ReadAsStringAsync();
-                    if (jsonResponse.Contains("error")) continue; // Skip if API error
-
-                    using var doc = JsonDocument.Parse(jsonResponse);
-
-                    // Basic parsing - Last.fm free tier is very limited
-                    // This is mainly for fallback cases
-                }
-                catch
-                {
-                    continue;
-                }
-
-                await Task.Delay(500);
-            }
-
-            return null;
+            return await _downloadService.ExtractMetadata(url);
         }
 
         private async Task ApplyProperMetadata()
         {
-            try
-            {
-                if (CurrentTrack == null || string.IsNullOrEmpty(CurrentTrack.FileName) || string.IsNullOrEmpty(FfmpegPath))
-                {
-                    return;
-                }
+            if (_downloadService == null || CurrentTrack == null)
+                return;
 
+            if (!string.IsNullOrEmpty(CurrentTrack.FileName))
+            {
                 string audioFilePath = Path.Combine(DownloadFolder, CurrentTrack.FileName);
-                if (!File.Exists(audioFilePath))
-                {
-                    return;
-                }
-
-                string tempOutput = Path.Combine(DownloadFolder, $"temp_{Guid.NewGuid():N}.mp3");
-
-                var argsList = new List<string>();
-                argsList.AddRange(new[] { "-i", audioFilePath });
-
-                Bitmap? artworkToUse = CurrentTrack.AlbumArt ?? CurrentTrack.Thumbnail;
-
-                string? tempArtwork = null;
-                if (artworkToUse != null)
-                {
-                    tempArtwork = Path.Combine(Path.GetTempPath(), $"temp_artwork_{Guid.NewGuid():N}.jpg");
-
-                    try
-                    {
-                        using (var fileStream = new FileStream(tempArtwork, FileMode.Create))
-                        {
-                            artworkToUse.Save(fileStream);
-                        }
-
-                        argsList.AddRange(new[] { "-i", tempArtwork });
-                        argsList.AddRange(new[] { "-map", "0:a", "-map", "1:0" });
-                        argsList.AddRange(new[] { "-c:a", "copy", "-c:v", "mjpeg" });
-                        argsList.AddRange(new[] { "-disposition:v", "attached_pic" });
-                    }
-                    catch (Exception ex)
-                    {
-                        tempArtwork = null;
-                        argsList.AddRange(new[] { "-c", "copy" });
-                    }
-                }
-                else
-                {
-                    argsList.AddRange(new[] { "-c", "copy" });
-                }
-
-                argsList.AddRange(new[] { "-id3v2_version", "3" });
-
-                // Apply comprehensive metadata
-                if (!string.IsNullOrEmpty(CurrentTrack.Title) && CurrentTrack.Title != "Unknown")
-                {
-                    argsList.AddRange(new[] { "-metadata", $"title={CurrentTrack.Title}" });
-                }
-
-                if (!string.IsNullOrEmpty(CurrentTrack.Artist) && CurrentTrack.Artist != "Unknown")
-                {
-                    argsList.AddRange(new[] { "-metadata", $"artist={CurrentTrack.Artist}" });
-                }
-
-                if (!string.IsNullOrEmpty(CurrentTrack.Album))
-                {
-                    argsList.AddRange(new[] { "-metadata", $"album={CurrentTrack.Album}" });
-                }
-
-                if (!string.IsNullOrEmpty(CurrentTrack.AlbumArtist))
-                {
-                    argsList.AddRange(new[] { "-metadata", $"albumartist={CurrentTrack.AlbumArtist}" });
-                    argsList.AddRange(new[] { "-metadata", $"album_artist={CurrentTrack.AlbumArtist}" });
-                }
-
-                if (!string.IsNullOrEmpty(CurrentTrack.Genre))
-                {
-                    argsList.AddRange(new[] { "-metadata", $"genre={CurrentTrack.Genre}" });
-                }
-
-                if (!string.IsNullOrEmpty(CurrentTrack.Year))
-                {
-                    argsList.AddRange(new[] { "-metadata", $"date={CurrentTrack.Year}" });
-                    argsList.AddRange(new[] { "-metadata", $"year={CurrentTrack.Year}" });
-                }
-
-                if (CurrentTrack.TrackNumber > 0)
-                {
-                    argsList.AddRange(new[] { "-metadata", $"track={CurrentTrack.TrackNumber}" });
-                }
-
-                if (CurrentTrack.DiscNumber > 0)
-                {
-                    argsList.AddRange(new[] { "-metadata", $"disc={CurrentTrack.DiscNumber}" });
-                }
-
-                if (!string.IsNullOrEmpty(CurrentTrack.Comment))
-                {
-                    argsList.AddRange(new[] { "-metadata", $"comment={CurrentTrack.Comment}" });
-                }
-
-                if (!string.IsNullOrEmpty(CurrentTrack.Composer))
-                {
-                    argsList.AddRange(new[] { "-metadata", $"composer={CurrentTrack.Composer}" });
-                }
-
-                if (!string.IsNullOrEmpty(CurrentTrack.Encoder))
-                {
-                    argsList.AddRange(new[] { "-metadata", $"encoded_by={CurrentTrack.Encoder}" });
-                }
-
-                // Add URL as metadata for reference
-                if (!string.IsNullOrEmpty(CurrentTrack.Url))
-                {
-                    argsList.AddRange(new[] { "-metadata", $"website={CurrentTrack.Url}" });
-                }
-
-                argsList.Add(tempOutput);
-
-                var output = new StringBuilder();
-                var error = new StringBuilder();
-
-                var result = await Cli.Wrap(FfmpegPath)
-                    .WithArguments(argsList)
-                    .WithStandardOutputPipe(PipeTarget.ToStringBuilder(output))
-                    .WithStandardErrorPipe(PipeTarget.ToStringBuilder(error))
-                    .WithValidation(CommandResultValidation.None)
-                    .ExecuteAsync();
-
-                try
-                {
-                    if (result.ExitCode == 0 && File.Exists(tempOutput))
-                    {
-                        if (File.Exists(audioFilePath))
-                            File.Delete(audioFilePath);
-                        File.Move(tempOutput, audioFilePath);
-                    }
-                    else
-                    {
-                        if (File.Exists(tempOutput))
-                            File.Delete(tempOutput);
-                    }
-                }
-                finally
-                {
-                    if (tempArtwork != null && File.Exists(tempArtwork))
-                    {
-                        File.Delete(tempArtwork);
-                    }
-                }
+                await _downloadService.ApplyMetadata(CurrentTrack, audioFilePath);
             }
-            catch (Exception ex)
-            {
-                // Handle exception
-            }
-        }
-
-        // Levenshtein distance for better string matching
-
-        private async Task<Bitmap?> LoadImageAsync(string url)
-        {
-            try
-            {
-                var response = await httpClient.GetAsync(url);
-                response.EnsureSuccessStatusCode();
-
-                var imageBytes = await response.Content.ReadAsByteArrayAsync();
-                if (imageBytes.Length < 100)
-                    return null;
-
-                using var stream = new MemoryStream(imageBytes);
-                return new Bitmap(stream);
-            }
-            catch (Exception ex)
-            {
-                return null;
-            }
-        }
-
-        private string FormatUploadDate(string? uploadDate)
-        {
-            if (string.IsNullOrEmpty(uploadDate) || uploadDate.Length != 8)
-                return "";
-
-            try
-            {
-                var year = uploadDate.Substring(0, 4);
-                var month = uploadDate.Substring(4, 2);
-                var day = uploadDate.Substring(6, 2);
-                return $"{year}-{month}-{day}";
-            }
-            catch
-            {
-                return uploadDate;
-            }
-        }
-
-        private string FormatDuration(double seconds)
-        {
-            if (seconds <= 0) return "Unknown";
-
-            var timeSpan = TimeSpan.FromSeconds(seconds);
-            if (timeSpan.TotalHours >= 1)
-            {
-                return $"{(int)timeSpan.TotalHours}:{timeSpan:mm\\:ss}";
-            }
-            return $"{timeSpan:mm\\:ss}";
         }
 
         [RelayCommand]
@@ -1511,101 +970,22 @@ namespace Symphex.ViewModels
 
         private async Task<TrackInfo?> ExtractMetadataWithAlbumArt(string url, int threadIndex)
         {
-            try
+            if (_downloadService == null)
             {
-                CliOutput += $"[Thread {threadIndex}] Starting metadata extraction...\n";
-
-                // Use the existing ExtractMetadata method
-                var trackInfo = await ExtractMetadata(url);
-
-                if (trackInfo == null) return null;
-
-                CliOutput += $"[Thread {threadIndex}] Basic metadata extracted, searching for album art...\n";
-
-                // Now find real album art (this was the missing piece!)
-                await albumArtSearchService.FindRealAlbumArtForBatch(trackInfo, threadIndex);
-
-                CliOutput += $"[Thread {threadIndex}] Album art search completed\n";
-
-                return trackInfo;
+                InitializeDownloadService();
             }
-            catch (Exception ex)
-            {
-                CliOutput += $"[Thread {threadIndex}] Metadata extraction error: {ex.Message}\n";
-                return null;
-            }
+
+            return await _downloadService.ExtractMetadataWithAlbumArt(url, threadIndex);
         }
 
         private async Task RealDownloadForBatch(string url, TrackInfo trackInfo, int index)
         {
-            try
+            if (_downloadService == null)
             {
-                bool isDirectUrl = url.StartsWith("http://") || url.StartsWith("https://");
-                string fullUrl = isDirectUrl ? url : $"ytsearch1:{url}";
-
-                var output = new StringBuilder();
-                var error = new StringBuilder();
-
-                // Create filename based on track info
-                string filenameTemplate;
-                if (!string.IsNullOrEmpty(trackInfo.Title) && !string.IsNullOrEmpty(trackInfo.Artist))
-                {
-                    string cleanTitle = SanitizeFilename(trackInfo.Title);
-                    string cleanArtist = SanitizeFilename(trackInfo.Artist);
-                    filenameTemplate = Path.Combine(DownloadFolder, $"{cleanArtist} - {cleanTitle}.%(ext)s");
-                }
-                else
-                {
-                    filenameTemplate = Path.Combine(DownloadFolder, "%(uploader)s - %(title)s.%(ext)s");
-                }
-
-                List<string> argsList = new List<string>
-        {
-            $"\"{fullUrl}\"",
-            "--extract-audio",
-            "--audio-format", "mp3",
-            "--audio-quality", "0",
-            "--no-playlist",
-            "--embed-thumbnail",
-            "--add-metadata",
-            "-o", $"\"{filenameTemplate}\""
-        };
-
-                // Add FFmpeg location if available
-                if (!string.IsNullOrEmpty(FfmpegPath) && File.Exists(FfmpegPath))
-                {
-                    string ffmpegDir = Path.GetDirectoryName(FfmpegPath) ?? "";
-                    argsList.AddRange(new[] { "--ffmpeg-location", $"\"{ffmpegDir}\"" });
-                }
-
-                string args = string.Join(" ", argsList);
-
-                var result = await Cli.Wrap(YtDlpPath)
-                    .WithArguments(args)
-                    .WithStandardOutputPipe(PipeTarget.ToStringBuilder(output))
-                    .WithStandardErrorPipe(PipeTarget.ToStringBuilder(error))
-                    .WithValidation(CommandResultValidation.None)
-                    .ExecuteAsync();
-
-                if (result.ExitCode == 0)
-                {
-                    string actualFilePath = await FindDownloadedFile(output.ToString());
-                    if (!string.IsNullOrEmpty(actualFilePath))
-                    {
-                        trackInfo.FileName = Path.GetFileName(actualFilePath);
-                        // Apply metadata if available
-                        await ApplyProperMetadataForBatch(trackInfo, actualFilePath);
-                    }
-                }
-                else
-                {
-                    throw new Exception($"Download failed with exit code {result.ExitCode}");
-                }
+                InitializeDownloadService();
             }
-            catch (Exception ex)
-            {
-                throw new Exception($"Batch download failed: {ex.Message}");
-            }
+
+            await _downloadService.DownloadForBatch(url, trackInfo, index);
         }
 
         // Helper method to copy track information
@@ -1633,115 +1013,10 @@ namespace Symphex.ViewModels
         // Metadata application for batch processing
         private async Task ApplyProperMetadataForBatch(TrackInfo trackInfo, string audioFilePath)
         {
-            try
-            {
-                if (string.IsNullOrEmpty(FfmpegPath) || !File.Exists(audioFilePath))
-                    return;
+            if (_downloadService == null)
+                return;
 
-                string tempOutput = Path.Combine(DownloadFolder, $"temp_{Guid.NewGuid():N}.mp3");
-                var argsList = new List<string>();
-                argsList.AddRange(new[] { "-i", audioFilePath });
-
-                // Handle album art embedding
-                Bitmap? artworkToUse = trackInfo.AlbumArt ?? trackInfo.Thumbnail;
-                string? tempArtwork = null;
-
-                if (artworkToUse != null)
-                {
-                    tempArtwork = Path.Combine(Path.GetTempPath(), $"temp_artwork_{Guid.NewGuid():N}.jpg");
-
-                    try
-                    {
-                        using (var fileStream = new FileStream(tempArtwork, FileMode.Create))
-                        {
-                            artworkToUse.Save(fileStream);
-                        }
-
-                        argsList.AddRange(new[] { "-i", tempArtwork });
-                        argsList.AddRange(new[] { "-map", "0:a", "-map", "1:0" });
-                        argsList.AddRange(new[] { "-c:a", "copy", "-c:v", "mjpeg" });
-                        argsList.AddRange(new[] { "-disposition:v", "attached_pic" });
-                    }
-                    catch
-                    {
-                        tempArtwork = null;
-                        argsList.AddRange(new[] { "-c", "copy" });
-                    }
-                }
-                else
-                {
-                    argsList.AddRange(new[] { "-c", "copy" });
-                }
-
-                // Apply comprehensive metadata
-                argsList.AddRange(new[] { "-id3v2_version", "3" });
-
-                if (!string.IsNullOrEmpty(trackInfo.Title) && trackInfo.Title != "Unknown")
-                {
-                    argsList.AddRange(new[] { "-metadata", $"title={trackInfo.Title}" });
-                }
-
-                if (!string.IsNullOrEmpty(trackInfo.Artist) && trackInfo.Artist != "Unknown")
-                {
-                    argsList.AddRange(new[] { "-metadata", $"artist={trackInfo.Artist}" });
-                }
-
-                if (!string.IsNullOrEmpty(trackInfo.Album))
-                {
-                    argsList.AddRange(new[] { "-metadata", $"album={trackInfo.Album}" });
-                }
-
-                if (!string.IsNullOrEmpty(trackInfo.AlbumArtist))
-                {
-                    argsList.AddRange(new[] { "-metadata", $"albumartist={trackInfo.AlbumArtist}" });
-                }
-
-                if (!string.IsNullOrEmpty(trackInfo.Genre))
-                {
-                    argsList.AddRange(new[] { "-metadata", $"genre={trackInfo.Genre}" });
-                }
-
-                if (!string.IsNullOrEmpty(trackInfo.Year))
-                {
-                    argsList.AddRange(new[] { "-metadata", $"date={trackInfo.Year}" });
-                }
-
-                if (trackInfo.TrackNumber > 0)
-                {
-                    argsList.AddRange(new[] { "-metadata", $"track={trackInfo.TrackNumber}" });
-                }
-
-                argsList.Add(tempOutput);
-
-                var result = await Cli.Wrap(FfmpegPath)
-                    .WithArguments(argsList)
-                    .WithValidation(CommandResultValidation.None)
-                    .ExecuteAsync();
-
-                try
-                {
-                    if (result.ExitCode == 0 && File.Exists(tempOutput))
-                    {
-                        File.Delete(audioFilePath);
-                        File.Move(tempOutput, audioFilePath);
-                    }
-                    else if (File.Exists(tempOutput))
-                    {
-                        File.Delete(tempOutput);
-                    }
-                }
-                finally
-                {
-                    if (tempArtwork != null && File.Exists(tempArtwork))
-                    {
-                        File.Delete(tempArtwork);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                // Silent fail for metadata application in batch mode
-            }
+            await _downloadService.ApplyMetadataForBatch(trackInfo, audioFilePath);
         }
 
         // Cleanup method for batch processing
@@ -1945,89 +1220,34 @@ namespace Symphex.ViewModels
             {
                 DownloadProgress = 20;
 
-                bool isUrl = DownloadUrl.StartsWith("http://") || DownloadUrl.StartsWith("https://");
-                string fullUrl = isUrl ? DownloadUrl : $"ytsearch1:{DownloadUrl}";
-
-                var output = new StringBuilder();
-                var error = new StringBuilder();
-
-                // Create filename based on cleaned metadata
-                string filenameTemplate;
-                if (CurrentTrack != null && !string.IsNullOrEmpty(CurrentTrack.Title) && !string.IsNullOrEmpty(CurrentTrack.Artist))
+                if (_downloadService == null)
                 {
-                    string cleanTitle = SanitizeFilename(CurrentTrack.Title);
-                    string cleanArtist = SanitizeFilename(CurrentTrack.Artist);
-                    filenameTemplate = Path.Combine(DownloadFolder, $"{cleanArtist} - {cleanTitle}.%(ext)s");
-                }
-                else
-                {
-                    // Fallback to default naming
-                    filenameTemplate = Path.Combine(DownloadFolder, "%(uploader)s - %(title)s.%(ext)s");
+                    InitializeDownloadService();
                 }
 
-                List<string> argsList = new List<string>
-        {
-            $"\"{fullUrl}\"",
-            "--extract-audio",
-            "--audio-format", "mp3",
-            "--audio-quality", "0",
-            "--no-playlist",
-            "--embed-thumbnail",
-            "--add-metadata",
-            "-o", $"\"{filenameTemplate}\""
-        };
-
-                // Add FFmpeg location if available
-                if (!string.IsNullOrEmpty(FfmpegPath) && File.Exists(FfmpegPath))
-                {
-                    string ffmpegDir = Path.GetDirectoryName(FfmpegPath) ?? "";
-                    argsList.AddRange(new[] { "--ffmpeg-location", $"\"{ffmpegDir}\"" });
-                }
-
-                string args = string.Join(" ", argsList);
-
-                StatusText = isUrl ? "🎵 Downloading audio..." : "🔍 Searching and downloading audio...";
+                StatusText = DownloadUrl.StartsWith("http") ? "Downloading audio..." : "Searching and downloading audio...";
                 DownloadProgress = 30;
 
-                var result = await Cli.Wrap(YtDlpPath)
-                    .WithArguments(args)
-                    .WithStandardOutputPipe(PipeTarget.ToStringBuilder(output))
-                    .WithStandardErrorPipe(PipeTarget.ToStringBuilder(error))
-                    .WithValidation(CommandResultValidation.None)
-                    .ExecuteAsync();
+                string actualFilePath = await _downloadService.PerformDownload(DownloadUrl, CurrentTrack);
 
                 DownloadProgress = 90;
 
-                var outputText = output.ToString();
-                var errorText = error.ToString();
-
-                if (result.ExitCode == 0)
+                if (!string.IsNullOrEmpty(actualFilePath) && CurrentTrack != null)
                 {
+                    CurrentTrack.FileName = Path.GetFileName(actualFilePath);
+                    StatusText = "Applying metadata and finalizing...";
                     DownloadProgress = 95;
-                    StatusText = "🔧 Applying metadata and finalizing...";
 
-                    // Find the actual downloaded file
-                    string actualFilePath = await FindDownloadedFile(outputText);
-
-                    if (!string.IsNullOrEmpty(actualFilePath) && CurrentTrack != null)
-                    {
-                        CurrentTrack.FileName = Path.GetFileName(actualFilePath);
-
-                        // Apply enhanced metadata
-                        await ApplyProperMetadata();
-                    }
-
-                    DownloadProgress = 100;
-                    await VerifyAndReportDownloadSuccess(actualFilePath);
+                    // Apply enhanced metadata
+                    await ApplyProperMetadata();
                 }
-                else
-                {
-                    throw new Exception($"Download failed with exit code {result.ExitCode}: {errorText}");
-                }
+
+                DownloadProgress = 100;
+                await VerifyAndReportDownloadSuccess(actualFilePath);
             }
             catch (Exception ex)
             {
-                StatusText = $"❌ Download failed: {ex.Message}";
+                StatusText = $"Download failed: {ex.Message}";
                 throw;
             }
         }
