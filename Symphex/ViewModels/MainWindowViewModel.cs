@@ -22,84 +22,11 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Symphex.Models;
 
 namespace Symphex.ViewModels
 {
-    public partial class TrackInfo : ObservableObject
-    {
-        [ObservableProperty]
-        private string title = "";
-
-        [ObservableProperty]
-        private bool isDownloading = false;
-
-        [ObservableProperty]
-        private bool isDownloadComplete = false;
-
-        [ObservableProperty]
-        private string downloadFolder = "";
-
-        [ObservableProperty]
-        private string artist = "";
-
-        [ObservableProperty]
-        private string album = "";
-
-        [ObservableProperty]
-        private string duration = "";
-
-        [ObservableProperty]
-        private Bitmap? thumbnail;
-
-        [ObservableProperty]
-        private string fileName = "";
-
-        [ObservableProperty]
-        private string url = "";
-
-        [ObservableProperty]
-        private string uploader = "";
-
-        [ObservableProperty]
-        private string uploadDate = "";
-
-        [ObservableProperty]
-        private long viewCount = 0;
-
-        [ObservableProperty]
-        private Bitmap? albumArt;
-
-        [ObservableProperty]
-        private bool hasRealAlbumArt = false;
-
-        [ObservableProperty]
-        private string genre = "";
-
-        [ObservableProperty]
-        private string year = "";
-
-        [ObservableProperty]
-        private int trackNumber = 0;
-
-        [ObservableProperty]
-        private int discNumber = 0;
-
-        [ObservableProperty]
-        private string composer = "";
-
-        [ObservableProperty]
-        private string albumArtist = "";
-
-        [ObservableProperty]
-        private string comment = "";
-
-        [ObservableProperty]
-        private int bitrate = 0;
-
-        [ObservableProperty]
-        private string encoder = "";
-
-    }
+    
 
     public partial class MainWindowViewModel : ViewModelBase
     {
@@ -179,8 +106,6 @@ namespace Symphex.ViewModels
         private string FfmpegExecutableName => GetFfmpegExecutableName();
         private readonly HttpClient httpClient = new();
 
-
-
         public MainWindowViewModel()
         {
             CurrentTrack = new TrackInfo();
@@ -249,13 +174,11 @@ namespace Symphex.ViewModels
         {
             try
             {
-
                 // Check and auto-install yt-dlp
                 await SetupOrDownloadYtDlp();
 
                 // Check and auto-install FFmpeg
                 await SetupOrDownloadFfmpeg();
-
             }
             catch (Exception ex)
             {
@@ -348,7 +271,6 @@ namespace Symphex.ViewModels
 
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
                 {
-
                     FfmpegPath = "";
                 }
                 else
@@ -366,7 +288,6 @@ namespace Symphex.ViewModels
         {
             try
             {
-
                 string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
                 string toolsDir = Path.Combine(appDirectory, "tools");
 
@@ -377,7 +298,6 @@ namespace Symphex.ViewModels
 
                 string ytDlpPath = Path.Combine(toolsDir, YtDlpExecutableName);
                 string downloadUrl = GetYtDlpDownloadUrl();
-
 
                 using (var localHttpClient = new HttpClient())
                 {
@@ -398,7 +318,6 @@ namespace Symphex.ViewModels
             }
             catch (Exception ex)
             {
-
                 YtDlpPath = "";
             }
         }
@@ -415,7 +334,6 @@ namespace Symphex.ViewModels
                     return;
                 }
 
-
                 string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
                 string toolsDir = Path.Combine(appDirectory, "tools");
 
@@ -423,7 +341,6 @@ namespace Symphex.ViewModels
                 {
                     Directory.CreateDirectory(toolsDir);
                 }
-
 
                 using (var localHttpClient = new HttpClient())
                 {
@@ -436,7 +353,6 @@ namespace Symphex.ViewModels
 
                     string zipPath = Path.Combine(toolsDir, "ffmpeg.zip");
                     await File.WriteAllBytesAsync(zipPath, zipBytes);
-
 
                     if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                     {
@@ -451,12 +367,10 @@ namespace Symphex.ViewModels
 
                     // Re-run setup to find the extracted executable
                     await SetupOrDownloadFfmpeg();
-
                 }
             }
             catch (Exception ex)
             {
-
                 FfmpegPath = "";
             }
         }
@@ -1065,7 +979,6 @@ namespace Symphex.ViewModels
             }
         }
 
-
         private string CleanSongTitle(string title)
         {
             if (string.IsNullOrEmpty(title))
@@ -1580,8 +1493,6 @@ namespace Symphex.ViewModels
             }
         }
 
-
-
         private async Task<(Bitmap? albumArt, string album, string genre, string year, int trackNumber)?> SearchDiscogsComprehensive(List<(string query, double weight)> searchVariations)
         {
             foreach (var (query, weight) in searchVariations.Take(6))
@@ -1650,7 +1561,6 @@ namespace Symphex.ViewModels
 
                     // Basic parsing - Last.fm free tier is very limited
                     // This is mainly for fallback cases
-
                 }
                 catch
                 {
@@ -2012,6 +1922,7 @@ namespace Symphex.ViewModels
                 return false;
             }
         }
+
         private bool IsValidAlbumArt(Bitmap bitmap)
         {
             try
@@ -2040,7 +1951,6 @@ namespace Symphex.ViewModels
                 return false;
             }
         }
-
 
         private void UpdateMetadataFromSource(TrackInfo trackInfo, string albumName, string genreName, string releaseYear, int trackNum)
         {
@@ -2670,7 +2580,6 @@ namespace Symphex.ViewModels
             }
         }
 
-
         // Direct URL processing method for batch operations
         private async Task ProcessDirectUrlForBatch(string url, TrackInfo trackInfo, int index)
         {
@@ -3269,7 +3178,6 @@ namespace Symphex.ViewModels
             }
         }
 
-
         private async Task ProcessNextBatchUrl()
         {
             try
@@ -3424,7 +3332,6 @@ namespace Symphex.ViewModels
                 throw; // Re-throw so the batch processor can handle it
             }
         }
-
 
         private async Task RealDownload()
         {
@@ -3727,8 +3634,6 @@ namespace Symphex.ViewModels
                 string ytDlpPath = Path.Combine(toolsDir, YtDlpExecutableName);
                 string downloadUrl = GetYtDlpDownloadUrl();
 
-
-
                 using (var localHttpClient = new HttpClient())
                 {
                     DownloadProgress = 30;
@@ -3826,7 +3731,6 @@ namespace Symphex.ViewModels
             catch (Exception ex)
             {
                 StatusText = $"❌ Failed to download FFmpeg: {ex.Message}";
-
             }
             finally
             {
@@ -4023,6 +3927,5 @@ namespace Symphex.ViewModels
                 // Show toast with the path so user can navigate manually
             }
         }
-
     }
 }

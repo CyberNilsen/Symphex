@@ -38,7 +38,6 @@
 		<CFBundleIconFile>SymphexLogo.icns</CFBundleIconFile>
 	</PropertyGroup>
 	<ItemGroup>
-		<Folder Include="Models\" />
 		<AvaloniaResource Include="Assets\**" />
 	</ItemGroup>
 	<ItemGroup>
