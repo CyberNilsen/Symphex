@@ -105,7 +105,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Platform Support
 - **Windows**: Primary development and testing platform
-- **macOS**: Tested on both Intel and Apple Silicon
+- **macOS**: Tested on Apple Silicon
 - **Linux**: Community testing, various distributions supported
 
 ### Dependencies
