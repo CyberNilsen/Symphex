@@ -505,14 +505,6 @@ namespace Symphex.ViewModels
                    url.Contains("spotify://");
         }
 
-        public class SpotifyTrack
-        {
-            public string Title { get; set; } = "";
-            public string Artist { get; set; } = "";
-            public string Album { get; set; } = "";
-            public string Duration { get; set; } = "";
-            public string SpotifyUrl { get; set; } = "";
-        }
 
         [ObservableProperty]
         private bool isProcessingSpotify = false;
