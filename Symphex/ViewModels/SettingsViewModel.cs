@@ -19,7 +19,7 @@ namespace Symphex.ViewModels
     {
         private readonly HttpClient httpClient = new();
         private const string GITHUB_API_URL = "https://api.github.com/repos/CyberNilsen/symphex/releases/latest";
-        private const string CURRENT_VERSION = "1.2.1"; // Update this with your actual version
+        private const string CURRENT_VERSION = "1.2.2"; // Update this with your actual version
 
         [ObservableProperty]
         private string currentVersionText = $"Current Version: {CURRENT_VERSION}";
