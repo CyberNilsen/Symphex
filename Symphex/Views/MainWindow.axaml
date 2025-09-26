@@ -41,10 +41,10 @@
 		</Style>
 
 		<Style Selector="Button.simple">
-			<Setter Property="Background" Value="#1a1a1a"/>
+			<Setter Property="Background" Value="#1f1f1f"/>
 			<Setter Property="Foreground" Value="#ffffff"/>
-			<Setter Property="BorderThickness" Value="1"/>
-			<Setter Property="BorderBrush" Value="#404040"/>
+			<Setter Property="BorderThickness" Value="2"/>
+			<Setter Property="BorderBrush" Value="#666666"/>
 			<Setter Property="CornerRadius" Value="8"/>
 			<Setter Property="Padding" Value="16,8"/>
 			<Setter Property="FontSize" Value="13"/>
@@ -52,37 +52,47 @@
 			<Setter Property="Cursor" Value="Hand"/>
 		</Style>
 		<Style Selector="Button.simple:pointerover">
-			<Setter Property="Background" Value="#2a2a2a"/>
-			<Setter Property="BorderBrush" Value="#606060"/>
+			<Setter Property="Background" Value="#333333"/>
+			<Setter Property="BorderBrush" Value="#888888"/>
+			<Setter Property="RenderTransform" Value="scale(1.02)"/>
+		</Style>
+		<Style Selector="Button.simple:pressed">
+			<Setter Property="Background" Value="#0f0f0f"/>
+			<Setter Property="RenderTransform" Value="scale(0.98)"/>
 		</Style>
 
 		<Style Selector="TextBox.large">
-			<Setter Property="Background" Value="#1a1a1a"/>
-			<Setter Property="BorderBrush" Value="#404040"/>
-			<Setter Property="BorderThickness" Value="1"/>
+			<Setter Property="Background" Value="{DynamicResource TextControlBackground}"/>
+			<Setter Property="BorderBrush" Value="{DynamicResource TextControlBorderBrush}"/>
+			<Setter Property="BorderThickness" Value="2"/>
 			<Setter Property="CornerRadius" Value="10"/>
 			<Setter Property="Padding" Value="16,12"/>
 			<Setter Property="FontSize" Value="15"/>
-			<Setter Property="Foreground" Value="#ffffff"/>
-			<Setter Property="CaretBrush" Value="#3b82f6"/>
-			<Setter Property="SelectionBrush" Value="#3b82f640"/>
+			<Setter Property="Foreground" Value="{DynamicResource TextControlForeground}"/>
+			<Setter Property="FontWeight" Value="Medium"/>
+			<Setter Property="CaretBrush" Value="{DynamicResource SystemAccentColor}"/>
+			<Setter Property="SelectionBrush" Value="{DynamicResource TextControlSelectionHighlightColor}"/>
 		</Style>
 		<Style Selector="TextBox.large:focus /template/ Border#PART_BorderElement">
-			<Setter Property="BorderBrush" Value="#3b82f6"/>
+			<Setter Property="BorderBrush" Value="{DynamicResource SystemAccentColor}"/>
+			<Setter Property="BorderThickness" Value="3"/>
+		</Style>
+		<Style Selector="TextBox.large:pointerover /template/ Border#PART_BorderElement">
+			<Setter Property="BorderBrush" Value="{DynamicResource TextControlBorderBrushPointerOver}"/>
 		</Style>
 		
 		<Style Selector="TextBox.large /template/ TextBlock#PART_Watermark">
-			<Setter Property="Foreground" Value="#666666"/>
+			<Setter Property="Foreground" Value="{DynamicResource TextControlPlaceholderForeground}"/>
 		</Style>
 		<Style Selector="TextBox.large:pointerover /template/ TextBlock#PART_Watermark">
-			<Setter Property="Foreground" Value="#777777"/>
+			<Setter Property="Foreground" Value="{DynamicResource TextControlPlaceholderForegroundPointerOver}"/>
 		</Style>
 		<Style Selector="TextBox.large:focus /template/ TextBlock#PART_Watermark">
-			<Setter Property="Foreground" Value="#555555"/>
+			<Setter Property="Foreground" Value="{DynamicResource TextControlPlaceholderForegroundFocused}"/>
 		</Style>
 
 		<Style Selector="Border.card">
-			<Setter Property="Background" Value="#111111"/>
+			<Setter Property="Background" Value="#1a1a1a"/>
 			<Setter Property="CornerRadius" Value="14"/>
 			<Setter Property="Effect">
 				<DropShadowEffect Color="Black" Opacity="0.3" BlurRadius="15" OffsetX="0" OffsetY="4"/>
@@ -90,8 +100,8 @@
 		</Style>
 
 		<Style Selector="Border.preview">
-			<Setter Property="Background" Value="#0f0f0f"/>
-			<Setter Property="BorderBrush" Value="#333333"/>
+			<Setter Property="Background" Value="#151515"/>
+			<Setter Property="BorderBrush" Value="#444444"/>
 			<Setter Property="BorderThickness" Value="1"/>
 			<Setter Property="CornerRadius" Value="14"/>
 			<Setter Property="Effect">
@@ -100,7 +110,7 @@
 		</Style>
 
 		<Style Selector="Border.progress">
-			<Setter Property="Background" Value="#1a1a1a"/>
+			<Setter Property="Background" Value="#333333"/>
 			<Setter Property="CornerRadius" Value="8"/>
 			<Setter Property="Height" Value="8"/>
 		</Style>
@@ -228,26 +238,26 @@
 
 								<StackPanel Spacing="12" HorizontalAlignment="Center" VerticalAlignment="Center"
 											IsVisible="{Binding CurrentTrack.Title, Converter={x:Static StringConverters.IsNullOrEmpty}}">
-									<Border Width="80" Height="80" CornerRadius="12" Background="#2a2a2a">
-										<TextBlock Text="🎵" FontSize="32" Foreground="#666666"
+									<Border Width="80" Height="80" CornerRadius="12" Background="#3a3a3a">
+										<TextBlock Text="🎵" FontSize="32" Foreground="#777777"
 												   HorizontalAlignment="Center" VerticalAlignment="Center"/>
 									</Border>
 									<StackPanel Spacing="4">
 										<TextBlock Text="No song loaded" FontSize="16" FontWeight="Medium"
-												   Foreground="#666666" HorizontalAlignment="Center"/>
+												   Foreground="#888888" HorizontalAlignment="Center"/>
 										<TextBlock Text="Enter a link and click download to see song details here"
-												   FontSize="12" Foreground="#555555" HorizontalAlignment="Center"
+												   FontSize="12" Foreground="#666666" HorizontalAlignment="Center"
 												   TextWrapping="Wrap" TextAlignment="Center"/>
 									</StackPanel>
 								</StackPanel>
 
 								<StackPanel Spacing="12" IsVisible="{Binding CurrentTrack.Title, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
 
-									<Border Width="120" Height="120" CornerRadius="12" Background="#2a2a2a" HorizontalAlignment="Center">
+									<Border Width="120" Height="120" CornerRadius="12" Background="#3a3a3a" HorizontalAlignment="Center">
 										<Grid>
 											<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="4">
-												<TextBlock Text="🎵" FontSize="40" Foreground="#666666"/>
-												<TextBlock Text="Album Art" FontSize="10" Foreground="#999999"/>
+												<TextBlock Text="🎵" FontSize="40" Foreground="#777777"/>
+												<TextBlock Text="Album Art" FontSize="10" Foreground="#888888"/>
 											</StackPanel>
 											<Image Source="{Binding CurrentTrack.AlbumArt}" Stretch="UniformToFill"/>
 										</Grid>
@@ -281,7 +291,7 @@
 
 				</Grid>
 
-				<Border Grid.Row="4" Background="#1a1a1a" CornerRadius="10" Padding="16,10" HorizontalAlignment="Center" MinWidth="400">
+				<Border Grid.Row="4" Background="#2a2a2a" CornerRadius="10" Padding="16,10" HorizontalAlignment="Center" MinWidth="400">
 					<StackPanel Spacing="4">
 						<TextBlock Text="📁 Downloads saved to:" FontSize="13" Foreground="#999999" HorizontalAlignment="Center"/>
 						<TextBlock Text="{Binding DownloadFolder}" FontSize="12" FontWeight="Medium"
