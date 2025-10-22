@@ -33,14 +33,12 @@ namespace Symphex.Services
         {
             try
             {
-                // Always treat direct URLs as URLs, don't add search prefix
                 bool isDirectUrl = url.StartsWith("http://") || url.StartsWith("https://");
                 string fullUrl = isDirectUrl ? url : $"ytsearch1:{url}";
 
                 var output = new StringBuilder();
                 var error = new StringBuilder();
 
-                // Use simpler arguments for better compatibility
                 var args = new List<string>
                 {
                     $"\"{fullUrl}\"",
@@ -57,40 +55,36 @@ namespace Symphex.Services
                     .WithValidation(CommandResultValidation.None)
                     .ExecuteAsync();
 
-                var outputText = output.ToString().Trim();
-                var errorText = error.ToString();
-
                 if (result.ExitCode != 0)
                 {
+                    Debug.WriteLine($"[ExtractMetadata] yt-dlp exited with code {result.ExitCode}");
+                    Debug.WriteLine(error.ToString());
                     return null;
                 }
 
+                var outputText = output.ToString().Trim();
                 if (string.IsNullOrEmpty(outputText))
                 {
+                    Debug.WriteLine("[ExtractMetadata] No output from yt-dlp");
                     return null;
                 }
 
-                // Parse the JSON response
-                var lines = outputText.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-                var jsonLine = lines.FirstOrDefault(line => line.Trim().StartsWith("{"));
-
+                var jsonLine = outputText.Split('\n').FirstOrDefault(line => line.Trim().StartsWith("{"));
                 if (string.IsNullOrEmpty(jsonLine))
                 {
+                    Debug.WriteLine("[ExtractMetadata] No JSON line found in yt-dlp output");
                     return null;
                 }
 
                 using var doc = JsonDocument.Parse(jsonLine);
                 var root = doc.RootElement;
 
-                // Extract basic info
                 string rawTitle = root.TryGetProperty("title", out var title) ? title.GetString() ?? "Unknown" : "Unknown";
                 string rawUploader = root.TryGetProperty("uploader", out var uploader) ? uploader.GetString() ?? "Unknown" : "Unknown";
 
-                // Clean up title and extract artist
                 string finalArtist = "Unknown";
                 string finalTitle = rawTitle;
 
-                // Try to parse artist - title format
                 if (rawTitle.Contains(" - "))
                 {
                     var parts = rawTitle.Split(new[] { " - " }, 2, StringSplitOptions.RemoveEmptyEntries);
@@ -102,22 +96,17 @@ namespace Symphex.Services
                 }
                 else
                 {
-                    // Fallback to using uploader as artist
                     finalArtist = CleanArtistName(rawUploader);
                     finalTitle = CleanSongTitle(rawTitle);
                 }
 
-                // Extract additional metadata
                 string albumInfo = root.TryGetProperty("album", out var album) ? album.GetString() ?? "" : "";
 
                 string yearInfo = "";
                 if (root.TryGetProperty("upload_date", out var uploadDate))
                 {
                     string dateStr = uploadDate.GetString() ?? "";
-                    if (dateStr.Length >= 4)
-                    {
-                        yearInfo = dateStr.Substring(0, 4);
-                    }
+                    if (dateStr.Length >= 4) yearInfo = dateStr.Substring(0, 4);
                 }
 
                 var trackInfo = new TrackInfo
@@ -136,83 +125,108 @@ namespace Symphex.Services
                     Year = yearInfo
                 };
 
-                // Load thumbnail
                 string? thumbnailUrl = GetBestThumbnailUrl(root);
                 if (!string.IsNullOrEmpty(thumbnailUrl))
                 {
-                    trackInfo.Thumbnail = await LoadImageAsync(thumbnailUrl);
+                    try
+                    {
+                        trackInfo.Thumbnail = await LoadImageAsync(thumbnailUrl);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[ExtractMetadata] Failed to load thumbnail: {ex}");
+                    }
                 }
 
-                // Find real album art and additional metadata
-                await _albumArtSearchService.FindRealAlbumArt(trackInfo);
+                try
+                {
+                    await _albumArtSearchService.FindRealAlbumArt(trackInfo);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[ExtractMetadata] Album art search failed: {ex}");
+                }
 
                 return trackInfo;
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"[ExtractMetadata] Exception: {ex}");
                 return null;
             }
         }
 
         public async Task<string> PerformDownload(string url, TrackInfo? trackInfo)
         {
-            bool isUrl = url.StartsWith("http://") || url.StartsWith("https://");
-            string fullUrl = isUrl ? url : $"ytsearch1:{url}";
-
-            var output = new StringBuilder();
-            var error = new StringBuilder();
-
-            // Create filename based on cleaned metadata
-            string filenameTemplate;
-            if (trackInfo != null && !string.IsNullOrEmpty(trackInfo.Title) && !string.IsNullOrEmpty(trackInfo.Artist))
+            try
             {
-                string cleanTitle = SanitizeFilename(trackInfo.Title);
-                string cleanArtist = SanitizeFilename(trackInfo.Artist);
-                filenameTemplate = Path.Combine(_downloadFolder, $"{cleanArtist} - {cleanTitle}.%(ext)s");
+                bool isUrl = url.StartsWith("http://") || url.StartsWith("https://");
+                string fullUrl = isUrl ? url : $"ytsearch1:{url}";
+
+                string filenameTemplate;
+                if (trackInfo != null && !string.IsNullOrEmpty(trackInfo.Title) && !string.IsNullOrEmpty(trackInfo.Artist))
+                {
+                    string cleanTitle = SanitizeFilename(trackInfo.Title);
+                    string cleanArtist = SanitizeFilename(trackInfo.Artist);
+                    filenameTemplate = Path.Combine(_downloadFolder, $"{cleanArtist} - {cleanTitle}.%(ext)s");
+                }
+                else filenameTemplate = Path.Combine(_downloadFolder, "%(uploader)s - %(title)s.%(ext)s");
+
+                var argsList = new List<string>
+                {
+                    $"\"{fullUrl}\"",
+                    "--extract-audio",
+                    "--audio-format", "mp3",
+                    "--audio-quality", "0",
+                    "--no-playlist",
+                    "--embed-thumbnail",
+                    "--add-metadata",
+                    "-o", $"\"{filenameTemplate}\""
+                };
+
+                if (!string.IsNullOrEmpty(_ffmpegPath) && File.Exists(_ffmpegPath))
+                {
+                    string ffmpegDir = Path.GetDirectoryName(_ffmpegPath) ?? "";
+                    argsList.AddRange(new[] { "--ffmpeg-location", $"\"{ffmpegDir}\"" });
+                }
+
+                Debug.WriteLine($"[PerformDownload] Downloading: {fullUrl}");
+                Debug.WriteLine($"[PerformDownload] Arguments: {string.Join(" ", argsList)}");
+
+                var outputLines = new List<string>();
+                var errorLines = new List<string>();
+
+                var result = await Cli.Wrap(_ytDlpPath)
+                    .WithArguments(argsList)
+                    .WithStandardOutputPipe(PipeTarget.ToDelegate(line =>
+                    {
+                        Debug.WriteLine($"[yt-dlp stdout] {line}");
+                        outputLines.Add(line);
+                    }))
+                    .WithStandardErrorPipe(PipeTarget.ToDelegate(line =>
+                    {
+                        Debug.WriteLine($"[yt-dlp stderr] {line}");
+                        errorLines.Add(line);
+                    }))
+                    .WithValidation(CommandResultValidation.None)
+                    .ExecuteAsync();
+
+                if (result.ExitCode != 0)
+                {
+                    Debug.WriteLine($"[PerformDownload] yt-dlp failed with code {result.ExitCode}");
+                    Debug.WriteLine(string.Join("\n", errorLines));
+                    throw new Exception($"yt-dlp exited with {result.ExitCode}");
+                }
+
+                string actualFilePath = await FindDownloadedFile(string.Join("\n", outputLines), trackInfo);
+                Debug.WriteLine($"[PerformDownload] Completed: {actualFilePath}");
+                return actualFilePath;
             }
-            else
+            catch (Exception ex)
             {
-                // Fallback to default naming
-                filenameTemplate = Path.Combine(_downloadFolder, "%(uploader)s - %(title)s.%(ext)s");
+                Debug.WriteLine($"[PerformDownload] Exception: {ex}");
+                throw;
             }
-
-            List<string> argsList = new List<string>
-            {
-                $"\"{fullUrl}\"",
-                "--extract-audio",
-                "--audio-format", "mp3",
-                "--audio-quality", "0",
-                "--no-playlist",
-                "--embed-thumbnail",
-                "--add-metadata",
-                "-o", $"\"{filenameTemplate}\""
-            };
-
-            // Add FFmpeg location if available
-            if (!string.IsNullOrEmpty(_ffmpegPath) && File.Exists(_ffmpegPath))
-            {
-                string ffmpegDir = Path.GetDirectoryName(_ffmpegPath) ?? "";
-                argsList.AddRange(new[] { "--ffmpeg-location", $"\"{ffmpegDir}\"" });
-            }
-
-            string args = string.Join(" ", argsList);
-
-            var result = await Cli.Wrap(_ytDlpPath)
-                .WithArguments(args)
-                .WithStandardOutputPipe(PipeTarget.ToStringBuilder(output))
-                .WithStandardErrorPipe(PipeTarget.ToStringBuilder(error))
-                .WithValidation(CommandResultValidation.None)
-                .ExecuteAsync();
-
-            var outputText = output.ToString();
-            var errorText = error.ToString();
-
-            if (result.ExitCode != 0)
-            {
-                throw new Exception($"Download failed with exit code {result.ExitCode}: {errorText}");
-            }
-
-            return await FindDownloadedFile(outputText, trackInfo);
         }
 
         public async Task ApplyMetadata(TrackInfo trackInfo, string audioFilePath)
@@ -251,6 +265,7 @@ namespace Symphex.Services
                     {
                         tempArtwork = null;
                         argsList.AddRange(new[] { "-c", "copy" });
+                        Debug.WriteLine($"[ApplyMetadata] Failed to process artwork: {ex}");
                     }
                 }
                 else
@@ -360,7 +375,7 @@ namespace Symphex.Services
             }
             catch (Exception ex)
             {
-                // Handle exception
+                Debug.WriteLine($"[ApplyMetadata] Exception: {ex}");
             }
         }
 
@@ -380,6 +395,7 @@ namespace Symphex.Services
             }
             catch (Exception ex)
             {
+                Debug.WriteLine($"[ExtractMetadataWithAlbumArt] Exception: {ex}");
                 return null;
             }
         }
@@ -493,7 +509,7 @@ namespace Symphex.Services
             }
             catch (Exception ex)
             {
-                // Silent fail for metadata application in batch mode
+                Debug.WriteLine($"[ApplyMetadataForBatch] Exception: {ex}");
             }
         }
 
@@ -561,14 +577,16 @@ namespace Symphex.Services
                 }
                 else
                 {
-                    throw new Exception($"Download failed with exit code {result.ExitCode}");
+
+                    Debug.WriteLine($"[DownloadForBatch] yt-dlp failed with code {result.ExitCode}");
                 }
 
                 return "";
             }
             catch (Exception ex)
             {
-                throw new Exception($"Batch download failed: {ex.Message}");
+                Debug.WriteLine($"[DownloadForBatch] Exception: {ex}");
+                return "";
             }
         }
 
