@@ -44,7 +44,7 @@ namespace Symphex.ViewModels
         private string statusText = "🎵 Ready to download music...";
 
         [ObservableProperty]
-        private string cliOutput = "Symphex Music Downloader v1.0\n" +
+        private string cliOutput = "Symphex Music Downloader v1.2.3\n" +
                                    "=============================\n" +
                                    "Ready to process downloads...\n\n";
 
@@ -1545,7 +1545,7 @@ namespace Symphex.ViewModels
         [RelayCommand]
         private void ClearLog()
         {
-            CliOutput = "Symphex Music Downloader v1.0\n" +
+            CliOutput = "Symphex Music Downloader v1.2.3\n" +
                         "=============================\n" +
                         "Log cleared...\n\n";
         }

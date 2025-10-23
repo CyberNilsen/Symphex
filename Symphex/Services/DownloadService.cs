@@ -33,23 +33,35 @@ namespace Symphex.Services
         {
             try
             {
-                bool isDirectUrl = url.StartsWith("http://") || url.StartsWith("https://");
+                // Validate yt-dlp exists before attempting to use it
+                if (!File.Exists(_ytDlpPath))
+                {
+                    Debug.WriteLine($"[ExtractMetadata] ERROR: yt-dlp not found at: {_ytDlpPath}");
+                    throw new FileNotFoundException($"yt-dlp not found at: {_ytDlpPath}");
+                }
+
+                // Better URL detection - check for any youtube/spotify/soundcloud domains
+                bool isDirectUrl = IsValidUrl(url);
                 string fullUrl = isDirectUrl ? url : $"ytsearch1:{url}";
 
                 var output = new StringBuilder();
                 var error = new StringBuilder();
 
                 var args = new List<string>
-                {
-                    $"\"{fullUrl}\"",
-                    "--dump-json",
-                    "--no-playlist",
-                    "--no-warnings",
-                    "--quiet"
-                };
+        {
+            fullUrl,
+            "--dump-json",
+            "--no-playlist",
+            "--no-warnings",
+            "--quiet"
+        };
+
+                Debug.WriteLine($"[ExtractMetadata] Executing: {_ytDlpPath}");
+                Debug.WriteLine($"[ExtractMetadata] URL detected as: {(isDirectUrl ? "Direct URL" : "Search query")}");
+                Debug.WriteLine($"[ExtractMetadata] Full URL: {fullUrl}");
 
                 var result = await Cli.Wrap(_ytDlpPath)
-                    .WithArguments(string.Join(" ", args))
+                    .WithArguments(args)
                     .WithStandardOutputPipe(PipeTarget.ToStringBuilder(output))
                     .WithStandardErrorPipe(PipeTarget.ToStringBuilder(error))
                     .WithValidation(CommandResultValidation.None)
@@ -58,7 +70,7 @@ namespace Symphex.Services
                 if (result.ExitCode != 0)
                 {
                     Debug.WriteLine($"[ExtractMetadata] yt-dlp exited with code {result.ExitCode}");
-                    Debug.WriteLine(error.ToString());
+                    Debug.WriteLine($"[ExtractMetadata] Error output: {error}");
                     return null;
                 }
 
@@ -134,7 +146,7 @@ namespace Symphex.Services
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"[ExtractMetadata] Failed to load thumbnail: {ex}");
+                        Debug.WriteLine($"[ExtractMetadata] Failed to load thumbnail: {ex.Message}");
                     }
                 }
 
@@ -144,14 +156,22 @@ namespace Symphex.Services
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"[ExtractMetadata] Album art search failed: {ex}");
+                    Debug.WriteLine($"[ExtractMetadata] Album art search failed: {ex.Message}");
                 }
 
                 return trackInfo;
             }
+            catch (System.ComponentModel.Win32Exception ex)
+            {
+                Debug.WriteLine($"[ExtractMetadata] Win32Exception - Cannot execute yt-dlp: {ex.Message}");
+                Debug.WriteLine($"[ExtractMetadata] yt-dlp path: {_ytDlpPath}");
+                Debug.WriteLine($"[ExtractMetadata] File exists: {File.Exists(_ytDlpPath)}");
+                throw new Exception($"Cannot execute yt-dlp. Please reinstall it. Error: {ex.Message}");
+            }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[ExtractMetadata] Exception: {ex}");
+                Debug.WriteLine($"[ExtractMetadata] Exception: {ex.Message}");
+                Debug.WriteLine($"[ExtractMetadata] Stack trace: {ex.StackTrace}");
                 return null;
             }
         }
@@ -160,8 +180,20 @@ namespace Symphex.Services
         {
             try
             {
-                bool isUrl = url.StartsWith("http://") || url.StartsWith("https://");
+                // Validate yt-dlp exists
+                if (!File.Exists(_ytDlpPath))
+                {
+                    Debug.WriteLine($"[PerformDownload] ERROR: yt-dlp not found at: {_ytDlpPath}");
+                    throw new FileNotFoundException($"yt-dlp not found at: {_ytDlpPath}");
+                }
+
+                // Better URL detection
+                bool isUrl = IsValidUrl(url);
                 string fullUrl = isUrl ? url : $"ytsearch1:{url}";
+
+                Debug.WriteLine($"[PerformDownload] URL detected as: {(isUrl ? "Direct URL" : "Search query")}");
+                Debug.WriteLine($"[PerformDownload] Original input: {url}");
+                Debug.WriteLine($"[PerformDownload] Full URL: {fullUrl}");
 
                 string filenameTemplate;
                 if (trackInfo != null && !string.IsNullOrEmpty(trackInfo.Title) && !string.IsNullOrEmpty(trackInfo.Artist))
@@ -173,24 +205,33 @@ namespace Symphex.Services
                 else filenameTemplate = Path.Combine(_downloadFolder, "%(uploader)s - %(title)s.%(ext)s");
 
                 var argsList = new List<string>
-                {
-                    $"\"{fullUrl}\"",
-                    "--extract-audio",
-                    "--audio-format", "mp3",
-                    "--audio-quality", "0",
-                    "--no-playlist",
-                    "--embed-thumbnail",
-                    "--add-metadata",
-                    "-o", $"\"{filenameTemplate}\""
-                };
+        {
+            fullUrl,
+            "--extract-audio",
+            "--audio-format", "mp3",
+            "--audio-quality", "0",
+            "--no-playlist",
+            "--embed-thumbnail",
+            "--add-metadata",
+            "-o", filenameTemplate
+        };
 
+                // Only add ffmpeg location if it actually exists
                 if (!string.IsNullOrEmpty(_ffmpegPath) && File.Exists(_ffmpegPath))
                 {
                     string ffmpegDir = Path.GetDirectoryName(_ffmpegPath) ?? "";
-                    argsList.AddRange(new[] { "--ffmpeg-location", $"\"{ffmpegDir}\"" });
+                    if (Directory.Exists(ffmpegDir))
+                    {
+                        argsList.AddRange(new[] { "--ffmpeg-location", ffmpegDir });
+                        Debug.WriteLine($"[PerformDownload] Using FFmpeg from: {ffmpegDir}");
+                    }
+                }
+                else
+                {
+                    Debug.WriteLine("[PerformDownload] FFmpeg path not set or file doesn't exist - using system FFmpeg");
                 }
 
-                Debug.WriteLine($"[PerformDownload] Downloading: {fullUrl}");
+                Debug.WriteLine($"[PerformDownload] Executing: {_ytDlpPath}");
                 Debug.WriteLine($"[PerformDownload] Arguments: {string.Join(" ", argsList)}");
 
                 var outputLines = new List<string>();
@@ -214,17 +255,33 @@ namespace Symphex.Services
                 if (result.ExitCode != 0)
                 {
                     Debug.WriteLine($"[PerformDownload] yt-dlp failed with code {result.ExitCode}");
-                    Debug.WriteLine(string.Join("\n", errorLines));
-                    throw new Exception($"yt-dlp exited with {result.ExitCode}");
+                    Debug.WriteLine($"[PerformDownload] Error output:\n{string.Join("\n", errorLines)}");
+                    throw new Exception($"yt-dlp exited with code {result.ExitCode}. Check debug output for details.");
                 }
 
                 string actualFilePath = await FindDownloadedFile(string.Join("\n", outputLines), trackInfo);
+
+                if (string.IsNullOrEmpty(actualFilePath))
+                {
+                    Debug.WriteLine("[PerformDownload] ERROR: Could not find downloaded file");
+                    Debug.WriteLine($"[PerformDownload] yt-dlp output:\n{string.Join("\n", outputLines)}");
+                    throw new Exception("Download completed but file not found");
+                }
+
                 Debug.WriteLine($"[PerformDownload] Completed: {actualFilePath}");
                 return actualFilePath;
             }
+            catch (System.ComponentModel.Win32Exception ex)
+            {
+                Debug.WriteLine($"[PerformDownload] Win32Exception - Cannot execute yt-dlp: {ex.Message}");
+                Debug.WriteLine($"[PerformDownload] yt-dlp path: {_ytDlpPath}");
+                Debug.WriteLine($"[PerformDownload] File exists: {File.Exists(_ytDlpPath)}");
+                throw new Exception($"Cannot execute yt-dlp at '{_ytDlpPath}'. Please check if the file exists and is not corrupted. Error: {ex.Message}");
+            }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[PerformDownload] Exception: {ex}");
+                Debug.WriteLine($"[PerformDownload] Exception: {ex.Message}");
+                Debug.WriteLine($"[PerformDownload] Stack trace: {ex.StackTrace}");
                 throw;
             }
         }
@@ -517,13 +574,20 @@ namespace Symphex.Services
         {
             try
             {
-                bool isDirectUrl = url.StartsWith("http://") || url.StartsWith("https://");
+                // Validate yt-dlp exists
+                if (!File.Exists(_ytDlpPath))
+                {
+                    Debug.WriteLine($"[DownloadForBatch] ERROR: yt-dlp not found at: {_ytDlpPath}");
+                    return "";
+                }
+
+                // Better URL detection
+                bool isDirectUrl = IsValidUrl(url);
                 string fullUrl = isDirectUrl ? url : $"ytsearch1:{url}";
 
                 var output = new StringBuilder();
                 var error = new StringBuilder();
 
-                // Create filename based on track info
                 string filenameTemplate;
                 if (!string.IsNullOrEmpty(trackInfo.Title) && !string.IsNullOrEmpty(trackInfo.Artist))
                 {
@@ -537,28 +601,31 @@ namespace Symphex.Services
                 }
 
                 List<string> argsList = new List<string>
-                {
-                    $"\"{fullUrl}\"",
-                    "--extract-audio",
-                    "--audio-format", "mp3",
-                    "--audio-quality", "0",
-                    "--no-playlist",
-                    "--embed-thumbnail",
-                    "--add-metadata",
-                    "-o", $"\"{filenameTemplate}\""
-                };
+        {
+            fullUrl,
+            "--extract-audio",
+            "--audio-format", "mp3",
+            "--audio-quality", "0",
+            "--no-playlist",
+            "--embed-thumbnail",
+            "--add-metadata",
+            "-o", filenameTemplate
+        };
 
-                // Add FFmpeg location if available
+                // Add FFmpeg location if available and valid
                 if (!string.IsNullOrEmpty(_ffmpegPath) && File.Exists(_ffmpegPath))
                 {
                     string ffmpegDir = Path.GetDirectoryName(_ffmpegPath) ?? "";
-                    argsList.AddRange(new[] { "--ffmpeg-location", $"\"{ffmpegDir}\"" });
+                    if (Directory.Exists(ffmpegDir))
+                    {
+                        argsList.AddRange(new[] { "--ffmpeg-location", ffmpegDir });
+                    }
                 }
 
-                string args = string.Join(" ", argsList);
+                Debug.WriteLine($"[DownloadForBatch #{index}] Downloading: {fullUrl}");
 
                 var result = await Cli.Wrap(_ytDlpPath)
-                    .WithArguments(args)
+                    .WithArguments(argsList)
                     .WithStandardOutputPipe(PipeTarget.ToStringBuilder(output))
                     .WithStandardErrorPipe(PipeTarget.ToStringBuilder(error))
                     .WithValidation(CommandResultValidation.None)
@@ -570,24 +637,68 @@ namespace Symphex.Services
                     if (!string.IsNullOrEmpty(actualFilePath))
                     {
                         trackInfo.FileName = Path.GetFileName(actualFilePath);
-                        // Apply metadata if available
                         await ApplyMetadataForBatch(trackInfo, actualFilePath);
+                        Debug.WriteLine($"[DownloadForBatch #{index}] Success: {actualFilePath}");
                         return actualFilePath;
+                    }
+                    else
+                    {
+                        Debug.WriteLine($"[DownloadForBatch #{index}] Download succeeded but file not found");
                     }
                 }
                 else
                 {
-
-                    Debug.WriteLine($"[DownloadForBatch] yt-dlp failed with code {result.ExitCode}");
+                    Debug.WriteLine($"[DownloadForBatch #{index}] yt-dlp failed with code {result.ExitCode}");
+                    Debug.WriteLine($"[DownloadForBatch #{index}] Error: {error}");
                 }
 
                 return "";
             }
-            catch (Exception ex)
+            catch (System.ComponentModel.Win32Exception ex)
             {
-                Debug.WriteLine($"[DownloadForBatch] Exception: {ex}");
+                Debug.WriteLine($"[DownloadForBatch #{index}] Win32Exception: {ex.Message}");
+                Debug.WriteLine($"[DownloadForBatch #{index}] yt-dlp path: {_ytDlpPath}");
                 return "";
             }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[DownloadForBatch #{index}] Exception: {ex.Message}");
+                return "";
+            }
+        }
+
+        private bool IsValidUrl(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input))
+                return false;
+
+            // Direct protocol check
+            if (input.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+                input.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            // Check for common music platforms without protocol
+            var domains = new[]
+            {
+        "youtube.com", "youtu.be", "music.youtube.com",
+        "spotify.com", "open.spotify.com",
+        "soundcloud.com",
+        "bandcamp.com",
+        "vimeo.com",
+        "dailymotion.com"
+    };
+
+            string lowerInput = input.ToLower();
+            foreach (var domain in domains)
+            {
+                if (lowerInput.Contains(domain))
+                {
+                    // It's a URL without protocol - add https://
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         // Private helper methods
