@@ -40,9 +40,7 @@
 	<ItemGroup>
 		<AvaloniaResource Include="Assets\**" />
 	</ItemGroup>
-	<ItemGroup>
-	  <Compile Include="publish.py" />
-	</ItemGroup>
+	
 	<ItemGroup>
 		<PackageReference Include="Avalonia" Version="11.3.4" />
 		<PackageReference Include="Avalonia.Desktop" Version="11.3.4" />
