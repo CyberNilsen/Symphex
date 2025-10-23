@@ -10,9 +10,9 @@
 		<ApplicationIcon>Assets\SymphexLogo.ico</ApplicationIcon>
 
 		<!-- Version Information -->
-		<AssemblyVersion>1.2.2.0</AssemblyVersion>
-		<FileVersion>1.2.2.0</FileVersion>
-		<Version>1.2.2</Version>
+		<AssemblyVersion>1.2.3.0</AssemblyVersion>
+		<FileVersion>1.2.3.0</FileVersion>
+		<Version>1.2.3</Version>
 
 		<!-- Application Information -->
 		<AssemblyTitle>Symphex Music Downloader</AssemblyTitle>
@@ -30,8 +30,8 @@
 		<CFBundleName>Symphex Music Downloader</CFBundleName>
 		<CFBundleDisplayName>Music Downloader</CFBundleDisplayName>
 		<CFBundleIdentifier>com.symphex.musicdownloader</CFBundleIdentifier>
-		<CFBundleVersion>1.2.1</CFBundleVersion>
-		<CFBundleShortVersionString>1.2.1</CFBundleShortVersionString>
+		<CFBundleVersion>1.2.3</CFBundleVersion>
+		<CFBundleShortVersionString>1.2.3</CFBundleShortVersionString>
 		<CFBundlePackageType>APPL</CFBundlePackageType>
 		<CFBundleSignature>????</CFBundleSignature>
 		<CFBundleExecutable>Symphex</CFBundleExecutable>
@@ -39,6 +39,9 @@
 	</PropertyGroup>
 	<ItemGroup>
 		<AvaloniaResource Include="Assets\**" />
+	</ItemGroup>
+	<ItemGroup>
+	  <Compile Include="publish.py" />
 	</ItemGroup>
 	<ItemGroup>
 		<PackageReference Include="Avalonia" Version="11.3.4" />
