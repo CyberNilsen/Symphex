@@ -99,6 +99,15 @@ namespace Symphex.ViewModels
         [ObservableProperty]
         private string currentProcessingUrl = "";
 
+        [ObservableProperty]
+        private bool enableAlbumArtDownload = true; // Default to enabled
+
+        [ObservableProperty]
+        private bool showQuickSettings = false;
+
+        [ObservableProperty]
+        private bool showDownloadSettings = false;
+
         private readonly HttpClient httpClient = new();
 
         private readonly DependencyManager dependencyManager = new();
@@ -139,9 +148,26 @@ namespace Symphex.ViewModels
                 DownloadFolder,
                 YtDlpPath,
                 FfmpegPath,
-                albumArtSearchService
+                albumArtSearchService,
+                EnableAlbumArtDownload 
+
             );
         }
+
+        partial void OnEnableAlbumArtDownloadChanged(bool value)
+        {
+            if (_downloadService != null)
+            {
+                _downloadService.UpdateAlbumArtSetting(value);
+            }
+        }
+
+        [RelayCommand]
+        private void ToggleQuickSettings()
+        {
+            ShowQuickSettings = !ShowQuickSettings;
+        }
+
 
         [RelayCommand]
         private void OpenSettings()
@@ -171,6 +197,12 @@ namespace Symphex.ViewModels
             {
                 StatusText = $"Error opening settings: {ex.Message}";
             }
+        }
+
+        [RelayCommand]
+        private void ToggleDownloadSettings()
+        {
+            ShowDownloadSettings = !ShowDownloadSettings;
         }
 
         private void SetupDownloadFolder()
@@ -208,6 +240,8 @@ namespace Symphex.ViewModels
 
         [ObservableProperty]
         private int processedSpotifyTracks = 0;
+
+
 
         private async Task ProcessSpotifyDownload(string spotifyUrl)
         {

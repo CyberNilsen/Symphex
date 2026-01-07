@@ -20,13 +20,22 @@ namespace Symphex.Services
         private readonly string _ytDlpPath;
         private readonly string _ffmpegPath;
         private readonly AlbumArtSearchService _albumArtSearchService;
+        private bool _enableAlbumArt = true;
 
-        public DownloadService(string downloadFolder, string ytDlpPath, string ffmpegPath, AlbumArtSearchService albumArtSearchService)
+
+        public DownloadService(string downloadFolder, string ytDlpPath, string ffmpegPath, AlbumArtSearchService albumArtSearchService, bool enableAlbumArt = true)
         {
             _downloadFolder = downloadFolder;
             _ytDlpPath = ytDlpPath;
             _ffmpegPath = ffmpegPath;
             _albumArtSearchService = albumArtSearchService;
+            _enableAlbumArt = enableAlbumArt;
+        }
+
+        public void UpdateAlbumArtSetting(bool enabled)
+        {
+            _enableAlbumArt = enabled;
+            Debug.WriteLine($"[DownloadService] Album art download {(enabled ? "enabled" : "disabled")}");
         }
 
         public async Task<TrackInfo?> ExtractMetadata(string url)
@@ -137,26 +146,39 @@ namespace Symphex.Services
                     Year = yearInfo
                 };
 
-                string? thumbnailUrl = GetBestThumbnailUrl(root);
-                if (!string.IsNullOrEmpty(thumbnailUrl))
+                if (_enableAlbumArt)
                 {
+                    // Load thumbnail first
+                    string? thumbnailUrl = GetBestThumbnailUrl(root);
+                    if (!string.IsNullOrEmpty(thumbnailUrl))
+                    {
+                        try
+                        {
+                            trackInfo.Thumbnail = await LoadImageAsync(thumbnailUrl);
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[ExtractMetadata] Failed to load thumbnail: {ex.Message}");
+                        }
+                    }
+
+                    // Then search for real album art
                     try
                     {
-                        trackInfo.Thumbnail = await LoadImageAsync(thumbnailUrl);
+                        await _albumArtSearchService.FindRealAlbumArt(trackInfo);
                     }
                     catch (Exception ex)
                     {
-                        Debug.WriteLine($"[ExtractMetadata] Failed to load thumbnail: {ex.Message}");
+                        Debug.WriteLine($"[ExtractMetadata] Album art search failed: {ex.Message}");
                     }
                 }
-
-                try
+                else
                 {
-                    await _albumArtSearchService.FindRealAlbumArt(trackInfo);
-                }
-                catch (Exception ex)
-                {
-                    Debug.WriteLine($"[ExtractMetadata] Album art search failed: {ex.Message}");
+                    // Don't load any artwork at all when disabled
+                    trackInfo.AlbumArt = null;
+                    trackInfo.Thumbnail = null;
+                    trackInfo.HasRealAlbumArt = false;
+                    Debug.WriteLine("[ExtractMetadata] Album art download disabled - no artwork loaded");
                 }
 
                 return trackInfo;
@@ -299,10 +321,11 @@ namespace Symphex.Services
                 var argsList = new List<string>();
                 argsList.AddRange(new[] { "-i", audioFilePath });
 
-                Bitmap? artworkToUse = trackInfo.AlbumArt ?? trackInfo.Thumbnail;
+                // Only process artwork if album art is enabled
+                Bitmap? artworkToUse = _enableAlbumArt ? (trackInfo.AlbumArt ?? trackInfo.Thumbnail) : null;
 
                 string? tempArtwork = null;
-                if (artworkToUse != null)
+                if (artworkToUse != null && _enableAlbumArt)
                 {
                     tempArtwork = Path.Combine(Path.GetTempPath(), $"temp_artwork_{Guid.NewGuid():N}.jpg");
 
@@ -328,11 +351,12 @@ namespace Symphex.Services
                 else
                 {
                     argsList.AddRange(new[] { "-c", "copy" });
+                    Debug.WriteLine("[ApplyMetadata] No artwork to embed");
                 }
 
+                // Rest of metadata application continues as normal...
                 argsList.AddRange(new[] { "-id3v2_version", "3" });
 
-                // Apply comprehensive metadata
                 if (!string.IsNullOrEmpty(trackInfo.Title) && trackInfo.Title != "Unknown")
                 {
                     argsList.AddRange(new[] { "-metadata", $"title={trackInfo.Title}" });
@@ -390,7 +414,6 @@ namespace Symphex.Services
                     argsList.AddRange(new[] { "-metadata", $"encoded_by={trackInfo.Encoder}" });
                 }
 
-                // Add URL as metadata for reference
                 if (!string.IsNullOrEmpty(trackInfo.Url))
                 {
                     argsList.AddRange(new[] { "-metadata", $"website={trackInfo.Url}" });
@@ -440,13 +463,22 @@ namespace Symphex.Services
         {
             try
             {
-                // Use the existing ExtractMetadata method
                 var trackInfo = await ExtractMetadata(url);
 
                 if (trackInfo == null) return null;
 
-                // Now find real album art (this was the missing piece!)
-                await _albumArtSearchService.FindRealAlbumArtForBatch(trackInfo, threadIndex);
+                // Only find album art if enabled (ExtractMetadata already handles this, but double-check for batch)
+                if (_enableAlbumArt)
+                {
+                    await _albumArtSearchService.FindRealAlbumArtForBatch(trackInfo, threadIndex);
+                }
+                else
+                {
+                    trackInfo.AlbumArt = null;
+                    trackInfo.Thumbnail = null;
+                    trackInfo.HasRealAlbumArt = false;
+                    Debug.WriteLine($"[ExtractMetadataWithAlbumArt #{threadIndex}] Album art disabled - no artwork loaded");
+                }
 
                 return trackInfo;
             }

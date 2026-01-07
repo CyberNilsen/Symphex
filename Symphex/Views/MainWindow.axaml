@@ -182,6 +182,7 @@
 						<ColumnDefinition Width="*"/>
 					</Grid.ColumnDefinitions>
 
+					<!-- DOWNLOAD SECTION (Left Card) -->
 					<Border Grid.Column="0" Classes="card" Padding="24" MinHeight="360" Width="390">
 						<StackPanel Spacing="16" VerticalAlignment="Center">
 							<TextBlock Text="Download Section" FontSize="18" FontWeight="Bold"
@@ -224,11 +225,15 @@
 									<Button Content="Clear" Command="{Binding ClearCommand}" Classes="simple"/>
 									<Button Content="📁 Open Downloads" Command="{Binding OpenFolderCommand}" Classes="simple"/>
 								</StackPanel>
-								<Button Content="⚙️ Settings" Command="{Binding OpenSettingsCommand}" Classes="simple" HorizontalAlignment="Center"/>
+								<StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
+									<Button Content="⚙️ Settings" Command="{Binding OpenSettingsCommand}" Classes="simple"/>
+									<Button Content="🎨 Options" Command="{Binding ToggleQuickSettingsCommand}" Classes="simple" ToolTip.Tip="Show/hide download options"/>
+								</StackPanel>
 							</StackPanel>
 						</StackPanel>
 					</Border>
 
+					<!-- SONG PREVIEW (Right Card) -->
 					<Border Grid.Column="2" Classes="preview" Padding="24" MinHeight="360" Width="390">
 						<StackPanel Spacing="16" Width="342">
 							<TextBlock Text="Song Preview" FontSize="18" FontWeight="Bold"
@@ -301,5 +306,199 @@
 
 			</Grid>
 		</ScrollViewer>
+
+		<!-- OVERLAY DIMMED BACKGROUND -->
+		<Border IsVisible="{Binding ShowQuickSettings}"
+				Background="#000000"
+				Opacity="0.7"
+				ZIndex="999"
+				PointerPressed="OnOverlayPressed"/>
+
+		<!-- CENTERED OVERLAY SETTINGS PANEL -->
+		<Border IsVisible="{Binding ShowQuickSettings}"
+				HorizontalAlignment="Center"
+				VerticalAlignment="Center"
+				ZIndex="1000"
+				Classes="card"
+				Padding="28"
+				Width="550"
+				MaxHeight="500">
+			<Border.Effect>
+				<DropShadowEffect Color="Black" Opacity="0.6" BlurRadius="40" OffsetX="0" OffsetY="10"/>
+			</Border.Effect>
+			
+			<StackPanel Spacing="20">
+				<!-- Header with Close Button -->
+				<Grid>
+					<StackPanel Orientation="Horizontal" 
+								HorizontalAlignment="Center" 
+								Spacing="10">
+						<TextBlock Text="🎨" FontSize="24" VerticalAlignment="Center"/>
+						<TextBlock Text="Download Options" 
+								   FontSize="20" 
+								   FontWeight="Bold"
+								   Foreground="#ffffff" 
+								   VerticalAlignment="Center"/>
+					</StackPanel>
+					
+					<!-- Close X Button -->
+					<Button Content="✕"
+							Command="{Binding ToggleQuickSettingsCommand}"
+							HorizontalAlignment="Right"
+							VerticalAlignment="Top"
+							Width="32"
+							Height="32"
+							Padding="0"
+							Background="#2a2a2a"
+							BorderThickness="0"
+							CornerRadius="6"
+							Foreground="#999999"
+							FontSize="18"
+							FontWeight="Bold"
+							Cursor="Hand"
+							ToolTip.Tip="Close"
+							HorizontalContentAlignment="Center"
+							VerticalContentAlignment="Center">
+						<Button.Styles>
+							<Style Selector="Button:pointerover">
+								<Setter Property="Background" Value="#ef4444"/>
+								<Setter Property="Foreground" Value="White"/>
+							</Style>
+							<Style Selector="Button:pressed">
+								<Setter Property="Background" Value="#dc2626"/>
+								<Setter Property="Foreground" Value="White"/>
+							</Style>
+						</Button.Styles>
+					</Button>
+				</Grid>
+				
+				<!-- Divider -->
+				<Border Height="1" Background="#333333" Margin="0,0,0,8"/>
+				
+				<!-- Album Art Setting Card -->
+				<Border Background="#252525"
+						BorderBrush="#444444"
+						BorderThickness="1"
+						CornerRadius="10"
+						Padding="20">
+					<StackPanel Spacing="14">
+						<!-- Main Toggle -->
+						<CheckBox 
+							IsChecked="{Binding EnableAlbumArtDownload}"
+							FontSize="15"
+							Foreground="#ffffff">
+							<TextBlock Text="Download high-quality album artwork" 
+									   FontWeight="SemiBold"
+									   Foreground="#ffffff"
+									   FontSize="15"/>
+						</CheckBox>
+						
+						<!-- Info Section -->
+						<StackPanel Spacing="10" Margin="32,8,0,0">
+							<!-- Info Line 1 -->
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<TextBlock Text="🎨" FontSize="14" VerticalAlignment="Center"/>
+								<TextBlock 
+									Text="Searches iTunes, Deezer, and MusicBrainz for cover art"
+									FontSize="13"
+									Foreground="#bbbbbb"
+									TextWrapping="Wrap"
+									VerticalAlignment="Center"/>
+							</StackPanel>
+							
+							<!-- Info Line 2 -->
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<TextBlock Text="⚡" FontSize="14" VerticalAlignment="Center"/>
+								<TextBlock 
+									Text="Disabling speeds up downloads significantly (skips API searches)"
+									FontSize="13"
+									Foreground="#999999"
+									TextWrapping="Wrap"
+									VerticalAlignment="Center"/>
+							</StackPanel>
+							
+							<!-- Info Line 3 -->
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<TextBlock Text="📸" FontSize="14" VerticalAlignment="Center"/>
+								<TextBlock 
+									Text="When disabled, only video thumbnails will be used"
+									FontSize="13"
+									Foreground="#999999"
+									TextWrapping="Wrap"
+									VerticalAlignment="Center"/>
+							</StackPanel>
+						</StackPanel>
+					</StackPanel>
+				</Border>
+				
+				<!-- Current Track Status (only shows when a track is loaded) -->
+				<Border 
+					IsVisible="{Binding ShowMetadata}"
+					CornerRadius="10"
+					Padding="16"
+					Background="#1a3a1a"
+					BorderBrush="#4CAF50"
+					BorderThickness="2">
+					
+					<StackPanel Spacing="8">
+						<TextBlock Text="Current Track Status" 
+								   FontSize="13" 
+								   FontWeight="SemiBold"
+								   Foreground="#cccccc"
+								   Margin="0,0,0,4"/>
+						
+						<StackPanel Orientation="Horizontal" Spacing="12">
+							<!-- Green checkmark for real album art -->
+							<Border Width="28" Height="28" 
+									CornerRadius="14" 
+									Background="#4CAF50"
+									IsVisible="{Binding CurrentTrack.HasRealAlbumArt}">
+								<TextBlock Text="✓" 
+										   FontWeight="Bold" 
+										   FontSize="18"
+										   Foreground="White"
+										   HorizontalAlignment="Center" 
+										   VerticalAlignment="Center"/>
+							</Border>
+							
+							<!-- Orange warning for thumbnail only -->
+							<Border Width="28" Height="28" 
+									CornerRadius="14" 
+									Background="#FF9800"
+									IsVisible="{Binding !CurrentTrack.HasRealAlbumArt}">
+								<TextBlock Text="⚠" 
+										   FontSize="18"
+										   Foreground="White"
+										   HorizontalAlignment="Center" 
+										   VerticalAlignment="Center"/>
+							</Border>
+							
+							<!-- Status text -->
+							<StackPanel VerticalAlignment="Center">
+								<TextBlock FontSize="13" 
+										   Foreground="#aaaaaa"
+										   Text="Album art status:"/>
+								<TextBlock FontSize="15" 
+										   FontWeight="SemiBold"
+										   Foreground="#ffffff"
+										   Text="{Binding CurrentTrack.HasRealAlbumArt, Converter={x:Static converters:BoolToAlbumArtStatusConverter.Instance}}"/>
+							</StackPanel>
+						</StackPanel>
+					</StackPanel>
+				</Border>
+				
+				<!-- Action Buttons -->
+				<StackPanel Orientation="Horizontal" 
+							Spacing="12" 
+							HorizontalAlignment="Center"
+							Margin="0,8,0,0">
+					<Button Content="Done" 
+							Command="{Binding ToggleQuickSettingsCommand}"
+							Classes="download"
+							Padding="32,10"
+							FontSize="14"/>
+				</StackPanel>
+			</StackPanel>
+		</Border>
 	</Grid>
 </Window>
