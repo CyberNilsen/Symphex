@@ -741,29 +741,41 @@ namespace Symphex.Services
 
             string cleaned = title;
 
-            // More comprehensive cleaning patterns
+            // Remove ALL parentheses and their contents
+            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\s*\([^)]*\)", "", 
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            
+            // Remove ALL square brackets and their contents
+            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\s*\[[^\]]*\]", "", 
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            // Remove common suffixes and patterns that might not be in brackets
             var patterns = new[]
             {
-                @"\s*\(Official\s*Video\)",
-                @"\s*\(Official\s*Audio\)",
-                @"\s*\(Official\s*Music\s*Video\)",
-                @"\s*\(Official\)",
-                @"\s*\(Lyrics?\)",
-                @"\s*\(Lyric\s*Video\)",
-                @"\s*\(HD\)",
-                @"\s*\(4K\)",
-                @"\s*\[Official\s*Video\]",
-                @"\s*\[Official\s*Audio\]",
-                @"\s*\[Official\s*Music\s*Video\]",
-                @"\s*\[Lyrics?\]",
-                @"\s*\[HD\]",
-                @"\s*\[4K\]",
-                @"\s*\(Music\s*Video\)",
-                @"\s*\[Music\s*Video\]",
-                @"\s*\(Visualizer\)",
-                @"\s*\[Visualizer\]",
-                @"\s*\(Live\)",
-                @"\s*\[Live\]"
+                @"\s*Official\s*Video",
+                @"\s*Official\s*Audio",
+                @"\s*Official\s*Music\s*Video",
+                @"\s*Music\s*Video",
+                @"\s*Lyric\s*Video",
+                @"\s*Lyrics?",
+                @"\s*Visualizer",
+                @"\s*Live\s*Performance",
+                @"\s*Live",
+                @"\s*HD",
+                @"\s*4K",
+                @"\s*HQ",
+                @"\s*Audio\s*Only",
+                @"\s*Full\s*Song",
+                @"\s*Full\s*Video",
+                @"\s*Remaster(ed)?",
+                @"\s*\d{4}\s*Remaster",
+                @"\s*Extended\s*Version",
+                @"\s*Radio\s*Edit",
+                @"\s*Explicit",
+                @"\s*Clean\s*Version",
+                @"\s*ft\.?\s*.*$",  // Remove featuring artists at the end
+                @"\s*feat\.?\s*.*$",
+                @"\s*featuring\s*.*$"
             };
 
             foreach (var pattern in patterns)
@@ -781,8 +793,17 @@ namespace Symphex.Services
                 .Replace("\u2018", "") // Left single quote
                 .Replace("\u2019", "") // Right single quote
                 .Replace("_", " ")
-                .Replace("  ", " ")
+                .Replace("-", " ")
+                .Replace("|", " ")
+                .Replace("–", " ") // En dash
+                .Replace("—", " ") // Em dash
                 .Trim();
+
+            // Remove multiple spaces
+            while (cleaned.Contains("  "))
+            {
+                cleaned = cleaned.Replace("  ", " ");
+            }
 
             return string.IsNullOrEmpty(cleaned) ? title : cleaned;
         }
@@ -794,6 +815,14 @@ namespace Symphex.Services
 
             string cleaned = artist;
 
+            // Remove ALL parentheses and their contents
+            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\s*\([^)]*\)", "", 
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            
+            // Remove ALL square brackets and their contents
+            cleaned = System.Text.RegularExpressions.Regex.Replace(cleaned, @"\s*\[[^\]]*\]", "", 
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
             // Clean common channel suffixes and patterns
             var patterns = new[]
             {
@@ -803,7 +832,11 @@ namespace Symphex.Services
                 @"\s*Music",
                 @"\s*Official",
                 @"\s*Channel",
-                @"\s*TV"
+                @"\s*TV",
+                @"\s*Entertainment",
+                @"\s*Productions?",
+                @"\s*Studios?",
+                @"\s*Label"
             };
 
             foreach (var pattern in patterns)
@@ -820,8 +853,17 @@ namespace Symphex.Services
                 .Replace("\u2018", "")
                 .Replace("\u2019", "")
                 .Replace("_", " ")
-                .Replace("  ", " ")
+                .Replace("-", " ")
+                .Replace("|", " ")
+                .Replace("–", " ")
+                .Replace("—", " ")
                 .Trim();
+
+            // Remove multiple spaces
+            while (cleaned.Contains("  "))
+            {
+                cleaned = cleaned.Replace("  ", " ");
+            }
 
             return string.IsNullOrEmpty(cleaned) ? artist : cleaned;
         }
