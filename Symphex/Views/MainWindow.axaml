@@ -429,25 +429,48 @@
 					</Border>
 				</Grid>
 
+				<!-- Action Buttons -->
 				<StackPanel Spacing="8" HorizontalAlignment="Center">
 					<TextBlock Text="💡 Click on an image to select it" FontSize="12" Foreground="#cccccc"
 							   HorizontalAlignment="Center"/>
-					<Button Content="⏭️ Skip &amp; Use Default" 
-							Tapped="OnSkipArtworkSelection"
-							Background="#444444" 
-							Foreground="White"
-							BorderThickness="0"
-							CornerRadius="8"
-							Padding="16,8"
-							FontSize="13"
-							Cursor="Hand"
-							HorizontalAlignment="Center">
-						<Button.Styles>
-							<Style Selector="Button:pointerover">
-								<Setter Property="Background" Value="#555555"/>
-							</Style>
-						</Button.Styles>
-					</Button>
+					
+					<!-- Buttons side by side -->
+					<StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
+						<!-- Skip Button -->
+						<Button Content="⏭️ Skip &amp; Use Default" 
+								Tapped="OnSkipArtworkSelection"
+								Background="#444444" 
+								Foreground="White"
+								BorderThickness="0"
+								CornerRadius="8"
+								Padding="16,10"
+								FontSize="13"
+								Cursor="Hand">
+							<Button.Styles>
+								<Style Selector="Button:pointerover">
+									<Setter Property="Background" Value="#555555"/>
+								</Style>
+							</Button.Styles>
+						</Button>
+
+						<!-- No Picture Button -->
+						<Button Content="🚫 No Picture" 
+								Tapped="OnNoPictureSelected"
+								Background="#8B0000" 
+								Foreground="White"
+								BorderThickness="0"
+								CornerRadius="8"
+								Padding="16,10"
+								FontSize="13"
+								FontWeight="SemiBold"
+								Cursor="Hand">
+							<Button.Styles>
+								<Style Selector="Button:pointerover">
+									<Setter Property="Background" Value="#A52A2A"/>
+								</Style>
+							</Button.Styles>
+						</Button>
+					</StackPanel>
 				</StackPanel>
 			</StackPanel>
 		</Border>

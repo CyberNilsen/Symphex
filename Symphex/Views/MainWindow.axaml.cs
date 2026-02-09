@@ -141,5 +141,13 @@ namespace Symphex.Views
                 viewModel.SelectArtworkCommand.Execute(-1);
             }
         }
+
+        private void OnNoPictureSelected(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is ViewModels.MainWindowViewModel viewModel)
+            {
+                viewModel.SelectArtworkCommand.Execute(-2); // -2 = no picture
+            }
+        }
     }
 }

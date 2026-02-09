@@ -326,8 +326,18 @@ namespace Symphex.ViewModels
         {
             try
             {
+                // -2 means no picture
+                if (index == -2)
+                {
+                    if (CurrentTrack != null)
+                    {
+                        CurrentTrack.AlbumArt = null;
+                        CurrentTrack.Thumbnail = null;
+                        Debug.WriteLine("[SelectArtwork] User selected NO PICTURE");
+                    }
+                }
                 // -1 means skip/use default
-                if (index == -1)
+                else if (index == -1)
                 {
                     Debug.WriteLine("[SelectArtwork] User skipped - using default");
                 }
