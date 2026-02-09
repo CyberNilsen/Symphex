@@ -21,6 +21,8 @@ namespace Symphex.Services
         private readonly string _ffmpegPath;
         private readonly AlbumArtSearchService _albumArtSearchService;
         private bool _enableAlbumArt = true;
+        private bool _skipThumbnailDownload = false; // false = download thumbnails (inverted logic)
+        private string _selectedThumbnailSize = "Medium Quality (600x600)";
 
 
         public DownloadService(string downloadFolder, string ytDlpPath, string ffmpegPath, AlbumArtSearchService albumArtSearchService, bool enableAlbumArt = true)
@@ -38,10 +40,24 @@ namespace Symphex.Services
             Debug.WriteLine($"[DownloadService] Album art download {(enabled ? "enabled" : "disabled")}");
         }
 
-        public async Task<TrackInfo?> ExtractMetadata(string url)
+        public void UpdateThumbnailSettings(bool skipThumbnail)
+        {
+            _skipThumbnailDownload = skipThumbnail;
+            Debug.WriteLine($"[DownloadService] Thumbnail download {(skipThumbnail ? "disabled" : "enabled")}");
+        }
+
+        public void UpdateThumbnailSize(string size)
+        {
+            _selectedThumbnailSize = size;
+            Debug.WriteLine($"[DownloadService] Thumbnail size set to: {size}");
+        }
+
+        public async Task<TrackInfo?> ExtractMetadata(string url, string thumbnailSizePreference = "Maximum Quality", bool skipThumbnail = false)
         {
             try
             {
+                Debug.WriteLine($"[ExtractMetadata] Settings: EnableAlbumArt={_enableAlbumArt}, SkipThumbnail={skipThumbnail}, Size={thumbnailSizePreference}");
+                
                 // Validate yt-dlp exists before attempting to use it
                 if (!File.Exists(_ytDlpPath))
                 {
@@ -146,39 +162,135 @@ namespace Symphex.Services
                     Year = yearInfo
                 };
 
-                if (_enableAlbumArt)
+                // Handle artwork based on settings
+                // NOTE: SkipThumbnailDownload is now INVERTED - checked = download, unchecked = skip
+                bool actuallySkipThumbnail = !skipThumbnail;
+                
+                if (!_enableAlbumArt && actuallySkipThumbnail)
                 {
-                    // Load thumbnail first
-                    string? thumbnailUrl = GetBestThumbnailUrl(root);
-                    if (!string.IsNullOrEmpty(thumbnailUrl))
+                    // BOTH disabled - absolutely NO artwork
+                    trackInfo.AlbumArt = null;
+                    trackInfo.Thumbnail = null;
+                    trackInfo.HasRealAlbumArt = false;
+                    Debug.WriteLine("[ExtractMetadata] ALL artwork disabled - no pictures");
+                    return trackInfo;
+                }
+                else if (!_enableAlbumArt && !actuallySkipThumbnail)
+                {
+                    // Album art disabled, thumbnail enabled - load thumbnail only
+                    Bitmap? thumbnailImage = await LoadThumbnailBySize(root, thumbnailSizePreference);
+                    if (thumbnailImage != null)
                     {
-                        try
+                        // Resize thumbnail
+                        var (targetWidth, targetHeight) = GetTargetDimensionsFromSize(_selectedThumbnailSize);
+                        var resized = ResizeImage(thumbnailImage, targetWidth, targetHeight);
+                        if (resized != null)
                         {
-                            trackInfo.Thumbnail = await LoadImageAsync(thumbnailUrl);
+                            trackInfo.Thumbnail = resized;
+                            trackInfo.AlbumArt = resized; // Use thumbnail as album art
+                            Debug.WriteLine($"[ExtractMetadata] Resized thumbnail to {resized.PixelSize.Width}x{resized.PixelSize.Height}");
                         }
-                        catch (Exception ex)
+                        else
                         {
-                            Debug.WriteLine($"[ExtractMetadata] Failed to load thumbnail: {ex.Message}");
+                            trackInfo.Thumbnail = thumbnailImage;
+                            trackInfo.AlbumArt = thumbnailImage;
                         }
                     }
-
-                    // Then search for real album art
+                    trackInfo.HasRealAlbumArt = false;
+                    Debug.WriteLine("[ExtractMetadata] Album art disabled - using thumbnail only");
+                    return trackInfo;
+                }
+                else if (_enableAlbumArt && actuallySkipThumbnail)
+                {
+                    // Album art enabled, thumbnail skipped - search for album art only
+                    trackInfo.Thumbnail = null;
+                    trackInfo.HasRealAlbumArt = false;
+                    Debug.WriteLine("[ExtractMetadata] Thumbnail skipped - will search for album art only");
+                    
                     try
                     {
                         await _albumArtSearchService.FindRealAlbumArt(trackInfo);
+                        
+                        // Resize album art if found
+                        if (trackInfo.AlbumArt != null)
+                        {
+                            var (targetWidth, targetHeight) = GetTargetDimensionsFromSize(_selectedThumbnailSize);
+                            var resized = ResizeImage(trackInfo.AlbumArt, targetWidth, targetHeight);
+                            if (resized != null)
+                            {
+                                trackInfo.AlbumArt = resized;
+                                Debug.WriteLine($"[ExtractMetadata] Resized album art to {resized.PixelSize.Width}x{resized.PixelSize.Height}");
+                            }
+                        }
                     }
                     catch (Exception ex)
                     {
                         Debug.WriteLine($"[ExtractMetadata] Album art search failed: {ex.Message}");
                     }
+                    return trackInfo;
                 }
                 else
                 {
-                    // Don't load any artwork at all when disabled
-                    trackInfo.AlbumArt = null;
-                    trackInfo.Thumbnail = null;
-                    trackInfo.HasRealAlbumArt = false;
-                    Debug.WriteLine("[ExtractMetadata] Album art download disabled - no artwork loaded");
+                    // BOTH enabled - load thumbnail first, then search for album art
+                    Bitmap? thumbnailImage = await LoadThumbnailBySize(root, thumbnailSizePreference);
+                    if (thumbnailImage != null)
+                    {
+                        trackInfo.Thumbnail = thumbnailImage;
+                    }
+                    else
+                    {
+                        // Fallback to best thumbnail URL if size-based loading fails
+                        string? thumbnailUrl = GetBestThumbnailUrl(root);
+                        if (!string.IsNullOrEmpty(thumbnailUrl))
+                        {
+                            try
+                            {
+                                trackInfo.Thumbnail = await LoadImageAsync(thumbnailUrl);
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[ExtractMetadata] Failed to load thumbnail: {ex.Message}");
+                            }
+                        }
+                    }
+
+                    // Store available thumbnails for user selection
+                    trackInfo.AvailableThumbnails = ExtractAllThumbnails(root);
+
+                    // Search for real album art
+                    try
+                    {
+                        await _albumArtSearchService.FindRealAlbumArt(trackInfo);
+                        
+                        // Resize album art if found
+                        if (trackInfo.AlbumArt != null)
+                        {
+                            var (targetWidth, targetHeight) = GetTargetDimensionsFromSize(_selectedThumbnailSize);
+                            var resized = ResizeImage(trackInfo.AlbumArt, targetWidth, targetHeight);
+                            if (resized != null)
+                            {
+                                trackInfo.AlbumArt = resized;
+                                Debug.WriteLine($"[ExtractMetadata] Resized album art to {resized.PixelSize.Width}x{resized.PixelSize.Height}");
+                            }
+                        }
+                        
+                        // Also resize thumbnail if present
+                        if (trackInfo.Thumbnail != null)
+                        {
+                            var (targetWidth, targetHeight) = GetTargetDimensionsFromSize(_selectedThumbnailSize);
+                            var resized = ResizeImage(trackInfo.Thumbnail, targetWidth, targetHeight);
+                            if (resized != null)
+                            {
+                                trackInfo.Thumbnail = resized;
+                                Debug.WriteLine($"[ExtractMetadata] Resized thumbnail to {resized.PixelSize.Width}x{resized.PixelSize.Height}");
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[ExtractMetadata] Album art search failed: {ex.Message}");
+                    }
+                    return trackInfo;
                 }
 
                 return trackInfo;
@@ -232,11 +344,19 @@ namespace Symphex.Services
             "--extract-audio",
             "--audio-format", "mp3",
             "--audio-quality", "0",
-            "--no-playlist",
-            "--embed-thumbnail",
-            "--add-metadata",
-            "-o", filenameTemplate
+            "--no-playlist"
         };
+
+                // Only embed thumbnail if user wants thumbnails (inverted logic: _skipThumbnailDownload=true means download)
+                bool actuallySkipThumbnail = !_skipThumbnailDownload;
+                if (!actuallySkipThumbnail)
+                {
+                    argsList.Add("--embed-thumbnail");
+                }
+
+                argsList.Add("--add-metadata");
+                argsList.Add("-o");
+                argsList.Add(filenameTemplate);
 
                 // Only add ffmpeg location if it actually exists
                 if (!string.IsNullOrEmpty(_ffmpegPath) && File.Exists(_ffmpegPath))
@@ -321,19 +441,36 @@ namespace Symphex.Services
                 var argsList = new List<string>();
                 argsList.AddRange(new[] { "-i", audioFilePath });
 
-                // Only process artwork if album art is enabled
-                Bitmap? artworkToUse = _enableAlbumArt ? (trackInfo.AlbumArt ?? trackInfo.Thumbnail) : null;
+                // Determine which artwork to use: album art (if enabled) or thumbnail (as fallback)
+                Bitmap? artworkToUse = null;
+                if (_enableAlbumArt)
+                {
+                    artworkToUse = trackInfo.AlbumArt ?? trackInfo.Thumbnail;
+                }
+                else
+                {
+                    // Album art disabled, but still use thumbnail if available
+                    artworkToUse = trackInfo.Thumbnail;
+                }
 
                 string? tempArtwork = null;
-                if (artworkToUse != null && _enableAlbumArt)
+                if (artworkToUse != null)
                 {
                     tempArtwork = Path.Combine(Path.GetTempPath(), $"temp_artwork_{Guid.NewGuid():N}.jpg");
 
                     try
                     {
-                        using (var fileStream = new FileStream(tempArtwork, FileMode.Create))
+                        // Resize artwork based on selected size
+                        var (targetWidth, targetHeight) = GetTargetDimensionsFromSize(_selectedThumbnailSize);
+                        var resizedArtwork = ResizeImage(artworkToUse, targetWidth, targetHeight);
+                        
+                        if (resizedArtwork != null)
                         {
-                            artworkToUse.Save(fileStream);
+                            using (var fileStream = new FileStream(tempArtwork, FileMode.Create))
+                            {
+                                resizedArtwork.Save(fileStream);
+                            }
+                            Debug.WriteLine($"[ApplyMetadata] Saved resized artwork: {resizedArtwork.PixelSize.Width}x{resizedArtwork.PixelSize.Height}");
                         }
 
                         argsList.AddRange(new[] { "-i", tempArtwork });
@@ -471,6 +608,30 @@ namespace Symphex.Services
                 if (_enableAlbumArt)
                 {
                     await _albumArtSearchService.FindRealAlbumArtForBatch(trackInfo, threadIndex);
+                    
+                    // Resize album art if found
+                    if (trackInfo.AlbumArt != null)
+                    {
+                        var (targetWidth, targetHeight) = GetTargetDimensionsFromSize(_selectedThumbnailSize);
+                        var resized = ResizeImage(trackInfo.AlbumArt, targetWidth, targetHeight);
+                        if (resized != null)
+                        {
+                            trackInfo.AlbumArt = resized;
+                            Debug.WriteLine($"[ExtractMetadataWithAlbumArt #{threadIndex}] Resized album art to {resized.PixelSize.Width}x{resized.PixelSize.Height}");
+                        }
+                    }
+                    
+                    // Also resize thumbnail if present
+                    if (trackInfo.Thumbnail != null)
+                    {
+                        var (targetWidth, targetHeight) = GetTargetDimensionsFromSize(_selectedThumbnailSize);
+                        var resized = ResizeImage(trackInfo.Thumbnail, targetWidth, targetHeight);
+                        if (resized != null)
+                        {
+                            trackInfo.Thumbnail = resized;
+                            Debug.WriteLine($"[ExtractMetadataWithAlbumArt #{threadIndex}] Resized thumbnail to {resized.PixelSize.Width}x{resized.PixelSize.Height}");
+                        }
+                    }
                 }
                 else
                 {
@@ -510,9 +671,17 @@ namespace Symphex.Services
 
                     try
                     {
-                        using (var fileStream = new FileStream(tempArtwork, FileMode.Create))
+                        // Resize artwork based on selected size
+                        var (targetWidth, targetHeight) = GetTargetDimensionsFromSize(_selectedThumbnailSize);
+                        var resizedArtwork = ResizeImage(artworkToUse, targetWidth, targetHeight);
+                        
+                        if (resizedArtwork != null)
                         {
-                            artworkToUse.Save(fileStream);
+                            using (var fileStream = new FileStream(tempArtwork, FileMode.Create))
+                            {
+                                resizedArtwork.Save(fileStream);
+                            }
+                            Debug.WriteLine($"[ApplyMetadataForBatch] Saved resized artwork: {resizedArtwork.PixelSize.Width}x{resizedArtwork.PixelSize.Height}");
                         }
 
                         argsList.AddRange(new[] { "-i", tempArtwork });
@@ -638,11 +807,19 @@ namespace Symphex.Services
             "--extract-audio",
             "--audio-format", "mp3",
             "--audio-quality", "0",
-            "--no-playlist",
-            "--embed-thumbnail",
-            "--add-metadata",
-            "-o", filenameTemplate
+            "--no-playlist"
         };
+
+                // Only embed thumbnail if user wants thumbnails (inverted logic: _skipThumbnailDownload=true means download)
+                bool actuallySkipThumbnail = !_skipThumbnailDownload;
+                if (!actuallySkipThumbnail)
+                {
+                    argsList.Add("--embed-thumbnail");
+                }
+
+                argsList.Add("--add-metadata");
+                argsList.Add("-o");
+                argsList.Add(filenameTemplate);
 
                 // Add FFmpeg location if available and valid
                 if (!string.IsNullOrEmpty(_ffmpegPath) && File.Exists(_ffmpegPath))
@@ -891,6 +1068,137 @@ namespace Symphex.Services
             return "";
         }
 
+        public List<ThumbnailOption> ExtractAllThumbnails(JsonElement root)
+        {
+            var thumbnailOptions = new List<ThumbnailOption>();
+
+            try
+            {
+                if (root.TryGetProperty("thumbnails", out var thumbnailsProp))
+                {
+                    foreach (var thumb in thumbnailsProp.EnumerateArray())
+                    {
+                        if (thumb.TryGetProperty("url", out var urlProp))
+                        {
+                            string url = urlProp.GetString() ?? "";
+                            int width = thumb.TryGetProperty("width", out var widthProp) ? widthProp.GetInt32() : 0;
+                            int height = thumb.TryGetProperty("height", out var heightProp) ? heightProp.GetInt32() : 0;
+
+                            if (!string.IsNullOrEmpty(url) && width > 0 && height > 0)
+                            {
+                                string quality = DetermineQuality(width, height);
+                                thumbnailOptions.Add(new ThumbnailOption
+                                {
+                                    Url = url,
+                                    Width = width,
+                                    Height = height,
+                                    Quality = quality
+                                });
+                            }
+                        }
+                    }
+                }
+
+                // Sort by resolution (highest first)
+                thumbnailOptions = thumbnailOptions
+                    .OrderByDescending(t => t.Width * t.Height)
+                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ExtractAllThumbnails] Error: {ex.Message}");
+            }
+
+            return thumbnailOptions;
+        }
+
+        private string DetermineQuality(int width, int height)
+        {
+            int pixels = width * height;
+
+            if (pixels >= 1440000) // 1200x1200 or higher
+                return "Maximum Quality";
+            else if (pixels >= 360000) // 600x600 or higher
+                return "High Quality";
+            else if (pixels >= 90000) // 300x300 or higher
+                return "Medium Quality";
+            else
+                return "Low Quality";
+        }
+
+        public async Task<Bitmap?> LoadThumbnailBySize(JsonElement root, string sizePreference)
+        {
+            try
+            {
+                var thumbnails = ExtractAllThumbnails(root);
+                if (thumbnails.Count == 0)
+                    return null;
+
+                ThumbnailOption? selectedThumb = null;
+                int targetWidth = 0;
+                int targetHeight = 0;
+
+                switch (sizePreference)
+                {
+                    case "Maximum Quality":
+                        // Get the absolute largest, no resizing
+                        selectedThumb = thumbnails.OrderByDescending(t => t.Width * t.Height).FirstOrDefault();
+                        break;
+                        
+                    case "High Quality (1200x1200)":
+                        // Target 1200x1200
+                        targetWidth = 1200;
+                        targetHeight = 1200;
+                        selectedThumb = thumbnails.OrderByDescending(t => t.Width * t.Height).FirstOrDefault();
+                        break;
+                        
+                    case "Medium Quality (600x600)":
+                        // Target 600x600
+                        targetWidth = 600;
+                        targetHeight = 600;
+                        selectedThumb = thumbnails.OrderByDescending(t => t.Width * t.Height).FirstOrDefault();
+                        break;
+                        
+                    case "Low Quality (300x300)":
+                        // Target 300x300
+                        targetWidth = 300;
+                        targetHeight = 300;
+                        selectedThumb = thumbnails.OrderByDescending(t => t.Width * t.Height).FirstOrDefault();
+                        break;
+                        
+                    default:
+                        selectedThumb = thumbnails.FirstOrDefault();
+                        break;
+                }
+
+                if (selectedThumb != null && !string.IsNullOrEmpty(selectedThumb.Url))
+                {
+                    Debug.WriteLine($"[LoadThumbnailBySize] Loading {sizePreference}: {selectedThumb.Width}x{selectedThumb.Height}");
+                    
+                    var image = await LoadImageAsync(selectedThumb.Url);
+                    if (image == null)
+                        return null;
+
+                    // Resize if needed (not Maximum Quality)
+                    if (targetWidth > 0 && targetHeight > 0)
+                    {
+                        var resized = ResizeImage(image, targetWidth, targetHeight);
+                        Debug.WriteLine($"[LoadThumbnailBySize] Final size: {resized?.PixelSize.Width}x{resized?.PixelSize.Height}");
+                        return resized;
+                    }
+
+                    Debug.WriteLine($"[LoadThumbnailBySize] No resize, final size: {image.PixelSize.Width}x{image.PixelSize.Height}");
+                    return image;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[LoadThumbnailBySize] Error: {ex.Message}");
+            }
+
+            return null;
+        }
+
         private async Task<Bitmap?> LoadImageAsync(string url)
         {
             try
@@ -910,6 +1218,66 @@ namespace Symphex.Services
             {
                 return null;
             }
+        }
+
+        private Bitmap? ResizeImage(Bitmap source, int targetWidth, int targetHeight)
+        {
+            try
+            {
+                // If already smaller or equal, don't resize
+                if (source.PixelSize.Width <= targetWidth && source.PixelSize.Height <= targetHeight)
+                    return source;
+
+                // Calculate aspect ratio
+                double aspectRatio = (double)source.PixelSize.Width / source.PixelSize.Height;
+                
+                int newWidth, newHeight;
+                
+                // Fit within target dimensions while maintaining aspect ratio
+                if (aspectRatio > 1) // Wider than tall
+                {
+                    newWidth = Math.Min(targetWidth, source.PixelSize.Width);
+                    newHeight = (int)(newWidth / aspectRatio);
+                }
+                else // Taller than wide or square
+                {
+                    newHeight = Math.Min(targetHeight, source.PixelSize.Height);
+                    newWidth = (int)(newHeight * aspectRatio);
+                }
+
+                Debug.WriteLine($"[ResizeImage] Resizing from {source.PixelSize.Width}x{source.PixelSize.Height} to {newWidth}x{newHeight}");
+
+                // Create a render target bitmap
+                var renderTarget = new Avalonia.Media.Imaging.RenderTargetBitmap(
+                    new Avalonia.PixelSize(newWidth, newHeight),
+                    new Avalonia.Vector(96, 96));
+
+                using (var context = renderTarget.CreateDrawingContext())
+                {
+                    var sourceRect = new Avalonia.Rect(0, 0, source.PixelSize.Width, source.PixelSize.Height);
+                    var destRect = new Avalonia.Rect(0, 0, newWidth, newHeight);
+                    context.DrawImage(source, sourceRect, destRect);
+                }
+
+                return renderTarget;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ResizeImage] Error: {ex.Message}");
+                return source; // Return original if resize fails
+            }
+        }
+
+        private (int width, int height) GetTargetDimensionsFromSize(string sizeOption)
+        {
+            return sizeOption switch
+            {
+                "Low Quality (300x300)" => (300, 300),
+                "Medium Quality (600x600)" => (600, 600),
+                "High Quality (1200x1200)" => (1200, 1200),
+                "Maximum Quality" => (int.MaxValue, int.MaxValue), // No resize
+                _ => (600, 600) // Default to medium
+            };
         }
 
         private string FormatUploadDate(string? uploadDate)

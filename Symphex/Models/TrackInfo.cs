@@ -1,5 +1,6 @@
 ﻿using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
+using System.Collections.Generic;
 
 namespace Symphex.Models
 {
@@ -76,5 +77,22 @@ namespace Symphex.Models
 
         [ObservableProperty]
         private string encoder = "";
+
+        [ObservableProperty]
+        private List<ThumbnailOption> availableThumbnails = new List<ThumbnailOption>();
+
+        [ObservableProperty]
+        private ThumbnailOption? selectedThumbnail;
+    }
+
+    public class ThumbnailOption
+    {
+        public string Url { get; set; } = "";
+        public int Width { get; set; }
+        public int Height { get; set; }
+        public string Quality { get; set; } = "";
+        public Bitmap? PreviewImage { get; set; }
+        
+        public string DisplayText => $"{Quality} ({Width}x{Height})";
     }
 }

@@ -92,14 +92,6 @@ namespace Symphex.Views
             }
         }
 
-        private void OnOverlayPressed(object sender, Avalonia.Input.PointerPressedEventArgs e)
-        {
-            if (DataContext is ViewModels.MainWindowViewModel viewModel)
-            {
-                viewModel.ShowQuickSettings = false;
-            }
-        }
-
         private void CliOutput_ScrollChanged(object sender, ScrollChangedEventArgs e)
         {
             var scrollViewer = sender as ScrollViewer;

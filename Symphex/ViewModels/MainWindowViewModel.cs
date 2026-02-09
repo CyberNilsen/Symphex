@@ -103,10 +103,29 @@ namespace Symphex.ViewModels
         private bool enableAlbumArtDownload = true; // Default to enabled
 
         [ObservableProperty]
-        private bool showQuickSettings = false;
+        private bool skipThumbnailDownload = true; // Default to TRUE = download thumbnails
 
         [ObservableProperty]
-        private bool showDownloadSettings = false;
+        private string selectedThumbnailSize = "Medium Quality (600x600)";
+
+        [ObservableProperty]
+        private List<string> thumbnailSizeOptions = new List<string>
+        {
+            "None (No Thumbnails)",
+            "Low Quality (300x300)",
+            "Medium Quality (600x600)",
+            "High Quality (1200x1200)",
+            "Maximum Quality"
+        };
+
+        [ObservableProperty]
+        private string lastDownloadedFileInfo = "";
+
+        [ObservableProperty]
+        private bool showFileInfo = false;
+
+        [ObservableProperty]
+        private string artworkSizeInfo = "";
 
         private readonly HttpClient httpClient = new();
 
@@ -162,20 +181,37 @@ namespace Symphex.ViewModels
             }
         }
 
-        [RelayCommand]
-        private void ToggleQuickSettings()
+        partial void OnSkipThumbnailDownloadChanged(bool value)
         {
-            ShowQuickSettings = !ShowQuickSettings;
+            if (_downloadService != null)
+            {
+                _downloadService.UpdateThumbnailSettings(value);
+            }
         }
 
+        partial void OnSelectedThumbnailSizeChanged(string value)
+        {
+            if (_downloadService != null)
+            {
+                _downloadService.UpdateThumbnailSize(value);
+            }
+        }
 
         [RelayCommand]
         private void OpenSettings()
         {
             try
             {
+                var settingsViewModel = new Symphex.ViewModels.SettingsViewModel
+                {
+                    EnableAlbumArtDownload = this.EnableAlbumArtDownload,
+                    SkipThumbnailDownload = this.SkipThumbnailDownload,
+                    SelectedThumbnailSize = this.SelectedThumbnailSize
+                };
+
                 var settingsWindow = new Symphex.Views.SettingsWindow
                 {
+                    DataContext = settingsViewModel,
                     WindowStartupLocation = WindowStartupLocation.CenterOwner
                 };
 
@@ -185,7 +221,16 @@ namespace Symphex.ViewModels
                     var mainWindow = desktop.MainWindow;
                     if (mainWindow != null)
                     {
-                        settingsWindow.ShowDialog(mainWindow);
+                        settingsWindow.ShowDialog(mainWindow).ContinueWith(t =>
+                        {
+                            // Copy settings back after dialog closes
+                            Dispatcher.UIThread.Post(() =>
+                            {
+                                this.EnableAlbumArtDownload = settingsViewModel.EnableAlbumArtDownload;
+                                this.SkipThumbnailDownload = settingsViewModel.SkipThumbnailDownload;
+                                this.SelectedThumbnailSize = settingsViewModel.SelectedThumbnailSize;
+                            });
+                        });
                         return;
                     }
                 }
@@ -197,12 +242,6 @@ namespace Symphex.ViewModels
             {
                 StatusText = $"Error opening settings: {ex.Message}";
             }
-        }
-
-        [RelayCommand]
-        private void ToggleDownloadSettings()
-        {
-            ShowDownloadSettings = !ShowDownloadSettings;
         }
 
         private void SetupDownloadFolder()
@@ -363,11 +402,19 @@ namespace Symphex.ViewModels
             "--extract-audio",
             "--audio-format", "mp3",
             "--audio-quality", "0",
-            "--no-playlist",
-            "--embed-thumbnail",
-            "--add-metadata",
-            "-o", $"\"{filenameTemplate}\""
+            "--no-playlist"
         };
+
+                // Only embed thumbnail if user wants thumbnails
+                bool actuallySkipThumbnail = !SkipThumbnailDownload;
+                if (!actuallySkipThumbnail)
+                {
+                    argsList.Add("--embed-thumbnail");
+                }
+
+                argsList.Add("--add-metadata");
+                argsList.Add("-o");
+                argsList.Add($"\"{filenameTemplate}\"");
 
                 // Add FFmpeg location if available
                 if (!string.IsNullOrEmpty(FfmpegPath) && File.Exists(FfmpegPath))
@@ -573,7 +620,37 @@ namespace Symphex.ViewModels
                 InitializeDownloadService();
             }
 
-            return await _downloadService.ExtractMetadata(url);
+            return await _downloadService.ExtractMetadata(url, SelectedThumbnailSize, SkipThumbnailDownload);
+        }
+
+        private void UpdateArtworkSizeInfo()
+        {
+            if (CurrentTrack == null)
+            {
+                ArtworkSizeInfo = "";
+                return;
+            }
+
+            var artwork = CurrentTrack.AlbumArt ?? CurrentTrack.Thumbnail;
+            if (artwork != null)
+            {
+                int width = artwork.PixelSize.Width;
+                int height = artwork.PixelSize.Height;
+                string source = CurrentTrack.HasRealAlbumArt ? "Album Art" : "Thumbnail";
+                ArtworkSizeInfo = $"{source}: {width}x{height}px";
+            }
+            else if (!SkipThumbnailDownload && !EnableAlbumArtDownload)
+            {
+                ArtworkSizeInfo = "No artwork (all disabled)";
+            }
+            else if (!SkipThumbnailDownload)
+            {
+                ArtworkSizeInfo = "Thumbnail skipped";
+            }
+            else
+            {
+                ArtworkSizeInfo = "No artwork found";
+            }
         }
 
         private async Task ApplyProperMetadata()
@@ -652,6 +729,9 @@ namespace Symphex.ViewModels
                     ShowMetadata = true;
                     StatusText = $"Found: {CurrentTrack.Title} by {CurrentTrack.Artist}";
                     DownloadProgress = 15;
+
+                    // Show artwork size info
+                    UpdateArtworkSizeInfo();
                 }
                 else
                 {

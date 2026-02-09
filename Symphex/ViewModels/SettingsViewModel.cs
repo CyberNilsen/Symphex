@@ -3,6 +3,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
@@ -44,6 +45,42 @@ namespace Symphex.ViewModels
 
         [ObservableProperty]
         private double updateProgress = 0;
+
+        [ObservableProperty]
+        private bool enableAlbumArtDownload = true;
+
+        [ObservableProperty]
+        private bool skipThumbnailDownload = false;
+
+        [ObservableProperty]
+        private string selectedThumbnailSize = "Maximum Quality";
+
+        [ObservableProperty]
+        private List<string> thumbnailSizeOptions = new List<string>
+        {
+            "Maximum Quality",
+            "High Quality (1200x1200)",
+            "Medium Quality (600x600)",
+            "Low Quality (300x300)"
+        };
+
+        // Orange warning: Album art disabled but thumbnails enabled
+        public bool ShowAlbumArtDisabledWarning => !EnableAlbumArtDownload && SkipThumbnailDownload;
+
+        // Red warning: Both album art and thumbnails disabled
+        public bool ShowNoArtworkWarning => !EnableAlbumArtDownload && !SkipThumbnailDownload;
+
+        partial void OnEnableAlbumArtDownloadChanged(bool value)
+        {
+            OnPropertyChanged(nameof(ShowNoArtworkWarning));
+            OnPropertyChanged(nameof(ShowAlbumArtDisabledWarning));
+        }
+
+        partial void OnSkipThumbnailDownloadChanged(bool value)
+        {
+            OnPropertyChanged(nameof(ShowNoArtworkWarning));
+            OnPropertyChanged(nameof(ShowAlbumArtDisabledWarning));
+        }
 
         private string latestDownloadUrl = "";
         private string latestVersion = "";
