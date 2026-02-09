@@ -128,7 +128,7 @@
 								</ComboBox>
 
 								<StackPanel Spacing="6" Margin="0,6,0,0">
-									<TextBlock Text="💡 Maximum: Best available quality (usually 1920x1080+)"
+									<TextBlock Text="💡 Maximum: Best available quality (usually 1200x1200+)"
 											   FontSize="12"
 											   Foreground="#777777"
 											   TextWrapping="Wrap"/>
