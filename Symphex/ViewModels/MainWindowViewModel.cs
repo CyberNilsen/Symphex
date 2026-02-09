@@ -110,7 +110,7 @@ namespace Symphex.ViewModels
         private string selectedThumbnailSize = "Medium Quality (600x600)";
 
         [ObservableProperty]
-        private bool enableArtworkSelection = false; // Toggle for artwork selection feature
+        private bool enableArtworkSelection = true; // Default ON - let users choose artwork
 
         [ObservableProperty]
         private int artworkSelectionTimeout = 5; // 5 seconds gives users time

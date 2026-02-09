@@ -10,7 +10,7 @@ namespace Symphex.Services
         public bool EnableAlbumArtDownload { get; set; } = true;
         public bool SkipThumbnailDownload { get; set; } = true; // true = download thumbnails (inverted logic)
         public string SelectedThumbnailSize { get; set; } = "Medium Quality (600x600)";
-        public bool EnableArtworkSelection { get; set; } = false;
+        public bool EnableArtworkSelection { get; set; } = true; 
         public int ArtworkSelectionTimeout { get; set; } = 5;
     }
 
