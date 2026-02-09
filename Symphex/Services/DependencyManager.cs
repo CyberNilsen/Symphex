@@ -31,7 +31,7 @@ namespace Symphex.Services
                 // Check and auto-install FFmpeg
                 await SetupOrDownloadFfmpeg();
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // Silent fail - dependency setup is optional
             }
@@ -74,7 +74,7 @@ namespace Symphex.Services
                 // If not found, auto-download
                 await AutoDownloadYtDlp();
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 YtDlpPath = "";
             }
@@ -126,7 +126,7 @@ namespace Symphex.Services
                     await AutoDownloadFfmpeg();
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 FfmpegPath = "";
             }
@@ -213,7 +213,7 @@ namespace Symphex.Services
             {
                 await DownloadYtDlp();
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 YtDlpPath = "";
             }
@@ -225,7 +225,7 @@ namespace Symphex.Services
             {
                 await DownloadFfmpeg();
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 FfmpegPath = "";
             }

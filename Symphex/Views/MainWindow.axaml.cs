@@ -70,7 +70,7 @@ namespace Symphex.Views
             }
         }
 
-        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        private void MainWindow_Loaded(object? sender, RoutedEventArgs e)
         {
             var scrollViewer = this.FindControl<ScrollViewer>("CliOutput");
             if (DataContext is ViewModels.MainWindowViewModel viewModel)

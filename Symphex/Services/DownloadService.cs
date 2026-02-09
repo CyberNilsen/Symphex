@@ -292,8 +292,6 @@ namespace Symphex.Services
                     }
                     return trackInfo;
                 }
-
-                return trackInfo;
             }
             catch (System.ComponentModel.Win32Exception ex)
             {
@@ -1214,7 +1212,7 @@ namespace Symphex.Services
                 using var stream = new MemoryStream(imageBytes);
                 return new Bitmap(stream);
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return null;
             }
@@ -1310,7 +1308,7 @@ namespace Symphex.Services
             return $"{timeSpan:mm\\:ss}";
         }
 
-        private async Task<string> FindDownloadedFile(string ytDlpOutput, TrackInfo? trackInfo)
+        private Task<string> FindDownloadedFile(string ytDlpOutput, TrackInfo? trackInfo)
         {
             try
             {
@@ -1327,7 +1325,7 @@ namespace Symphex.Services
                     if (destinationLine.Contains("Destination: "))
                     {
                         int destinationIndex = destinationLine.IndexOf("Destination: ");
-                        return destinationLine.Substring(destinationIndex + "Destination: ".Length).Trim();
+                        return Task.FromResult(destinationLine.Substring(destinationIndex + "Destination: ".Length).Trim());
                     }
                 }
 
@@ -1341,7 +1339,7 @@ namespace Symphex.Services
 
                     if (recentFiles.Length > 0)
                     {
-                        return recentFiles[0];
+                        return Task.FromResult(recentFiles[0]);
                     }
                 }
 
@@ -1351,14 +1349,14 @@ namespace Symphex.Services
                     string cleanTitle = SanitizeFilename(trackInfo.Title);
                     string cleanArtist = SanitizeFilename(trackInfo.Artist);
                     string expectedFilename = $"{cleanArtist} - {cleanTitle}.mp3";
-                    return Path.Combine(_downloadFolder, expectedFilename);
+                    return Task.FromResult(Path.Combine(_downloadFolder, expectedFilename));
                 }
 
-                return "";
+                return Task.FromResult("");
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                return "";
+                return Task.FromResult("");
             }
         }
 

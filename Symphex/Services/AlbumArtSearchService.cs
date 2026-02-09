@@ -378,7 +378,7 @@ namespace Symphex.Services
                 trackInfo.AlbumArt = trackInfo.Thumbnail;
                 trackInfo.HasRealAlbumArt = false;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 trackInfo.AlbumArt = trackInfo.Thumbnail;
                 trackInfo.HasRealAlbumArt = false;
@@ -505,7 +505,7 @@ namespace Symphex.Services
 
                         foreach (var imageUrl in imageUrls.Where(url => !string.IsNullOrEmpty(url)))
                         {
-                            var albumArt = await LoadImageWithRetryAndValidation(imageUrl);
+                            var albumArt = await LoadImageWithRetryAndValidation(imageUrl!);
                             if (albumArt != null && IsHighQualityAlbumArt(albumArt))
                             {
                                 var metadata = ExtractITunesMetadata(match);
@@ -594,7 +594,7 @@ namespace Symphex.Services
 
                         foreach (var imageUrl in imageUrls.Where(url => !string.IsNullOrEmpty(url)))
                         {
-                            var albumArt = await LoadImageWithRetryAndValidation(imageUrl);
+                            var albumArt = await LoadImageWithRetryAndValidation(imageUrl!);
                             if (albumArt != null && IsHighQualityAlbumArt(albumArt))
                             {
                                 var metadata = ExtractDeezerMetadata(match);
@@ -729,7 +729,7 @@ namespace Symphex.Services
                                 {
                                     if (!release.TryGetProperty("id", out var releaseId)) continue;
 
-                                    string mbid = releaseId.GetString();
+                                    string mbid = releaseId.GetString() ?? "";
                                     if (string.IsNullOrEmpty(mbid)) continue;
 
                                     var coverResult = await GetCoverArtFromArchiveRobust(mbid);
@@ -780,7 +780,7 @@ namespace Symphex.Services
                     {
                         if (!release.TryGetProperty("cover_image", out var coverImage)) continue;
 
-                        string imageUrl = coverImage.GetString();
+                        string imageUrl = coverImage.GetString() ?? "";
                         if (string.IsNullOrEmpty(imageUrl)) continue;
 
                         var albumArt = await LoadImageWithRetryAndValidation(imageUrl);
@@ -926,7 +926,7 @@ namespace Symphex.Services
 
                         foreach (var imageUrl in imageUrls.Where(url => !string.IsNullOrEmpty(url)))
                         {
-                            var albumArt = await LoadImageWithRetryAndValidation(imageUrl, 2); // Reduced retries for batch
+                            var albumArt = await LoadImageWithRetryAndValidation(imageUrl!, 2); // Reduced retries for batch
                             if (albumArt != null && IsHighQualityAlbumArt(albumArt))
                             {
                                 var metadata = ExtractITunesMetadata(match);
@@ -985,7 +985,7 @@ namespace Symphex.Services
 
                         foreach (var imageUrl in imageUrls.Where(url => !string.IsNullOrEmpty(url)))
                         {
-                            var albumArt = await LoadImageWithRetryAndValidation(imageUrl, 2);
+                            var albumArt = await LoadImageWithRetryAndValidation(imageUrl!, 2);
                             if (albumArt != null && IsHighQualityAlbumArt(albumArt))
                             {
                                 var metadata = ExtractDeezerMetadata(match);
@@ -1038,7 +1038,7 @@ namespace Symphex.Services
                         {
                             if (!release.TryGetProperty("id", out var releaseId)) continue;
 
-                            string mbid = releaseId.GetString();
+                            string mbid = releaseId.GetString() ?? "";
                             if (string.IsNullOrEmpty(mbid)) continue;
 
                             var coverResult = await GetCoverArtFromArchiveRobustWithTimeout(mbid, cts.Token);
@@ -1092,7 +1092,7 @@ namespace Symphex.Services
                 {
                     if (!image.TryGetProperty("image", out var imageUrl)) continue;
 
-                    string artUrl = imageUrl.GetString();
+                    string artUrl = imageUrl.GetString() ?? "";
                     if (string.IsNullOrEmpty(artUrl)) continue;
 
                     var albumArt = await LoadImageWithRetryAndValidation(artUrl);
@@ -1172,7 +1172,7 @@ namespace Symphex.Services
                 {
                     if (!image.TryGetProperty("image", out var imageUrl)) continue;
 
-                    string artUrl = imageUrl.GetString();
+                    string artUrl = imageUrl.GetString() ?? "";
                     if (string.IsNullOrEmpty(artUrl)) continue;
 
                     var albumArt = await LoadImageWithRetryAndValidation(artUrl, 1);

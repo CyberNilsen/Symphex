@@ -844,7 +844,7 @@ namespace Symphex.ViewModels
                 InitializeDownloadService();
             }
 
-            return await _downloadService.ExtractMetadata(url, SelectedThumbnailSize, SkipThumbnailDownload);
+            return await _downloadService!.ExtractMetadata(url, SelectedThumbnailSize, SkipThumbnailDownload);
         }
 
         private void UpdateArtworkSizeInfo()
@@ -1161,7 +1161,7 @@ namespace Symphex.ViewModels
 
             try
             {
-                Interlocked.Increment(ref activeDownloads);
+                ActiveDownloads++;
                 CliOutput += $"[{DateTime.Now:HH:mm:ss}] Starting download {index + 1}: {url}\n";
 
                 await ProcessSingleUrlForBatch(url, index);
@@ -1175,7 +1175,7 @@ namespace Symphex.ViewModels
             }
             finally
             {
-                Interlocked.Decrement(ref activeDownloads);
+                ActiveDownloads--;
                 semaphore.Release();
             }
         }
@@ -1319,17 +1319,17 @@ namespace Symphex.ViewModels
                 InitializeDownloadService();
             }
 
-            return await _downloadService.ExtractMetadataWithAlbumArt(url, threadIndex);
+            return await _downloadService!.ExtractMetadataWithAlbumArt(url, threadIndex);
         }
 
-        private async Task RealDownloadForBatch(string url, TrackInfo trackInfo, int index)
+        private Task RealDownloadForBatch(string url, TrackInfo trackInfo, int index)
         {
             if (_downloadService == null)
             {
                 InitializeDownloadService();
             }
 
-            await _downloadService.DownloadForBatch(url, trackInfo, index);
+            return _downloadService!.DownloadForBatch(url, trackInfo, index);
         }
 
         // Helper method to copy track information
@@ -1376,9 +1376,9 @@ namespace Symphex.ViewModels
                         File.Delete(CurrentBatchFilePath);
                         CliOutput += $"Batch file deleted: {Path.GetFileName(CurrentBatchFilePath)}\n";
                     }
-                    catch (Exception deleteEx)
+                    catch (Exception)
                     {
-                        CliOutput += $"Could not delete batch file: {deleteEx.Message}\n";
+                        CliOutput += "Could not delete batch file\n";
                     }
                 }
 
@@ -1596,7 +1596,7 @@ namespace Symphex.ViewModels
             }
         }
 
-        private async Task<string> FindDownloadedFile(string ytDlpOutput)
+        private Task<string> FindDownloadedFile(string ytDlpOutput)
         {
             try
             {
@@ -1613,7 +1613,7 @@ namespace Symphex.ViewModels
                     if (destinationLine.Contains("Destination: "))
                     {
                         int destinationIndex = destinationLine.IndexOf("Destination: ");
-                        return destinationLine.Substring(destinationIndex + "Destination: ".Length).Trim();
+                        return Task.FromResult(destinationLine.Substring(destinationIndex + "Destination: ".Length).Trim());
                     }
                 }
 
@@ -1627,7 +1627,7 @@ namespace Symphex.ViewModels
 
                     if (recentFiles.Length > 0)
                     {
-                        return recentFiles[0];
+                        return Task.FromResult(recentFiles[0]);
                     }
                 }
 
@@ -1637,14 +1637,14 @@ namespace Symphex.ViewModels
                     string cleanTitle = SanitizeFilename(CurrentTrack.Title);
                     string cleanArtist = SanitizeFilename(CurrentTrack.Artist);
                     string expectedFilename = $"{cleanArtist} - {cleanTitle}.mp3";
-                    return Path.Combine(DownloadFolder, expectedFilename);
+                    return Task.FromResult(Path.Combine(DownloadFolder, expectedFilename));
                 }
 
-                return "";
+                return Task.FromResult("");
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                return "";
+                return Task.FromResult("");
             }
         }
 
@@ -1662,7 +1662,7 @@ namespace Symphex.ViewModels
                 await Task.Delay(5000);
                 IsToastVisible = false;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 // Fallback to status text if toast fails
                 StatusText = $"Successfully downloaded {filename} ({fileSize})";
@@ -1730,7 +1730,7 @@ namespace Symphex.ViewModels
                     StatusText = "Download completed but file not found. Check your download folder.";
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 StatusText = "Download completed but couldn't verify file details.";
             }
@@ -1861,7 +1861,7 @@ namespace Symphex.ViewModels
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
             }
         }
@@ -1895,7 +1895,7 @@ namespace Symphex.ViewModels
         }
 
         [RelayCommand]
-        private async void OpenFolder()
+        private async Task OpenFolderAsync()
         {
             try
             {
@@ -1925,18 +1925,21 @@ namespace Symphex.ViewModels
                         };
 
                         var process = Process.Start(psi);
-                        await process.WaitForExitAsync();
-
-                        if (process.ExitCode != 0)
+                        if (process != null)
                         {
-                            // If that failed, try method 2
-                            var psi2 = new ProcessStartInfo
+                            await process.WaitForExitAsync();
+
+                            if (process.ExitCode != 0)
                             {
-                                FileName = "/usr/bin/open",
-                                Arguments = DownloadFolder,
-                                UseShellExecute = true
-                            };
-                            Process.Start(psi2);
+                                // If that failed, try method 2
+                                var psi2 = new ProcessStartInfo
+                                {
+                                    FileName = "/usr/bin/open",
+                                    Arguments = DownloadFolder,
+                                    UseShellExecute = true
+                                };
+                                Process.Start(psi2);
+                            }
                         }
                     }
                     catch
