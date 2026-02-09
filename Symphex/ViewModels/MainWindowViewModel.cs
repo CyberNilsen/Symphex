@@ -159,6 +159,9 @@ namespace Symphex.ViewModels
             CurrentTrack = new TrackInfo();
             SetupDownloadFolder();
 
+            // Load saved settings
+            LoadUserSettings();
+
             // Initialize the album art search service
             albumArtSearchService = new AlbumArtSearchService(httpClient);
 
@@ -195,6 +198,7 @@ namespace Symphex.ViewModels
             {
                 _downloadService.UpdateAlbumArtSetting(value);
             }
+            SaveUserSettings();
         }
 
         partial void OnSkipThumbnailDownloadChanged(bool value)
@@ -203,6 +207,7 @@ namespace Symphex.ViewModels
             {
                 _downloadService.UpdateThumbnailSettings(value);
             }
+            SaveUserSettings();
         }
 
         partial void OnSelectedThumbnailSizeChanged(string value)
@@ -210,6 +215,58 @@ namespace Symphex.ViewModels
             if (_downloadService != null)
             {
                 _downloadService.UpdateThumbnailSize(value);
+            }
+            SaveUserSettings();
+        }
+
+        partial void OnEnableArtworkSelectionChanged(bool value)
+        {
+            SaveUserSettings();
+        }
+
+        partial void OnArtworkSelectionTimeoutChanged(int value)
+        {
+            SaveUserSettings();
+        }
+
+        private void LoadUserSettings()
+        {
+            try
+            {
+                var settings = SettingsService.LoadSettings();
+                
+                EnableAlbumArtDownload = settings.EnableAlbumArtDownload;
+                SkipThumbnailDownload = settings.SkipThumbnailDownload;
+                SelectedThumbnailSize = settings.SelectedThumbnailSize;
+                EnableArtworkSelection = settings.EnableArtworkSelection;
+                ArtworkSelectionTimeout = settings.ArtworkSelectionTimeout;
+
+                Debug.WriteLine("[MainWindowViewModel] User settings loaded");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindowViewModel] Error loading settings: {ex.Message}");
+            }
+        }
+
+        private void SaveUserSettings()
+        {
+            try
+            {
+                var settings = new UserSettings
+                {
+                    EnableAlbumArtDownload = this.EnableAlbumArtDownload,
+                    SkipThumbnailDownload = this.SkipThumbnailDownload,
+                    SelectedThumbnailSize = this.SelectedThumbnailSize,
+                    EnableArtworkSelection = this.EnableArtworkSelection,
+                    ArtworkSelectionTimeout = this.ArtworkSelectionTimeout
+                };
+
+                SettingsService.SaveSettings(settings);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindowViewModel] Error saving settings: {ex.Message}");
             }
         }
 
