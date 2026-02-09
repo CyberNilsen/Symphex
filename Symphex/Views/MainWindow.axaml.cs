@@ -101,5 +101,45 @@ namespace Symphex.Views
                 // and temporarily disable auto-scroll until they scroll back to bottom
             }
         }
+
+        private void OnArtworkOption1Tapped(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is ViewModels.MainWindowViewModel viewModel)
+            {
+                viewModel.SelectArtworkCommand.Execute(0);
+            }
+        }
+
+        private void OnArtworkOption2Tapped(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is ViewModels.MainWindowViewModel viewModel)
+            {
+                viewModel.SelectArtworkCommand.Execute(1);
+            }
+        }
+
+        private void OnArtworkOption3Tapped(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is ViewModels.MainWindowViewModel viewModel)
+            {
+                viewModel.SelectArtworkCommand.Execute(2);
+            }
+        }
+
+        private void OnArtworkOption4Tapped(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is ViewModels.MainWindowViewModel viewModel)
+            {
+                viewModel.SelectArtworkCommand.Execute(3);
+            }
+        }
+
+        private void OnSkipArtworkSelection(object sender, RoutedEventArgs e)
+        {
+            if (DataContext is ViewModels.MainWindowViewModel viewModel)
+            {
+                viewModel.SelectArtworkCommand.Execute(-1);
+            }
+        }
     }
 }

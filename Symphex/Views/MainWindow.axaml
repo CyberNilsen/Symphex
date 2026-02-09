@@ -311,5 +311,146 @@
 
 			</Grid>
 		</ScrollViewer>
+
+		<!-- Artwork Selection Overlay - True overlay with ZIndex -->
+		<Border Background="#EE000000" IsVisible="{Binding IsSelectingArtwork}"
+				ZIndex="999"
+				HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+			<StackPanel Spacing="16" VerticalAlignment="Center" HorizontalAlignment="Center">
+				<StackPanel Spacing="6" HorizontalAlignment="Center">
+					<TextBlock Text="🎨 Choose Your Artwork" FontSize="20" FontWeight="Bold"
+							   Foreground="White" HorizontalAlignment="Center"/>
+					<TextBlock Text="{Binding SelectionCountdown, StringFormat='Auto-selecting in {0}s...'}"
+							   FontSize="13" Foreground="#FFD700" HorizontalAlignment="Center"/>
+				</StackPanel>
+
+				<!-- 4 Artwork Options in 2x2 Grid -->
+				<Grid ColumnDefinitions="*,*" RowDefinitions="*,*" Width="380" Height="380">
+					<!-- Option 1 -->
+					<Border Grid.Row="0" Grid.Column="0" Margin="8" CornerRadius="10" 
+							Background="#2a2a2a" Cursor="Hand" ClipToBounds="True"
+							Tapped="OnArtworkOption1Tapped">
+						<Border.Styles>
+							<Style Selector="Border:pointerover">
+								<Setter Property="Background" Value="#3a3a3a"/>
+								<Setter Property="RenderTransform" Value="scale(1.05)"/>
+							</Style>
+						</Border.Styles>
+						<Grid>
+							<Image Source="{Binding ArtworkOptions[0]}" Stretch="UniformToFill"/>
+							<!-- Number badge -->
+							<Border Background="#3b82f6" Width="28" Height="28" CornerRadius="14"
+									VerticalAlignment="Top" HorizontalAlignment="Right" Margin="6">
+								<TextBlock Text="1" FontSize="18" FontWeight="Bold" Foreground="White"
+										   TextAlignment="Center" VerticalAlignment="Center"/>
+							</Border>
+							<!-- Resolution label -->
+							<Border Background="#000000AA" CornerRadius="6" Padding="8,4"
+									VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="6">
+								<TextBlock Text="{Binding ArtworkOptions[0].PixelSize, StringFormat='{}{0.Width}x{0.Height}'}"
+										   FontSize="11" FontWeight="SemiBold" Foreground="White"/>
+							</Border>
+						</Grid>
+					</Border>
+
+					<!-- Option 2 -->
+					<Border Grid.Row="0" Grid.Column="1" Margin="8" CornerRadius="10"
+							Background="#2a2a2a" Cursor="Hand" ClipToBounds="True"
+							Tapped="OnArtworkOption2Tapped">
+						<Border.Styles>
+							<Style Selector="Border:pointerover">
+								<Setter Property="Background" Value="#3a3a3a"/>
+								<Setter Property="RenderTransform" Value="scale(1.05)"/>
+							</Style>
+						</Border.Styles>
+						<Grid>
+							<Image Source="{Binding ArtworkOptions[1]}" Stretch="UniformToFill"/>
+							<Border Background="#3b82f6" Width="28" Height="28" CornerRadius="14"
+									VerticalAlignment="Top" HorizontalAlignment="Right" Margin="6">
+								<TextBlock Text="2" FontSize="18" FontWeight="Bold" Foreground="White"
+										   TextAlignment="Center" VerticalAlignment="Center"/>
+							</Border>
+							<Border Background="#000000AA" CornerRadius="6" Padding="8,4"
+									VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="6">
+								<TextBlock Text="{Binding ArtworkOptions[1].PixelSize, StringFormat='{}{0.Width}x{0.Height}'}"
+										   FontSize="11" FontWeight="SemiBold" Foreground="White"/>
+							</Border>
+						</Grid>
+					</Border>
+
+					<!-- Option 3 -->
+					<Border Grid.Row="1" Grid.Column="0" Margin="8" CornerRadius="10"
+							Background="#2a2a2a" Cursor="Hand" ClipToBounds="True"
+							Tapped="OnArtworkOption3Tapped">
+						<Border.Styles>
+							<Style Selector="Border:pointerover">
+								<Setter Property="Background" Value="#3a3a3a"/>
+								<Setter Property="RenderTransform" Value="scale(1.05)"/>
+							</Style>
+						</Border.Styles>
+						<Grid>
+							<Image Source="{Binding ArtworkOptions[2]}" Stretch="UniformToFill"/>
+							<Border Background="#3b82f6" Width="28" Height="28" CornerRadius="14"
+									VerticalAlignment="Top" HorizontalAlignment="Right" Margin="6">
+								<TextBlock Text="3" FontSize="18" FontWeight="Bold" Foreground="White"
+										   TextAlignment="Center" VerticalAlignment="Center"/>
+							</Border>
+							<Border Background="#000000AA" CornerRadius="6" Padding="8,4"
+									VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="6">
+								<TextBlock Text="{Binding ArtworkOptions[2].PixelSize, StringFormat='{}{0.Width}x{0.Height}'}"
+										   FontSize="11" FontWeight="SemiBold" Foreground="White"/>
+							</Border>
+						</Grid>
+					</Border>
+
+					<!-- Option 4 -->
+					<Border Grid.Row="1" Grid.Column="1" Margin="8" CornerRadius="10"
+							Background="#2a2a2a" Cursor="Hand" ClipToBounds="True"
+							Tapped="OnArtworkOption4Tapped">
+						<Border.Styles>
+							<Style Selector="Border:pointerover">
+								<Setter Property="Background" Value="#3a3a3a"/>
+								<Setter Property="RenderTransform" Value="scale(1.05)"/>
+							</Style>
+						</Border.Styles>
+						<Grid>
+							<Image Source="{Binding ArtworkOptions[3]}" Stretch="UniformToFill"/>
+							<Border Background="#3b82f6" Width="28" Height="28" CornerRadius="14"
+									VerticalAlignment="Top" HorizontalAlignment="Right" Margin="6">
+								<TextBlock Text="4" FontSize="18" FontWeight="Bold" Foreground="White"
+										   TextAlignment="Center" VerticalAlignment="Center"/>
+							</Border>
+							<Border Background="#000000AA" CornerRadius="6" Padding="8,4"
+									VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="6">
+								<TextBlock Text="{Binding ArtworkOptions[3].PixelSize, StringFormat='{}{0.Width}x{0.Height}'}"
+										   FontSize="11" FontWeight="SemiBold" Foreground="White"/>
+							</Border>
+						</Grid>
+					</Border>
+				</Grid>
+
+				<StackPanel Spacing="8" HorizontalAlignment="Center">
+					<TextBlock Text="💡 Click on an image to select it" FontSize="12" Foreground="#cccccc"
+							   HorizontalAlignment="Center"/>
+					<Button Content="⏭️ Skip &amp; Use Default" 
+							Tapped="OnSkipArtworkSelection"
+							Background="#444444" 
+							Foreground="White"
+							BorderThickness="0"
+							CornerRadius="8"
+							Padding="16,8"
+							FontSize="13"
+							Cursor="Hand"
+							HorizontalAlignment="Center">
+						<Button.Styles>
+							<Style Selector="Button:pointerover">
+								<Setter Property="Background" Value="#555555"/>
+							</Style>
+						</Button.Styles>
+					</Button>
+				</StackPanel>
+			</StackPanel>
+		</Border>
+
 	</Grid>
 </Window>

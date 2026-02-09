@@ -13,6 +13,7 @@ using Symphex.Models;
 using Symphex.Services;
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
@@ -107,6 +108,21 @@ namespace Symphex.ViewModels
 
         [ObservableProperty]
         private string selectedThumbnailSize = "Medium Quality (600x600)";
+
+        [ObservableProperty]
+        private bool enableArtworkSelection = false; // Toggle for artwork selection feature
+
+        [ObservableProperty]
+        private int artworkSelectionTimeout = 5; // 5 seconds gives users time
+
+        [ObservableProperty]
+        private bool isSelectingArtwork = false; // Currently showing artwork options
+
+        [ObservableProperty]
+        private int selectionCountdown = 0; // Countdown timer
+
+        private ObservableCollection<Bitmap?> artworkOptions = new ObservableCollection<Bitmap?>(); // 4 artwork options to display
+        public ObservableCollection<Bitmap?> ArtworkOptions => artworkOptions;
 
         [ObservableProperty]
         private List<string> thumbnailSizeOptions = new List<string>
@@ -206,7 +222,9 @@ namespace Symphex.ViewModels
                 {
                     EnableAlbumArtDownload = this.EnableAlbumArtDownload,
                     SkipThumbnailDownload = this.SkipThumbnailDownload,
-                    SelectedThumbnailSize = this.SelectedThumbnailSize
+                    SelectedThumbnailSize = this.SelectedThumbnailSize,
+                    EnableArtworkSelection = this.EnableArtworkSelection,
+                    ArtworkSelectionTimeout = this.ArtworkSelectionTimeout
                 };
 
                 var settingsWindow = new Symphex.Views.SettingsWindow
@@ -229,6 +247,8 @@ namespace Symphex.ViewModels
                                 this.EnableAlbumArtDownload = settingsViewModel.EnableAlbumArtDownload;
                                 this.SkipThumbnailDownload = settingsViewModel.SkipThumbnailDownload;
                                 this.SelectedThumbnailSize = settingsViewModel.SelectedThumbnailSize;
+                                this.EnableArtworkSelection = settingsViewModel.EnableArtworkSelection;
+                                this.ArtworkSelectionTimeout = settingsViewModel.ArtworkSelectionTimeout;
                             });
                         });
                         return;
@@ -241,6 +261,143 @@ namespace Symphex.ViewModels
             catch (Exception ex)
             {
                 StatusText = $"Error opening settings: {ex.Message}";
+            }
+        }
+
+        [RelayCommand]
+        private void SelectArtwork(int index)
+        {
+            try
+            {
+                // -1 means skip/use default
+                if (index == -1)
+                {
+                    Debug.WriteLine("[SelectArtwork] User skipped - using default");
+                }
+                else if (index >= 0 && index < ArtworkOptions.Count && ArtworkOptions[index] != null)
+                {
+                    // User selected this artwork
+                    if (CurrentTrack != null)
+                    {
+                        CurrentTrack.AlbumArt = ArtworkOptions[index];
+                        Debug.WriteLine($"[SelectArtwork] User selected artwork option {index + 1}");
+                    }
+                }
+
+                // Hide selection overlay
+                IsSelectingArtwork = false;
+                SelectionCountdown = 0;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[SelectArtwork] Error: {ex.Message}");
+            }
+        }
+
+        private async Task ShowArtworkSelectionDialog()
+        {
+            try
+            {
+                // Clear and prepare 4 artwork options
+                ArtworkOptions.Clear();
+                
+                Debug.WriteLine($"[ShowArtworkSelectionDialog] Starting - Album Art: {CurrentTrack?.AlbumArt != null}, Thumbnail: {CurrentTrack?.Thumbnail != null}");
+                Debug.WriteLine($"[ShowArtworkSelectionDialog] Available thumbnails: {CurrentTrack?.AvailableThumbnails?.Count ?? 0}");
+                
+                // Option 1: Album art (if available), otherwise thumbnail
+                var option1 = CurrentTrack?.AlbumArt ?? CurrentTrack?.Thumbnail;
+                ArtworkOptions.Add(option1);
+                Debug.WriteLine($"[ShowArtworkSelectionDialog] Option 1: {(option1 != null ? $"{option1.PixelSize.Width}x{option1.PixelSize.Height}" : "null")}");
+                
+                // Option 2: Thumbnail (if different from album art)
+                if (CurrentTrack?.Thumbnail != null && CurrentTrack.Thumbnail != CurrentTrack.AlbumArt)
+                {
+                    ArtworkOptions.Add(CurrentTrack.Thumbnail);
+                    Debug.WriteLine($"[ShowArtworkSelectionDialog] Option 2: Thumbnail {CurrentTrack.Thumbnail.PixelSize.Width}x{CurrentTrack.Thumbnail.PixelSize.Height}");
+                }
+                else
+                {
+                    ArtworkOptions.Add(null);
+                    Debug.WriteLine("[ShowArtworkSelectionDialog] Option 2: null (no separate thumbnail)");
+                }
+                
+                // Options 3-4: Try to load different quality thumbnails from available list
+                if (CurrentTrack?.AvailableThumbnails != null && CurrentTrack.AvailableThumbnails.Count > 0)
+                {
+                    var thumbnails = CurrentTrack.AvailableThumbnails.OrderByDescending(t => t.Width).ToList();
+                    Debug.WriteLine($"[ShowArtworkSelectionDialog] Found {thumbnails.Count} available thumbnails");
+                    
+                    int loaded = 0;
+                    for (int i = 0; i < thumbnails.Count && loaded < 2; i++)
+                    {
+                        try
+                        {
+                            Debug.WriteLine($"[ShowArtworkSelectionDialog] Loading thumbnail {i + 1}: {thumbnails[i].Url}");
+                            var bitmap = await LoadImageAsync(thumbnails[i].Url);
+                            if (bitmap != null)
+                            {
+                                ArtworkOptions.Add(bitmap);
+                                Debug.WriteLine($"[ShowArtworkSelectionDialog] Option {ArtworkOptions.Count}: {bitmap.PixelSize.Width}x{bitmap.PixelSize.Height}");
+                                loaded++;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[ShowArtworkSelectionDialog] Failed to load thumbnail {i + 1}: {ex.Message}");
+                        }
+                    }
+                }
+                
+                // Fill remaining slots with nulls
+                while (ArtworkOptions.Count < 4)
+                {
+                    ArtworkOptions.Add(null);
+                    Debug.WriteLine($"[ShowArtworkSelectionDialog] Option {ArtworkOptions.Count}: null (filler)");
+                }
+
+                Debug.WriteLine($"[ShowArtworkSelectionDialog] Total options prepared: {ArtworkOptions.Count}");
+
+                // Show the selection overlay
+                IsSelectingArtwork = true;
+                SelectionCountdown = ArtworkSelectionTimeout;
+
+                // Start countdown timer
+                for (int i = ArtworkSelectionTimeout; i > 0; i--)
+                {
+                    if (!IsSelectingArtwork) break; // User made a selection
+                    
+                    SelectionCountdown = i;
+                    await Task.Delay(1000);
+                }
+
+                // Auto-select first option if user didn't choose
+                if (IsSelectingArtwork)
+                {
+                    Debug.WriteLine("[ShowArtworkSelectionDialog] Timeout - auto-selecting first option");
+                    IsSelectingArtwork = false;
+                    SelectionCountdown = 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ShowArtworkSelectionDialog] Error: {ex.Message}");
+                Debug.WriteLine($"[ShowArtworkSelectionDialog] Stack trace: {ex.StackTrace}");
+                IsSelectingArtwork = false;
+            }
+        }
+
+        private async Task<Bitmap?> LoadImageAsync(string url)
+        {
+            try
+            {
+                using var httpClient = new HttpClient();
+                var imageBytes = await httpClient.GetByteArrayAsync(url);
+                using var stream = new MemoryStream(imageBytes);
+                return new Bitmap(stream);
+            }
+            catch
+            {
+                return null;
             }
         }
 
@@ -732,6 +889,12 @@ namespace Symphex.ViewModels
 
                     // Show artwork size info
                     UpdateArtworkSizeInfo();
+
+                    // Show artwork selection if enabled
+                    if (EnableArtworkSelection && CurrentTrack.AvailableThumbnails != null && CurrentTrack.AvailableThumbnails.Count > 0)
+                    {
+                        await ShowArtworkSelectionDialog();
+                    }
                 }
                 else
                 {

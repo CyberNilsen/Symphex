@@ -197,6 +197,38 @@
 							</StackPanel>
 						</Border>
 
+						<!-- Artwork Selection Feature -->
+						<Border Background="#1a1a1a" CornerRadius="10" Padding="20">
+							<StackPanel Spacing="14">
+								<TextBlock Text="🖼️ Manual Artwork Selection"
+										   FontSize="15"
+										   FontWeight="SemiBold"
+										   Foreground="#ffffff"/>
+
+								<CheckBox IsChecked="{Binding EnableArtworkSelection}"
+										  FontSize="14"
+										  Foreground="#ffffff">
+									<TextBlock Text="Let me choose artwork before download"
+											   Foreground="#ffffff"/>
+								</CheckBox>
+
+								<StackPanel Spacing="8" Margin="32,4,0,0">
+									<TextBlock Text="✨ Shows 4 artwork options to choose from"
+											   FontSize="13"
+											   Foreground="#999999"
+											   TextWrapping="Wrap"/>
+									<TextBlock Text="⏱️ Auto-selects default after 5 seconds if no choice made"
+											   FontSize="13"
+											   Foreground="#999999"
+											   TextWrapping="Wrap"/>
+									<TextBlock Text="🎯 Click on your preferred artwork to select it"
+											   FontSize="13"
+											   Foreground="#999999"
+											   TextWrapping="Wrap"/>
+								</StackPanel>
+							</StackPanel>
+						</Border>
+
 						<!-- Warning when album art disabled but thumbnails enabled -->
 						<Border Background="#8B4513" CornerRadius="10" Padding="16"
 								IsVisible="{Binding ShowAlbumArtDisabledWarning}">
