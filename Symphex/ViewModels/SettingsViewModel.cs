@@ -61,6 +61,8 @@ namespace Symphex.ViewModels
         [ObservableProperty]
         private int artworkSelectionTimeout = 5; // 5 seconds gives users time to decide
 
+        public IRelayCommand? BackCommand { get; set; }
+
         [ObservableProperty]
         private List<string> thumbnailSizeOptions = new List<string>
         {

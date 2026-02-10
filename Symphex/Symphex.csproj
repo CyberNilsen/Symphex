@@ -46,6 +46,7 @@
 		<PackageReference Include="Avalonia.Desktop" Version="11.3.10" />
 		<PackageReference Include="Avalonia.Themes.Fluent" Version="11.3.10" />
 		<PackageReference Include="Avalonia.Fonts.Inter" Version="11.3.10" />
+		<PackageReference Include="Material.Icons.Avalonia" Version="2.1.10" />
 		<PackageReference Include="Avalonia.Diagnostics" Version="11.3.10">
 			<IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
 			<PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>

@@ -143,6 +143,12 @@ namespace Symphex.ViewModels
         [ObservableProperty]
         private string artworkSizeInfo = "";
 
+        [ObservableProperty]
+        private object? currentView;
+
+        [ObservableProperty]
+        private bool isSettingsView = false;
+
         private readonly HttpClient httpClient = new();
 
         private readonly DependencyManager dependencyManager = new();
@@ -271,7 +277,7 @@ namespace Symphex.ViewModels
         }
 
         [RelayCommand]
-        private void OpenSettings()
+        private void NavigateToSettings()
         {
             try
             {
@@ -284,40 +290,39 @@ namespace Symphex.ViewModels
                     ArtworkSelectionTimeout = this.ArtworkSelectionTimeout
                 };
 
-                var settingsWindow = new Symphex.Views.SettingsWindow
-                {
-                    DataContext = settingsViewModel,
-                    WindowStartupLocation = WindowStartupLocation.CenterOwner
-                };
+                // Set up back command
+                settingsViewModel.BackCommand = new RelayCommand(NavigateToHome);
 
-                // Try to set owner if possible
-                if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-                {
-                    var mainWindow = desktop.MainWindow;
-                    if (mainWindow != null)
-                    {
-                        settingsWindow.ShowDialog(mainWindow).ContinueWith(t =>
-                        {
-                            // Copy settings back after dialog closes
-                            Dispatcher.UIThread.Post(() =>
-                            {
-                                this.EnableAlbumArtDownload = settingsViewModel.EnableAlbumArtDownload;
-                                this.SkipThumbnailDownload = settingsViewModel.SkipThumbnailDownload;
-                                this.SelectedThumbnailSize = settingsViewModel.SelectedThumbnailSize;
-                                this.EnableArtworkSelection = settingsViewModel.EnableArtworkSelection;
-                                this.ArtworkSelectionTimeout = settingsViewModel.ArtworkSelectionTimeout;
-                            });
-                        });
-                        return;
-                    }
-                }
-
-                // Fallback: show without owner
-                settingsWindow.Show();
+                CurrentView = settingsViewModel;
+                IsSettingsView = true;
             }
             catch (Exception ex)
             {
                 StatusText = $"Error opening settings: {ex.Message}";
+            }
+        }
+
+        [RelayCommand]
+        private void NavigateToHome()
+        {
+            try
+            {
+                // Copy settings back from the settings view model
+                if (CurrentView is SettingsViewModel settingsViewModel)
+                {
+                    this.EnableAlbumArtDownload = settingsViewModel.EnableAlbumArtDownload;
+                    this.SkipThumbnailDownload = settingsViewModel.SkipThumbnailDownload;
+                    this.SelectedThumbnailSize = settingsViewModel.SelectedThumbnailSize;
+                    this.EnableArtworkSelection = settingsViewModel.EnableArtworkSelection;
+                    this.ArtworkSelectionTimeout = settingsViewModel.ArtworkSelectionTimeout;
+                }
+
+                CurrentView = null;
+                IsSettingsView = false;
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"Error navigating home: {ex.Message}";
             }
         }
 

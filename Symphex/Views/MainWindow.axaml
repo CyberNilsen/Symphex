@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
 		xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
 		xmlns:vm="using:Symphex.ViewModels"
+		xmlns:views="using:Symphex.Views"
 		xmlns:converters="using:Symphex.Converters"
 		xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
 		xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -118,6 +119,43 @@
 
 	<Grid>
 		
+		<!-- Settings Gear Icon Button - Top Right -->
+		<Button HorizontalAlignment="Right" VerticalAlignment="Top"
+				Margin="20"
+				Width="50" Height="50"
+				Background="#1a1a1a"
+				BorderThickness="2"
+				BorderBrush="#404040"
+				CornerRadius="25"
+				Cursor="Hand"
+				ZIndex="100"
+				Command="{Binding NavigateToSettingsCommand}"
+				IsVisible="{Binding !IsSettingsView}">
+			<Button.Styles>
+				<Style Selector="Button:pointerover">
+					<Setter Property="Background" Value="#2a2a2a"/>
+					<Setter Property="BorderBrush" Value="#606060"/>
+					<Setter Property="RenderTransform" Value="scale(1.1) rotate(90deg)"/>
+				</Style>
+				<Style Selector="Button:pressed">
+					<Setter Property="RenderTransform" Value="scale(0.95)"/>
+				</Style>
+			</Button.Styles>
+			<TextBlock Text="⚙️" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+		</Button>
+
+		<!-- Content Area with Navigation -->
+		<ContentControl Content="{Binding CurrentView}">
+			<ContentControl.DataTemplates>
+				<DataTemplate DataType="vm:SettingsViewModel">
+					<views:SettingsView/>
+				</DataTemplate>
+			</ContentControl.DataTemplates>
+		</ContentControl>
+
+		<!-- Main Download View (shown when CurrentView is null) -->
+		<Grid IsVisible="{Binding CurrentView, Converter={x:Static ObjectConverters.IsNull}}">
+		
 		<Border IsVisible="{Binding IsToastVisible}"
 				HorizontalAlignment="Center"
 				VerticalAlignment="Top"
@@ -225,7 +263,6 @@
 									<Button Content="Clear" Command="{Binding ClearCommand}" Classes="simple"/>
 									<Button Content="📁 Open Downloads" Command="{Binding OpenFolderCommand}" Classes="simple"/>
 								</StackPanel>
-								<Button Content="⚙️ Settings" Command="{Binding OpenSettingsCommand}" Classes="simple" HorizontalAlignment="Center"/>
 							</StackPanel>
 						</StackPanel>
 					</Border>
@@ -474,6 +511,9 @@
 				</StackPanel>
 			</StackPanel>
 		</Border>
+
+		</Grid>
+		<!-- End of Main Download View -->
 
 	</Grid>
 </Window>

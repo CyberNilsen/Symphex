@@ -1,0 +1,431 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Symphex.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="700"
+             x:Class="Symphex.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+
+	<Design.DataContext>
+		<vm:SettingsViewModel/>
+	</Design.DataContext>
+
+	<UserControl.Styles>
+		<Style Selector="Button.primary">
+			<Setter Property="Background" Value="#3b82f6"/>
+			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="CornerRadius" Value="10"/>
+			<Setter Property="Padding" Value="20,12"/>
+			<Setter Property="FontWeight" Value="Bold"/>
+			<Setter Property="FontSize" Value="14"/>
+			<Setter Property="Cursor" Value="Hand"/>
+			<Setter Property="Effect">
+				<DropShadowEffect Color="#3b82f6" Opacity="0.4" BlurRadius="20" OffsetX="0" OffsetY="4"/>
+			</Setter>
+		</Style>
+		<Style Selector="Button.primary:pointerover">
+			<Setter Property="Background" Value="#2563eb"/>
+			<Setter Property="RenderTransform" Value="scale(1.02)"/>
+		</Style>
+		<Style Selector="Button.primary:pressed">
+			<Setter Property="RenderTransform" Value="scale(0.98)"/>
+		</Style>
+
+		<Style Selector="Border.setting-card">
+			<Setter Property="Background">
+				<LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+					<GradientStop Color="#1a1a1a" Offset="0"/>
+					<GradientStop Color="#151515" Offset="1"/>
+				</LinearGradientBrush>
+			</Setter>
+			<Setter Property="CornerRadius" Value="16"/>
+			<Setter Property="Padding" Value="24"/>
+			<Setter Property="Effect">
+				<DropShadowEffect Color="Black" Opacity="0.5" BlurRadius="20" OffsetX="0" OffsetY="4"/>
+			</Setter>
+		</Style>
+
+		<Style Selector="CheckBox">
+			<Setter Property="Foreground" Value="#ffffff"/>
+			<Setter Property="FontSize" Value="14"/>
+		</Style>
+
+		<Style Selector="ComboBox">
+			<Setter Property="Background" Value="#0a0a0a"/>
+			<Setter Property="Foreground" Value="#ffffff"/>
+			<Setter Property="BorderBrush" Value="#3b82f6"/>
+			<Setter Property="BorderThickness" Value="2"/>
+			<Setter Property="CornerRadius" Value="10"/>
+			<Setter Property="Padding" Value="16,12"/>
+			<Setter Property="FontSize" Value="14"/>
+		</Style>
+
+		<Style Selector="TabControl">
+			<Setter Property="Background" Value="Transparent"/>
+		</Style>
+		
+		<Style Selector="TabItem">
+			<Setter Property="FontSize" Value="15"/>
+			<Setter Property="FontWeight" Value="SemiBold"/>
+			<Setter Property="Foreground" Value="#666666"/>
+			<Setter Property="Padding" Value="24,14"/>
+			<Setter Property="Margin" Value="0,0,8,0"/>
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="BorderThickness" Value="0"/>
+		</Style>
+		
+		<Style Selector="TabItem:selected">
+			<Setter Property="Foreground" Value="#3b82f6"/>
+			<Setter Property="Background">
+				<LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+					<GradientStop Color="#1a1a1a" Offset="0"/>
+					<GradientStop Color="#151515" Offset="1"/>
+				</LinearGradientBrush>
+			</Setter>
+			<Setter Property="CornerRadius" Value="12,12,0,0"/>
+		</Style>
+		
+		<Style Selector="TabItem:pointerover /template/ ContentPresenter">
+			<Setter Property="Background" Value="#0f0f0f"/>
+			<Setter Property="CornerRadius" Value="12,12,0,0"/>
+		</Style>
+
+		<Style Selector="ProgressBar">
+			<Setter Property="Background" Value="#1a1a1a"/>
+			<Setter Property="Foreground" Value="#3b82f6"/>
+			<Setter Property="CornerRadius" Value="8"/>
+			<Setter Property="Height" Value="8"/>
+		</Style>
+	</UserControl.Styles>
+
+	<Grid Margin="0" Background="#000000">
+		<Grid.RowDefinitions>
+			<RowDefinition Height="Auto"/>
+			<RowDefinition Height="*"/>
+		</Grid.RowDefinitions>
+
+		<!-- Modern Header -->
+		<Border Grid.Row="0" Background="#0a0a0a" Padding="20,15" BorderBrush="#1a1a1a" BorderThickness="0,0,0,1">
+			<Grid>
+				<Grid.ColumnDefinitions>
+					<ColumnDefinition Width="*"/>
+					<ColumnDefinition Width="Auto"/>
+				</Grid.ColumnDefinitions>
+
+				<!-- Title -->
+				<StackPanel Grid.Column="0" HorizontalAlignment="Center" VerticalAlignment="Center">
+					<TextBlock Text="Settings" FontSize="24" FontWeight="Bold" Foreground="#ffffff"/>
+					<TextBlock Text="Customize your download experience" FontSize="12" Foreground="#666666" HorizontalAlignment="Center"/>
+				</StackPanel>
+
+				<!-- Back Button - Right Side -->
+				<Button Grid.Column="1" 
+						Command="{Binding BackCommand}"
+						Background="Transparent"
+						BorderThickness="0"
+						Padding="0"
+						Cursor="Hand"
+						VerticalAlignment="Center">
+					<StackPanel Orientation="Horizontal" Spacing="10">
+						<TextBlock Text="Back" FontSize="14" Foreground="#3b82f6" FontWeight="SemiBold" VerticalAlignment="Center"/>
+						<Border Width="36" Height="36" CornerRadius="18" Background="#1a1a1a">
+							<materialIcons:MaterialIcon Kind="Close" Width="20" Height="20" Foreground="#3b82f6"/>
+						</Border>
+					</StackPanel>
+				</Button>
+			</Grid>
+		</Border>
+
+		<!-- Tabbed Content -->
+		<TabControl Grid.Row="1" Margin="0">
+			
+			<!-- General Tab -->
+			<TabItem>
+				<TabItem.Header>
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<materialIcons:MaterialIcon Kind="Cog" Width="18" Height="18"/>
+						<TextBlock Text="General" FontSize="14" FontWeight="SemiBold"/>
+					</StackPanel>
+				</TabItem.Header>
+				
+				<ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="20,10,20,20">
+					<StackPanel Spacing="16" MaxWidth="750" HorizontalAlignment="Center">
+						
+						<!-- Artwork Quality Card -->
+						<Border Classes="setting-card">
+							<StackPanel Spacing="16">
+								<StackPanel Orientation="Horizontal" Spacing="12">
+									<Border Width="48" Height="48" CornerRadius="12" Background="#3b82f6">
+										<materialIcons:MaterialIcon Kind="ImageOutline" Width="28" Height="28" Foreground="White"/>
+									</Border>
+									<StackPanel VerticalAlignment="Center">
+										<TextBlock Text="Artwork Quality" FontSize="18" FontWeight="Bold" Foreground="#ffffff"/>
+										<TextBlock Text="Choose image resolution for downloads" FontSize="13" Foreground="#888888"/>
+									</StackPanel>
+								</StackPanel>
+
+								<ComboBox SelectedItem="{Binding SelectedThumbnailSize}"
+										  ItemsSource="{Binding ThumbnailSizeOptions}"
+										  HorizontalAlignment="Stretch"
+										  FontSize="14"/>
+
+								<Border Background="#0a0a0a" CornerRadius="10" Padding="16">
+									<StackPanel Spacing="8">
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<materialIcons:MaterialIcon Kind="ChevronDoubleUp" Width="14" Height="14" Foreground="#f59e0b"/>
+											<TextBlock Text="Maximum: Best quality (1200x1200+)" FontSize="12" Foreground="#999999"/>
+										</StackPanel>
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<materialIcons:MaterialIcon Kind="Check" Width="14" Height="14" Foreground="#3b82f6"/>
+											<TextBlock Text="Medium: Recommended (600x600)" FontSize="12" Foreground="#999999"/>
+										</StackPanel>
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<materialIcons:MaterialIcon Kind="ChevronDoubleDown" Width="14" Height="14" Foreground="#10b981"/>
+											<TextBlock Text="Low: Smallest size (300x300)" FontSize="12" Foreground="#999999"/>
+										</StackPanel>
+									</StackPanel>
+								</Border>
+							</StackPanel>
+						</Border>
+
+						<!-- Album Art Card -->
+						<Border Classes="setting-card">
+							<StackPanel Spacing="16">
+								<StackPanel Orientation="Horizontal" Spacing="12">
+									<Border Width="48" Height="48" CornerRadius="12" Background="#10b981">
+										<materialIcons:MaterialIcon Kind="MusicBox" Width="28" Height="28" Foreground="White"/>
+									</Border>
+									<StackPanel VerticalAlignment="Center">
+										<TextBlock Text="Album Artwork" FontSize="18" FontWeight="Bold" Foreground="#ffffff"/>
+										<TextBlock Text="Search for official cover art" FontSize="13" Foreground="#888888"/>
+									</StackPanel>
+								</StackPanel>
+
+								<CheckBox IsChecked="{Binding EnableAlbumArtDownload}">
+									<TextBlock Text="Download high-quality album artwork" FontWeight="SemiBold" Foreground="#ffffff"/>
+								</CheckBox>
+
+								<Border Background="#0a0a0a" CornerRadius="10" Padding="16">
+									<StackPanel Spacing="8">
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<materialIcons:MaterialIcon Kind="Check" Width="14" Height="14" Foreground="#10b981"/>
+											<TextBlock Text="Searches iTunes, Deezer, and MusicBrainz" FontSize="12" Foreground="#999999"/>
+										</StackPanel>
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<materialIcons:MaterialIcon Kind="Flash" Width="14" Height="14" Foreground="#f59e0b"/>
+											<TextBlock Text="Disabling speeds up downloads" FontSize="12" Foreground="#999999"/>
+										</StackPanel>
+									</StackPanel>
+								</Border>
+							</StackPanel>
+						</Border>
+
+						<!-- Thumbnail Card -->
+						<Border Classes="setting-card">
+							<StackPanel Spacing="16">
+								<StackPanel Orientation="Horizontal" Spacing="12">
+									<Border Width="48" Height="48" CornerRadius="12" Background="#8b5cf6">
+										<materialIcons:MaterialIcon Kind="Video" Width="28" Height="28" Foreground="White"/>
+									</Border>
+									<StackPanel VerticalAlignment="Center">
+										<TextBlock Text="Video Thumbnails" FontSize="18" FontWeight="Bold" Foreground="#ffffff"/>
+										<TextBlock Text="Fallback when album art unavailable" FontSize="13" Foreground="#888888"/>
+									</StackPanel>
+								</StackPanel>
+
+								<CheckBox IsChecked="{Binding SkipThumbnailDownload}">
+									<TextBlock Text="Download video thumbnails as fallback" Foreground="#ffffff"/>
+								</CheckBox>
+
+								<Border Background="#0a0a0a" CornerRadius="10" Padding="16">
+									<StackPanel Orientation="Horizontal" Spacing="8">
+										<materialIcons:MaterialIcon Kind="Information" Width="14" Height="14" Foreground="#f59e0b"/>
+										<TextBlock Text="Uncheck to skip thumbnails (fastest, but no pictures if album art fails)" 
+												   FontSize="12" Foreground="#999999" TextWrapping="Wrap"/>
+									</StackPanel>
+								</Border>
+							</StackPanel>
+						</Border>
+
+						<!-- Warnings -->
+						<Border Background="#8B4513" CornerRadius="12" Padding="20"
+								IsVisible="{Binding ShowAlbumArtDisabledWarning}">
+							<StackPanel Orientation="Horizontal" Spacing="16">
+								<Border Width="48" Height="48" CornerRadius="24" Background="#FFFFFF20">
+									<materialIcons:MaterialIcon Kind="Alert" Width="28" Height="28" Foreground="White"/>
+								</Border>
+								<StackPanel VerticalAlignment="Center">
+									<TextBlock Text="Album Art Disabled" FontSize="16" FontWeight="Bold" Foreground="White"/>
+									<TextBlock Text="Only video thumbnails will be used (lower quality)" FontSize="13" Foreground="#FFE4B5"/>
+								</StackPanel>
+							</StackPanel>
+						</Border>
+
+						<Border Background="#DC143C" CornerRadius="12" Padding="20"
+								IsVisible="{Binding ShowNoArtworkWarning}">
+							<StackPanel Orientation="Horizontal" Spacing="16">
+								<Border Width="48" Height="48" CornerRadius="24" Background="#FFFFFF20">
+									<materialIcons:MaterialIcon Kind="Close" Width="28" Height="28" Foreground="White"/>
+								</Border>
+								<StackPanel VerticalAlignment="Center">
+									<TextBlock Text="No Artwork Enabled" FontSize="16" FontWeight="Bold" Foreground="White"/>
+									<TextBlock Text="Files will have no pictures" FontSize="13" Foreground="#FFE4E1"/>
+								</StackPanel>
+							</StackPanel>
+						</Border>
+
+						<!-- Bottom spacer to ensure scrolling works -->
+						<Border Height="100" Background="Transparent"/>
+
+					</StackPanel>
+				</ScrollViewer>
+			</TabItem>
+
+			<!-- Advanced Tab -->
+			<TabItem>
+				<TabItem.Header>
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<materialIcons:MaterialIcon Kind="Wrench" Width="18" Height="18"/>
+						<TextBlock Text="Advanced" FontSize="14" FontWeight="SemiBold"/>
+					</StackPanel>
+				</TabItem.Header>
+				
+				<ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="20,10,20,20">
+					<StackPanel Spacing="16" MaxWidth="750" HorizontalAlignment="Center">
+						
+						<!-- Manual Selection Card -->
+						<Border Classes="setting-card">
+							<StackPanel Spacing="16">
+								<StackPanel Orientation="Horizontal" Spacing="12">
+									<Border Width="48" Height="48" CornerRadius="12" Background="#f59e0b">
+										<materialIcons:MaterialIcon Kind="ViewGrid" Width="28" Height="28" Foreground="White"/>
+									</Border>
+									<StackPanel VerticalAlignment="Center">
+										<TextBlock Text="Manual Artwork Selection" FontSize="18" FontWeight="Bold" Foreground="#ffffff"/>
+										<TextBlock Text="Choose your preferred artwork" FontSize="13" Foreground="#888888"/>
+									</StackPanel>
+								</StackPanel>
+
+								<CheckBox IsChecked="{Binding EnableArtworkSelection}">
+									<TextBlock Text="Let me choose artwork before download" FontWeight="SemiBold" Foreground="#ffffff"/>
+								</CheckBox>
+
+								<Border Background="#0a0a0a" CornerRadius="10" Padding="16">
+									<StackPanel Spacing="10">
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<materialIcons:MaterialIcon Kind="ViewGrid" Width="16" Height="16" Foreground="#f59e0b"/>
+											<TextBlock Text="Shows 4 artwork options to choose from" FontSize="12" Foreground="#999999"/>
+										</StackPanel>
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<materialIcons:MaterialIcon Kind="Clock" Width="16" Height="16" Foreground="#3b82f6"/>
+											<TextBlock Text="Auto-selects after 5 seconds" FontSize="12" Foreground="#999999"/>
+										</StackPanel>
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<materialIcons:MaterialIcon Kind="CursorPointer" Width="16" Height="16" Foreground="#10b981"/>
+											<TextBlock Text="Click to select your favorite" FontSize="12" Foreground="#999999"/>
+										</StackPanel>
+									</StackPanel>
+								</Border>
+							</StackPanel>
+						</Border>
+
+					</StackPanel>
+				</ScrollViewer>
+			</TabItem>
+
+			<!-- Updates Tab -->
+			<TabItem>
+				<TabItem.Header>
+					<StackPanel Orientation="Horizontal" Spacing="8">
+						<materialIcons:MaterialIcon Kind="Download" Width="18" Height="18"/>
+						<TextBlock Text="Updates" FontSize="14" FontWeight="SemiBold"/>
+					</StackPanel>
+				</TabItem.Header>
+				
+				<ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Padding="20,10,20,20">
+					<StackPanel Spacing="16" MaxWidth="750" HorizontalAlignment="Center">
+						
+						<!-- Update Card -->
+						<Border Classes="setting-card">
+							<StackPanel Spacing="20">
+								<StackPanel Orientation="Horizontal" Spacing="12">
+									<Border Width="48" Height="48" CornerRadius="12" Background="#06b6d4">
+										<materialIcons:MaterialIcon Kind="CloudDownload" Width="28" Height="28" Foreground="White"/>
+									</Border>
+									<StackPanel VerticalAlignment="Center">
+										<TextBlock Text="Application Updates" FontSize="18" FontWeight="Bold" Foreground="#ffffff"/>
+										<TextBlock Text="Keep your app up to date" FontSize="13" Foreground="#888888"/>
+									</StackPanel>
+								</StackPanel>
+
+								<Border Background="#0a0a0a" CornerRadius="10" Padding="20">
+									<StackPanel Spacing="12">
+										<TextBlock Text="{Binding CurrentVersionText}" FontSize="14" Foreground="#cccccc" HorizontalAlignment="Center"/>
+										<TextBlock Text="{Binding UpdateStatusText}" FontSize="12" Foreground="#888888" 
+												   HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
+									</StackPanel>
+								</Border>
+
+								<Button Content="Check for Updates"
+										Command="{Binding CheckForUpdatesCommand}"
+										Classes="primary"
+										IsEnabled="{Binding !IsCheckingForUpdates}"
+										HorizontalAlignment="Center"/>
+
+								<!-- Checking Progress -->
+								<StackPanel Spacing="12" IsVisible="{Binding IsCheckingForUpdates}">
+									<TextBlock Text="Checking for updates..." FontSize="13" Foreground="#888888" HorizontalAlignment="Center"/>
+									<ProgressBar IsIndeterminate="True"/>
+								</StackPanel>
+
+								<!-- Update Available -->
+								<Border Background="#10b981" CornerRadius="12" Padding="24" IsVisible="{Binding IsUpdateAvailable}">
+									<StackPanel Spacing="16">
+										<StackPanel Spacing="8" HorizontalAlignment="Center">
+											<materialIcons:MaterialIcon Kind="CheckCircle" Width="48" Height="48" Foreground="White"/>
+											<TextBlock Text="Update Available!" FontSize="18" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
+											<TextBlock Text="{Binding LatestVersionText}" FontSize="14" Foreground="#e6fffa" HorizontalAlignment="Center"/>
+										</StackPanel>
+
+										<Button HorizontalAlignment="Center"
+												Command="{Binding UpdateCommand}"
+												IsEnabled="{Binding !IsUpdating}"
+												Background="White"
+												Foreground="#10b981"
+												BorderThickness="0"
+												CornerRadius="10"
+												Padding="24,12"
+												FontWeight="Bold"
+												FontSize="14"
+												Cursor="Hand">
+											<Button.Styles>
+												<Style Selector="Button:pointerover">
+													<Setter Property="Background" Value="#f0f0f0"/>
+												</Style>
+											</Button.Styles>
+											<StackPanel Orientation="Horizontal" Spacing="8">
+												<materialIcons:MaterialIcon Kind="Download" Width="20" Height="20" Foreground="#10b981"/>
+												<TextBlock Text="Download and Install" VerticalAlignment="Center"/>
+											</StackPanel>
+										</Button>
+									</StackPanel>
+								</Border>
+
+								<!-- Update Progress -->
+								<StackPanel Spacing="12" IsVisible="{Binding IsUpdating}">
+									<TextBlock Text="{Binding UpdateProgressText}" FontSize="13" Foreground="#888888" HorizontalAlignment="Center"/>
+									<ProgressBar Value="{Binding UpdateProgress}" Maximum="100"/>
+								</StackPanel>
+							</StackPanel>
+						</Border>
+
+					</StackPanel>
+				</ScrollViewer>
+			</TabItem>
+
+		</TabControl>
+	</Grid>
+</UserControl>
