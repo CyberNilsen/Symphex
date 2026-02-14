@@ -52,6 +52,10 @@
 			<Setter Property="Foreground" Value="#ffffff"/>
 			<Setter Property="FontSize" Value="14"/>
 		</Style>
+		
+		<Style Selector="CheckBox:pointerover /template/ Border#NormalRectangle">
+			<Setter Property="BorderBrush" Value="#60a5fa"/>
+		</Style>
 
 		<Style Selector="ComboBox">
 			<Setter Property="Background" Value="#0a0a0a"/>
@@ -61,6 +65,11 @@
 			<Setter Property="CornerRadius" Value="10"/>
 			<Setter Property="Padding" Value="16,12"/>
 			<Setter Property="FontSize" Value="14"/>
+		</Style>
+		
+		<Style Selector="ComboBox:pointerover">
+			<Setter Property="BorderBrush" Value="#60a5fa"/>
+			<Setter Property="Background" Value="#0f0f0f"/>
 		</Style>
 
 		<Style Selector="TabControl">
@@ -88,9 +97,13 @@
 			<Setter Property="CornerRadius" Value="12,12,0,0"/>
 		</Style>
 		
-		<Style Selector="TabItem:pointerover /template/ ContentPresenter">
+		<Style Selector="TabItem:pointerover">
 			<Setter Property="Background" Value="#0f0f0f"/>
 			<Setter Property="CornerRadius" Value="12,12,0,0"/>
+		</Style>
+		
+		<Style Selector="TabItem:pointerover:not(:selected)">
+			<Setter Property="Foreground" Value="#999999"/>
 		</Style>
 
 		<Style Selector="ProgressBar">
@@ -126,12 +139,18 @@
 						Command="{Binding BackCommand}"
 						Background="Transparent"
 						BorderThickness="0"
-						Padding="0"
+						Padding="8"
 						Cursor="Hand"
-						VerticalAlignment="Center">
+						VerticalAlignment="Center"
+						CornerRadius="8">
+					<Button.Styles>
+						<Style Selector="Button:pointerover">
+							<Setter Property="Background" Value="#1a1a1a"/>
+						</Style>
+					</Button.Styles>
 					<StackPanel Orientation="Horizontal" Spacing="10">
 						<TextBlock Text="Back" FontSize="14" Foreground="#3b82f6" FontWeight="SemiBold" VerticalAlignment="Center"/>
-						<Border Width="36" Height="36" CornerRadius="18" Background="#1a1a1a">
+						<Border Width="36" Height="36" CornerRadius="18" Background="#0a0a0a">
 							<materialIcons:MaterialIcon Kind="Close" Width="20" Height="20" Foreground="#3b82f6"/>
 						</Border>
 					</StackPanel>
