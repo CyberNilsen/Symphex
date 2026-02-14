@@ -130,18 +130,22 @@
 				Cursor="Hand"
 				ZIndex="100"
 				Command="{Binding NavigateToSettingsCommand}"
-				IsVisible="{Binding !IsSettingsView}">
+				IsVisible="{Binding !IsSettingsView}"
+				RenderTransformOrigin="0.5,0.5"
+				Padding="0">
 			<Button.Styles>
 				<Style Selector="Button:pointerover">
 					<Setter Property="Background" Value="#2a2a2a"/>
 					<Setter Property="BorderBrush" Value="#606060"/>
-					<Setter Property="RenderTransform" Value="scale(1.1) rotate(90deg)"/>
+					<Setter Property="RenderTransform" Value="scale(1.1)"/>
 				</Style>
 				<Style Selector="Button:pressed">
 					<Setter Property="RenderTransform" Value="scale(0.95)"/>
 				</Style>
 			</Button.Styles>
-			<TextBlock Text="⚙️" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+			<Viewbox Width="28" Height="28">
+				<TextBlock Text="⚙️" TextAlignment="Center"/>
+			</Viewbox>
 		</Button>
 
 		<!-- Content Area with Navigation -->
@@ -155,6 +159,230 @@
 
 		<!-- Main Download View (shown when CurrentView is null) -->
 		<Grid IsVisible="{Binding CurrentView, Converter={x:Static ObjectConverters.IsNull}}">
+		
+		<!-- Hamburger Menu Button - Floating when closed -->
+		<Button HorizontalAlignment="Left" VerticalAlignment="Top"
+				Margin="20"
+				Width="50" Height="50"
+				Background="#1a1a1a"
+				BorderThickness="2"
+				BorderBrush="#404040"
+				CornerRadius="25"
+				Cursor="Hand"
+				ZIndex="100"
+				Command="{Binding ToggleSidePanelCommand}"
+				IsVisible="{Binding !IsSidePanelOpen}">
+			<Button.Styles>
+				<Style Selector="Button:pointerover">
+					<Setter Property="Background" Value="#2a2a2a"/>
+					<Setter Property="BorderBrush" Value="#606060"/>
+					<Setter Property="RenderTransform" Value="scale(1.1)"/>
+				</Style>
+				<Style Selector="Button:pressed">
+					<Setter Property="RenderTransform" Value="scale(0.95)"/>
+				</Style>
+			</Button.Styles>
+			<TextBlock Text="☰" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+		</Button>
+		
+		<!-- Side Panel for Saved Links -->
+		<Border Background="#0a0a0a" 
+				Width="280" 
+				HorizontalAlignment="Left"
+				BorderBrush="#1a1a1a"
+				BorderThickness="0,0,1,0"
+				ZIndex="50"
+				IsVisible="{Binding IsSidePanelOpen}">
+			<Grid>
+				<Grid.RowDefinitions>
+					<RowDefinition Height="Auto"/>
+					<RowDefinition Height="*"/>
+					<RowDefinition Height="Auto"/>
+				</Grid.RowDefinitions>
+
+				<!-- Header -->
+				<Border Grid.Row="0" Background="#151515" Padding="16,12" BorderBrush="#1a1a1a" BorderThickness="0,0,0,1">
+					<Grid>
+						<StackPanel Spacing="12">
+							<TextBlock Text="📚 Saved Links" FontSize="16" FontWeight="Bold" Foreground="#ffffff"/>
+							
+							<!-- Filter Buttons -->
+							<StackPanel Orientation="Horizontal" Spacing="8">
+								<Button Content="All" 
+										Command="{Binding FilterLinksCommand}" 
+										CommandParameter="All"
+										Background="{Binding SelectedFilter, Converter={x:Static converters:FilterToColorConverter.Instance}, ConverterParameter=All}"
+										Foreground="White"
+										BorderThickness="0"
+										CornerRadius="6"
+										Padding="12,6"
+										FontSize="11"
+										Cursor="Hand"/>
+								<Button Content="★" 
+										Command="{Binding FilterLinksCommand}" 
+										CommandParameter="Favorites"
+										Background="{Binding SelectedFilter, Converter={x:Static converters:FilterToColorConverter.Instance}, ConverterParameter=Favorites}"
+										Foreground="White"
+										BorderThickness="0"
+										CornerRadius="6"
+										Padding="10,6"
+										FontSize="16"
+										Cursor="Hand"/>
+								<Button Content="Recent" 
+										Command="{Binding FilterLinksCommand}" 
+										CommandParameter="Recent"
+										Background="{Binding SelectedFilter, Converter={x:Static converters:FilterToColorConverter.Instance}, ConverterParameter=Recent}"
+										Foreground="White"
+										BorderThickness="0"
+										CornerRadius="6"
+										Padding="12,6"
+										FontSize="11"
+										Cursor="Hand"/>
+							</StackPanel>
+						</StackPanel>
+						
+						<!-- Close Button -->
+						<Button HorizontalAlignment="Right" VerticalAlignment="Top"
+								Width="32" Height="32"
+								Background="Transparent"
+								BorderThickness="0"
+								CornerRadius="16"
+								Cursor="Hand"
+								Command="{Binding ToggleSidePanelCommand}">
+							<Button.Styles>
+								<Style Selector="Button:pointerover">
+									<Setter Property="Background" Value="#2a2a2a"/>
+								</Style>
+							</Button.Styles>
+							<TextBlock Text="✕" FontSize="18" Foreground="#888888" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+						</Button>
+					</Grid>
+				</Border>
+
+				<!-- Links List -->
+				<ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+					<ItemsControl ItemsSource="{Binding FilteredLinks}">
+						<ItemsControl.ItemTemplate>
+							<DataTemplate>
+								<Border Background="#151515" 
+										Margin="8,4" 
+										Padding="12" 
+										CornerRadius="8"
+										BorderBrush="#2a2a2a"
+										BorderThickness="1">
+									<Border.Styles>
+										<Style Selector="Border:pointerover">
+											<Setter Property="Background" Value="#1a1a1a"/>
+										</Style>
+									</Border.Styles>
+									<Grid>
+										<Grid.RowDefinitions>
+											<RowDefinition Height="Auto"/>
+											<RowDefinition Height="Auto"/>
+											<RowDefinition Height="Auto"/>
+										</Grid.RowDefinitions>
+
+										<!-- Title and Favorite -->
+										<Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+											<TextBlock Grid.Column="0"
+													   Text="{Binding Title}" 
+													   FontSize="13" 
+													   FontWeight="SemiBold" 
+													   Foreground="#ffffff"
+													   TextTrimming="CharacterEllipsis"
+													   VerticalAlignment="Center"
+													   Margin="0,0,8,0"/>
+											<Button Grid.Column="1"
+													Content="{Binding IsFavorite, Converter={x:Static converters:BoolToStarConverter.Instance}}"
+													Foreground="{Binding IsFavorite, Converter={x:Static converters:BoolToStarColorConverter.Instance}}"
+													Command="{Binding $parent[Window].DataContext.ToggleFavoriteCommand}"
+													CommandParameter="{Binding Id}"
+													Background="Transparent"
+													BorderThickness="0"
+													Padding="4"
+													FontSize="16"
+													VerticalAlignment="Center"
+													Cursor="Hand">
+												<Button.Styles>
+													<Style Selector="Button:pointerover">
+														<Setter Property="Foreground" Value="#fbbf24"/>
+													</Style>
+												</Button.Styles>
+											</Button>
+										</Grid>
+
+										<!-- Artist -->
+										<TextBlock Grid.Row="1" 
+												   Text="{Binding Artist}" 
+												   FontSize="11" 
+												   Foreground="#888888"
+												   TextTrimming="CharacterEllipsis"
+												   Margin="0,2,0,0"/>
+
+										<!-- Actions -->
+										<StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+											<Button Content="📋 Load" 
+													Command="{Binding $parent[Window].DataContext.LoadSavedLinkCommand}"
+													CommandParameter="{Binding}"
+													Background="#3b82f6"
+													Foreground="White"
+													BorderThickness="0"
+													CornerRadius="6"
+													Padding="8,4"
+													FontSize="10"
+													Cursor="Hand">
+												<Button.Styles>
+													<Style Selector="Button:pointerover">
+														<Setter Property="Background" Value="#2563eb"/>
+													</Style>
+												</Button.Styles>
+											</Button>
+											<Button Content="🗑️" 
+													Command="{Binding $parent[Window].DataContext.DeleteSavedLinkCommand}"
+													CommandParameter="{Binding Id}"
+													Background="#dc2626"
+													Foreground="White"
+													BorderThickness="0"
+													CornerRadius="6"
+													Padding="8,4"
+													FontSize="10"
+													Cursor="Hand">
+												<Button.Styles>
+													<Style Selector="Button:pointerover">
+														<Setter Property="Background" Value="#b91c1c"/>
+													</Style>
+												</Button.Styles>
+											</Button>
+										</StackPanel>
+									</Grid>
+								</Border>
+							</DataTemplate>
+						</ItemsControl.ItemTemplate>
+					</ItemsControl>
+				</ScrollViewer>
+
+				<!-- Save Current Button -->
+				<Border Grid.Row="2" Background="#151515" Padding="12" BorderBrush="#1a1a1a" BorderThickness="0,1,0,0">
+					<Button Content="💾 Save Current Link" 
+							Command="{Binding SaveCurrentLinkCommand}"
+							Background="#10b981"
+							Foreground="White"
+							BorderThickness="0"
+							CornerRadius="8"
+							Padding="12,10"
+							FontSize="12"
+							FontWeight="SemiBold"
+							HorizontalAlignment="Stretch"
+							Cursor="Hand">
+						<Button.Styles>
+							<Style Selector="Button:pointerover">
+								<Setter Property="Background" Value="#059669"/>
+							</Style>
+						</Button.Styles>
+					</Button>
+				</Border>
+			</Grid>
+		</Border>
 		
 		<Border IsVisible="{Binding IsToastVisible}"
 				HorizontalAlignment="Center"
@@ -201,7 +429,7 @@
 								<GradientStop Color="#2563eb" Offset="1"/>
 							</LinearGradientBrush>
 						</Border.Background>
-						<TextBlock Text="🎵" FontSize="24" Foreground="White"
+						<TextBlock Text="S" FontSize="40" FontWeight="Bold" Foreground="White"
 								   HorizontalAlignment="Center" VerticalAlignment="Center"/>
 					</Border>
 

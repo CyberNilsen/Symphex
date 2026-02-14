@@ -149,6 +149,21 @@ namespace Symphex.ViewModels
         [ObservableProperty]
         private bool isSettingsView = false;
 
+        // Playlist Management
+        [ObservableProperty]
+        private bool isSidePanelOpen = false;
+
+        [ObservableProperty]
+        private ObservableCollection<SavedLink> savedLinks = new ObservableCollection<SavedLink>();
+
+        [ObservableProperty]
+        private ObservableCollection<SavedLink> filteredLinks = new ObservableCollection<SavedLink>();
+
+        [ObservableProperty]
+        private string selectedFilter = "All";
+
+        private readonly PlaylistService playlistService = new();
+
         private readonly HttpClient httpClient = new();
 
         private readonly DependencyManager dependencyManager = new();
@@ -167,6 +182,9 @@ namespace Symphex.ViewModels
 
             // Load saved settings
             LoadUserSettings();
+
+            // Load saved links
+            LoadSavedLinks();
 
             // Initialize the album art search service
             albumArtSearchService = new AlbumArtSearchService(httpClient);
@@ -1981,6 +1999,196 @@ namespace Symphex.ViewModels
                 // Clipboard.SetTextAsync(DownloadFolder);
 
                 // Show toast with the path so user can navigate manually
+            }
+        }
+
+        // Playlist Management Methods
+        private void ShowToast(string message)
+        {
+            ToastMessage = message;
+            IsToastVisible = true;
+            
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(3000);
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    IsToastVisible = false;
+                });
+            });
+        }
+
+        private void LoadSavedLinks()
+        {
+            try
+            {
+                var links = playlistService.LoadSavedLinks();
+                SavedLinks.Clear();
+                foreach (var link in links)
+                {
+                    SavedLinks.Add(link);
+                }
+                ApplyFilter();
+                Debug.WriteLine($"[MainWindowViewModel] Loaded {links.Count} saved links");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindowViewModel] Error loading saved links: {ex.Message}");
+            }
+        }
+
+        [RelayCommand]
+        private void ToggleSidePanel()
+        {
+            IsSidePanelOpen = !IsSidePanelOpen;
+        }
+
+        [RelayCommand]
+        private async Task SaveCurrentLink()
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(DownloadUrl))
+                {
+                    ShowToast("⚠️ No URL to save");
+                    return;
+                }
+
+                string title = "Unknown";
+                string artist = "Unknown";
+
+                // If we don't have track info yet, try to extract it
+                if (CurrentTrack == null || string.IsNullOrEmpty(CurrentTrack.Title) || CurrentTrack.Title == "Unknown")
+                {
+                    ShowToast("🔍 Fetching song info...");
+                    
+                    try
+                    {
+                        var trackInfo = await _downloadService?.ExtractMetadata(DownloadUrl.Trim(), SelectedThumbnailSize, !SkipThumbnailDownload);
+                        if (trackInfo != null)
+                        {
+                            title = trackInfo.Title;
+                            artist = trackInfo.Artist;
+                        }
+                    }
+                    catch
+                    {
+                        // If extraction fails, use the URL as title
+                        title = DownloadUrl.Trim();
+                    }
+                }
+                else
+                {
+                    title = CurrentTrack.Title;
+                    artist = CurrentTrack.Artist;
+                }
+
+                var newLink = new SavedLink
+                {
+                    Url = DownloadUrl.Trim(),
+                    Title = title,
+                    Artist = artist,
+                    DateAdded = DateTime.Now
+                };
+
+                playlistService.AddLink(SavedLinks.ToList(), newLink);
+                SavedLinks.Insert(0, newLink);
+                ApplyFilter();
+                
+                ShowToast("✅ Link saved!");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindowViewModel] Error saving link: {ex.Message}");
+                ShowToast("❌ Failed to save link");
+            }
+        }
+
+        [RelayCommand]
+        private void LoadSavedLink(SavedLink link)
+        {
+            try
+            {
+                DownloadUrl = link.Url;
+                ShowToast($"📋 Loaded: {link.Title}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindowViewModel] Error loading link: {ex.Message}");
+            }
+        }
+
+        [RelayCommand]
+        private void DeleteSavedLink(string id)
+        {
+            try
+            {
+                var link = SavedLinks.FirstOrDefault(l => l.Id == id);
+                if (link != null)
+                {
+                    SavedLinks.Remove(link);
+                    playlistService.RemoveLink(SavedLinks.ToList(), id);
+                    ApplyFilter();
+                    ShowToast("🗑️ Link deleted");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindowViewModel] Error deleting link: {ex.Message}");
+            }
+        }
+
+        [RelayCommand]
+        private void ToggleFavorite(string id)
+        {
+            try
+            {
+                var link = SavedLinks.FirstOrDefault(l => l.Id == id);
+                if (link != null)
+                {
+                    link.IsFavorite = !link.IsFavorite;
+                    
+                    // Save to file
+                    var allLinks = SavedLinks.ToList();
+                    playlistService.SaveLinks(allLinks);
+                    
+                    // Refresh the filtered view
+                    ApplyFilter();
+                    
+                    Debug.WriteLine($"[MainWindowViewModel] Toggled favorite for: {link.Title}, IsFavorite: {link.IsFavorite}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindowViewModel] Error toggling favorite: {ex.Message}");
+            }
+        }
+
+        [RelayCommand]
+        private void FilterLinks(string filter)
+        {
+            SelectedFilter = filter;
+            ApplyFilter();
+        }
+
+        private void ApplyFilter()
+        {
+            FilteredLinks.Clear();
+            
+            IEnumerable<SavedLink> filtered = SavedLinks;
+            
+            if (SelectedFilter == "Favorites")
+            {
+                filtered = SavedLinks.Where(l => l.IsFavorite);
+            }
+            else if (SelectedFilter == "Recent")
+            {
+                filtered = SavedLinks.OrderByDescending(l => l.DateAdded).Take(10);
+            }
+            
+            foreach (var link in filtered)
+            {
+                FilteredLinks.Add(link);
             }
         }
     }
