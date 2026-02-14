@@ -119,6 +119,37 @@
 
 	<Grid>
 		
+		<!-- History Icon Button - Top Right (left of settings) -->
+		<Button HorizontalAlignment="Right" VerticalAlignment="Top"
+				Margin="20,20,80,20"
+				Width="50" Height="50"
+				Background="#1a1a1a"
+				BorderThickness="2"
+				BorderBrush="#404040"
+				CornerRadius="25"
+				Cursor="Hand"
+				ZIndex="100"
+				Command="{Binding ToggleHistoryPanelCommand}"
+				RenderTransformOrigin="0.5,0.5">
+			<Button.IsVisible>
+				<MultiBinding Converter="{x:Static converters:MultiBoolToVisibilityConverter.Instance}">
+					<Binding Path="IsHistoryPanelOpen"/>
+					<Binding Path="IsSettingsView"/>
+				</MultiBinding>
+			</Button.IsVisible>
+			<Button.Styles>
+				<Style Selector="Button:pointerover">
+					<Setter Property="Background" Value="#2a2a2a"/>
+					<Setter Property="BorderBrush" Value="#606060"/>
+					<Setter Property="RenderTransform" Value="scale(1.1)"/>
+				</Style>
+				<Style Selector="Button:pressed">
+					<Setter Property="RenderTransform" Value="scale(0.95)"/>
+				</Style>
+			</Button.Styles>
+			<TextBlock Text="📜" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+		</Button>
+
 		<!-- Settings Gear Icon Button - Top Right -->
 		<Button HorizontalAlignment="Right" VerticalAlignment="Top"
 				Margin="20"
@@ -130,9 +161,14 @@
 				Cursor="Hand"
 				ZIndex="100"
 				Command="{Binding NavigateToSettingsCommand}"
-				IsVisible="{Binding !IsSettingsView}"
 				RenderTransformOrigin="0.5,0.5"
 				Padding="0">
+			<Button.IsVisible>
+				<MultiBinding Converter="{x:Static converters:MultiBoolToVisibilityConverter.Instance}">
+					<Binding Path="IsSettingsView"/>
+					<Binding Path="IsHistoryPanelOpen"/>
+				</MultiBinding>
+			</Button.IsVisible>
 			<Button.Styles>
 				<Style Selector="Button:pointerover">
 					<Setter Property="Background" Value="#2a2a2a"/>
@@ -384,6 +420,157 @@
 			</Grid>
 		</Border>
 		
+		<!-- History Panel - Right Side -->
+		<Border Background="#0a0a0a" 
+				Width="320" 
+				HorizontalAlignment="Right"
+				BorderBrush="#1a1a1a"
+				BorderThickness="1,0,0,0"
+				ZIndex="50"
+				IsVisible="{Binding IsHistoryPanelOpen}">
+			<Grid>
+				<Grid.RowDefinitions>
+					<RowDefinition Height="Auto"/>
+					<RowDefinition Height="*"/>
+					<RowDefinition Height="Auto"/>
+				</Grid.RowDefinitions>
+
+				<!-- Header -->
+				<Border Grid.Row="0" Background="#151515" Padding="16,12" BorderBrush="#1a1a1a" BorderThickness="0,0,0,1">
+					<Grid>
+						<StackPanel Spacing="12">
+							<TextBlock Text="📜 Download History" FontSize="16" FontWeight="Bold" Foreground="#ffffff"/>
+							
+							<!-- Search Box -->
+							<TextBox Text="{Binding HistorySearchText}"
+									 Watermark="Search downloads..."
+									 Background="#0a0a0a"
+									 Foreground="#ffffff"
+									 BorderBrush="#3b82f6"
+									 BorderThickness="2"
+									 CornerRadius="8"
+									 Padding="12,8"
+									 FontSize="12"/>
+						</StackPanel>
+						
+						<!-- Close Button -->
+						<Button HorizontalAlignment="Right" VerticalAlignment="Top"
+								Width="32" Height="32"
+								Background="Transparent"
+								BorderThickness="0"
+								CornerRadius="16"
+								Cursor="Hand"
+								Command="{Binding ToggleHistoryPanelCommand}">
+							<Button.Styles>
+								<Style Selector="Button:pointerover">
+									<Setter Property="Background" Value="#2a2a2a"/>
+								</Style>
+							</Button.Styles>
+							<TextBlock Text="✕" FontSize="18" Foreground="#888888" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+						</Button>
+					</Grid>
+				</Border>
+
+				<!-- History List -->
+				<ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+					<ItemsControl ItemsSource="{Binding FilteredHistory}">
+						<ItemsControl.ItemTemplate>
+							<DataTemplate>
+								<Border Background="#151515" 
+										Margin="8,4" 
+										Padding="12" 
+										CornerRadius="8"
+										BorderBrush="#2a2a2a"
+										BorderThickness="1">
+									<Border.Styles>
+										<Style Selector="Border:pointerover">
+											<Setter Property="Background" Value="#1a1a1a"/>
+										</Style>
+									</Border.Styles>
+									<StackPanel Spacing="8">
+										<!-- Title -->
+										<TextBlock Text="{Binding Title}" 
+												   FontSize="13" 
+												   FontWeight="SemiBold" 
+												   Foreground="#ffffff"
+												   TextWrapping="Wrap"/>
+
+										<!-- Artist & Date -->
+										<StackPanel Spacing="4">
+											<TextBlock Text="{Binding Artist}" 
+													   FontSize="11" 
+													   Foreground="#888888"
+													   TextTrimming="CharacterEllipsis"/>
+											<TextBlock Text="{Binding DownloadDate, StringFormat='{}{0:MMM dd, yyyy HH:mm}'}" 
+													   FontSize="10" 
+													   Foreground="#666666"/>
+										</StackPanel>
+
+										<!-- Actions -->
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<Button Content="▶️ Play" 
+													Command="{Binding $parent[Window].DataContext.OpenHistoryFileCommand}"
+													CommandParameter="{Binding FilePath}"
+													Background="#10b981"
+													Foreground="White"
+													BorderThickness="0"
+													CornerRadius="6"
+													Padding="8,4"
+													FontSize="10"
+													Cursor="Hand">
+												<Button.Styles>
+													<Style Selector="Button:pointerover">
+														<Setter Property="Background" Value="#059669"/>
+													</Style>
+												</Button.Styles>
+											</Button>
+											<Button Content="🗑️" 
+													Command="{Binding $parent[Window].DataContext.DeleteHistoryItemCommand}"
+													CommandParameter="{Binding Id}"
+													Background="#dc2626"
+													Foreground="White"
+													BorderThickness="0"
+													CornerRadius="6"
+													Padding="8,4"
+													FontSize="10"
+													Cursor="Hand">
+												<Button.Styles>
+													<Style Selector="Button:pointerover">
+														<Setter Property="Background" Value="#b91c1c"/>
+													</Style>
+												</Button.Styles>
+											</Button>
+										</StackPanel>
+									</StackPanel>
+								</Border>
+							</DataTemplate>
+						</ItemsControl.ItemTemplate>
+					</ItemsControl>
+				</ScrollViewer>
+
+				<!-- Clear History Button -->
+				<Border Grid.Row="2" Background="#151515" Padding="12" BorderBrush="#1a1a1a" BorderThickness="0,1,0,0">
+					<Button Content="🗑️ Clear All History" 
+							Command="{Binding ClearHistoryCommand}"
+							Background="#dc2626"
+							Foreground="White"
+							BorderThickness="0"
+							CornerRadius="8"
+							Padding="12,10"
+							FontSize="12"
+							FontWeight="SemiBold"
+							HorizontalAlignment="Stretch"
+							Cursor="Hand">
+						<Button.Styles>
+							<Style Selector="Button:pointerover">
+								<Setter Property="Background" Value="#b91c1c"/>
+							</Style>
+						</Button.Styles>
+					</Button>
+				</Border>
+			</Grid>
+		</Border>
+		
 		<Border IsVisible="{Binding IsToastVisible}"
 				HorizontalAlignment="Center"
 				VerticalAlignment="Top"
@@ -523,8 +710,8 @@
 									<Border Width="120" Height="120" CornerRadius="12" Background="#3a3a3a" HorizontalAlignment="Center">
 										<Grid>
 											<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="4">
-												<TextBlock Text="🎵" FontSize="40" Foreground="#777777"/>
-												<TextBlock Text="Album Art" FontSize="10" Foreground="#888888"/>
+												<TextBlock Text="🎵" FontSize="40" Foreground="#777777" HorizontalAlignment="Center"/>
+												<TextBlock Text="Album Art" FontSize="10" Foreground="#888888" HorizontalAlignment="Center"/>
 											</StackPanel>
 											<Image Source="{Binding CurrentTrack.AlbumArt}" Stretch="UniformToFill"/>
 										</Grid>

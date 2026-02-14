@@ -164,6 +164,21 @@ namespace Symphex.ViewModels
 
         private readonly PlaylistService playlistService = new();
 
+        // Download History
+        [ObservableProperty]
+        private bool isHistoryPanelOpen = false;
+
+        [ObservableProperty]
+        private ObservableCollection<DownloadHistoryItem> downloadHistory = new ObservableCollection<DownloadHistoryItem>();
+
+        [ObservableProperty]
+        private ObservableCollection<DownloadHistoryItem> filteredHistory = new ObservableCollection<DownloadHistoryItem>();
+
+        [ObservableProperty]
+        private string historySearchText = "";
+
+        private readonly DownloadHistoryService historyService = new();
+
         private readonly HttpClient httpClient = new();
 
         private readonly DependencyManager dependencyManager = new();
@@ -185,6 +200,9 @@ namespace Symphex.ViewModels
 
             // Load saved links
             LoadSavedLinks();
+
+            // Load download history
+            LoadDownloadHistory();
 
             // Initialize the album art search service
             albumArtSearchService = new AlbumArtSearchService(httpClient);
@@ -214,6 +232,15 @@ namespace Symphex.ViewModels
                 EnableAlbumArtDownload 
 
             );
+            
+            // Set up download completion callback for history tracking
+            _downloadService.OnDownloadCompleted = (track, filePath) =>
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    OnDownloadComplete(track, filePath);
+                });
+            };
         }
 
         partial void OnEnableAlbumArtDownloadChanged(bool value)
@@ -2189,6 +2216,174 @@ namespace Symphex.ViewModels
             foreach (var link in filtered)
             {
                 FilteredLinks.Add(link);
+            }
+        }
+
+        // Download History Methods
+        private void LoadDownloadHistory()
+        {
+            try
+            {
+                var history = historyService.LoadHistory();
+                DownloadHistory.Clear();
+                foreach (var item in history)
+                {
+                    DownloadHistory.Add(item);
+                }
+                ApplyHistoryFilter();
+                Debug.WriteLine($"[MainWindowViewModel] Loaded {history.Count} history items");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindowViewModel] Error loading history: {ex.Message}");
+            }
+        }
+
+        [RelayCommand]
+        private void ToggleHistoryPanel()
+        {
+            IsHistoryPanelOpen = !IsHistoryPanelOpen;
+            if (IsSidePanelOpen && IsHistoryPanelOpen)
+            {
+                IsSidePanelOpen = false; // Close saved links if history opens
+            }
+        }
+
+        partial void OnHistorySearchTextChanged(string value)
+        {
+            ApplyHistoryFilter();
+        }
+
+        private void ApplyHistoryFilter()
+        {
+            FilteredHistory.Clear();
+            
+            var filtered = DownloadHistory.AsEnumerable();
+            
+            if (!string.IsNullOrWhiteSpace(HistorySearchText))
+            {
+                var search = HistorySearchText.ToLower();
+                filtered = filtered.Where(h => 
+                    h.Title.ToLower().Contains(search) || 
+                    h.Artist.ToLower().Contains(search) ||
+                    h.Album.ToLower().Contains(search));
+            }
+            
+            foreach (var item in filtered)
+            {
+                FilteredHistory.Add(item);
+            }
+        }
+
+        public void AddToDownloadHistory(TrackInfo track, string filePath)
+        {
+            try
+            {
+                if (track == null || string.IsNullOrEmpty(filePath))
+                {
+                    Debug.WriteLine("[MainWindowViewModel] Cannot add to history - track or filePath is null");
+                    return;
+                }
+
+                long fileSize = 0;
+                if (File.Exists(filePath))
+                {
+                    fileSize = new FileInfo(filePath).Length;
+                }
+
+                var historyItem = new DownloadHistoryItem
+                {
+                    Title = track.Title,
+                    Artist = track.Artist,
+                    Album = track.Album ?? "",
+                    Url = track.Url,
+                    FilePath = filePath,
+                    DownloadDate = DateTime.Now,
+                    FileSize = fileSize,
+                    Duration = track.Duration
+                };
+
+                historyService.AddToHistory(DownloadHistory.ToList(), historyItem);
+                DownloadHistory.Insert(0, historyItem);
+                ApplyHistoryFilter();
+                
+                Debug.WriteLine($"[MainWindowViewModel] Added to history: {track.Title} by {track.Artist}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindowViewModel] Error adding to history: {ex.Message}");
+            }
+        }
+
+        // Call this method after a successful download:
+        // Example: OnDownloadComplete(CurrentTrack, downloadedFilePath);
+        public void OnDownloadComplete(TrackInfo? track, string filePath)
+        {
+            if (track != null && !string.IsNullOrEmpty(filePath) && File.Exists(filePath))
+            {
+                AddToDownloadHistory(track, filePath);
+                Debug.WriteLine($"[MainWindowViewModel] Download complete and added to history: {filePath}");
+            }
+        }
+
+        [RelayCommand]
+        private void DeleteHistoryItem(string id)
+        {
+            try
+            {
+                var item = DownloadHistory.FirstOrDefault(h => h.Id == id);
+                if (item != null)
+                {
+                    DownloadHistory.Remove(item);
+                    FilteredHistory.Remove(item);
+                    historyService.SaveHistory(DownloadHistory.ToList());
+                    ShowToast("🗑️ History item deleted");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindowViewModel] Error deleting history item: {ex.Message}");
+            }
+        }
+
+        [RelayCommand]
+        private void ClearHistory()
+        {
+            try
+            {
+                DownloadHistory.Clear();
+                FilteredHistory.Clear();
+                historyService.SaveHistory(DownloadHistory.ToList());
+                ShowToast("🗑️ History cleared");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindowViewModel] Error clearing history: {ex.Message}");
+            }
+        }
+
+        [RelayCommand]
+        private void OpenHistoryFile(string filePath)
+        {
+            try
+            {
+                if (File.Exists(filePath))
+                {
+                    Process.Start(new ProcessStartInfo
+                    {
+                        FileName = filePath,
+                        UseShellExecute = true
+                    });
+                }
+                else
+                {
+                    ShowToast("❌ File not found");
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindowViewModel] Error opening file: {ex.Message}");
+                ShowToast("❌ Could not open file");
             }
         }
     }

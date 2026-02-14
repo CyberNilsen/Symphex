@@ -24,6 +24,9 @@ namespace Symphex.Services
         private bool _skipThumbnailDownload = false; // false = download thumbnails (inverted logic)
         private string _selectedThumbnailSize = "Medium Quality (600x600)";
 
+        // Callback for download completion
+        public Action<TrackInfo, string>? OnDownloadCompleted { get; set; }
+
 
         public DownloadService(string downloadFolder, string ytDlpPath, string ffmpegPath, AlbumArtSearchService albumArtSearchService, bool enableAlbumArt = true)
         {
@@ -409,6 +412,13 @@ namespace Symphex.Services
                 }
 
                 Debug.WriteLine($"[PerformDownload] Completed: {actualFilePath}");
+                
+                // Notify download completion for history tracking
+                if (trackInfo != null)
+                {
+                    OnDownloadCompleted?.Invoke(trackInfo, actualFilePath);
+                }
+                
                 return actualFilePath;
             }
             catch (System.ComponentModel.Win32Exception ex)
@@ -846,6 +856,10 @@ namespace Symphex.Services
                         trackInfo.FileName = Path.GetFileName(actualFilePath);
                         await ApplyMetadataForBatch(trackInfo, actualFilePath);
                         Debug.WriteLine($"[DownloadForBatch #{index}] Success: {actualFilePath}");
+                        
+                        // Notify download completion
+                        OnDownloadCompleted?.Invoke(trackInfo, actualFilePath);
+                        
                         return actualFilePath;
                     }
                     else
@@ -948,9 +962,9 @@ namespace Symphex.Services
                 @"\s*Radio\s*Edit",
                 @"\s*Explicit",
                 @"\s*Clean\s*Version",
-                @"\s*ft\.?\s*.*$",  // Remove featuring artists at the end
-                @"\s*feat\.?\s*.*$",
-                @"\s*featuring\s*.*$"
+                @"\s+ft\.?\s+.*$",  // Remove featuring artists at the end (word boundary)
+                @"\s+feat\.?\s+.*$",
+                @"\s+featuring\s+.*$"
             };
 
             foreach (var pattern in patterns)
@@ -968,7 +982,6 @@ namespace Symphex.Services
                 .Replace("\u2018", "") // Left single quote
                 .Replace("\u2019", "") // Right single quote
                 .Replace("_", " ")
-                .Replace("-", " ")
                 .Replace("|", " ")
                 .Replace("–", " ") // En dash
                 .Replace("—", " ") // Em dash
@@ -980,6 +993,7 @@ namespace Symphex.Services
                 cleaned = cleaned.Replace("  ", " ");
             }
 
+            Debug.WriteLine($"[CleanSongTitle] Original: '{title}' -> Cleaned: '{cleaned}'");
             return string.IsNullOrEmpty(cleaned) ? title : cleaned;
         }
 
