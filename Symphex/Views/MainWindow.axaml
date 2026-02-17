@@ -704,20 +704,20 @@
 										BorderBrush="#3b82f6"
 										BorderThickness="2"
 										CornerRadius="10"
-										MinHeight="100"
+										Height="120"
 										Width="325"
-										Padding="20">
-									<StackPanel Spacing="12" VerticalAlignment="Center" HorizontalAlignment="Center">
-										<TextBlock Text="📁" FontSize="48" HorizontalAlignment="Center" Foreground="#3b82f6"/>
+										Padding="15">
+									<StackPanel Spacing="8" VerticalAlignment="Center" HorizontalAlignment="Center">
+										<TextBlock Text="📁" FontSize="32" HorizontalAlignment="Center" Foreground="#3b82f6"/>
 										<TextBlock Text="Drop music files or folders here" 
-												   FontSize="13" 
-												   Foreground="#888888" 
+												   FontSize="12" 
+												   Foreground="#cccccc" 
 												   HorizontalAlignment="Center"
 												   TextWrapping="Wrap"
 												   TextAlignment="Center"/>
-										<TextBlock Text="Supported: MP3, M4A, FLAC, WAV, OGG, OPUS" 
-												   FontSize="11" 
-												   Foreground="#666666" 
+										<TextBlock Text="MP3, M4A, FLAC, WAV, OGG, OPUS" 
+												   FontSize="10" 
+												   Foreground="#999999" 
 												   HorizontalAlignment="Center"/>
 									</StackPanel>
 								</Border>
@@ -725,24 +725,24 @@
 								<!-- Queued Files List -->
 								<Border Background="#1a1a1a" 
 										CornerRadius="10" 
-										Padding="12"
+										Padding="10"
 										Width="325"
-										Height="150"
+										MaxHeight="80"
 										IsVisible="{Binding QueuedFiles.Count}">
-									<StackPanel Spacing="8">
+									<StackPanel Spacing="6">
 										<StackPanel Orientation="Horizontal" Spacing="8">
-											<TextBlock Text="📋 Queued Files:" FontSize="13" FontWeight="SemiBold" Foreground="#3b82f6"/>
-											<TextBlock Text="{Binding QueuedFiles.Count}" FontSize="13" FontWeight="Bold" Foreground="#3b82f6"/>
+											<TextBlock Text="📋 Queued:" FontSize="12" FontWeight="SemiBold" Foreground="#3b82f6"/>
+											<TextBlock Text="{Binding QueuedFiles.Count}" FontSize="12" FontWeight="Bold" Foreground="#3b82f6"/>
 										</StackPanel>
-										<ScrollViewer Height="110" VerticalScrollBarVisibility="Auto">
+										<ScrollViewer MaxHeight="50" VerticalScrollBarVisibility="Auto">
 											<ItemsControl ItemsSource="{Binding QueuedFiles}">
 												<ItemsControl.ItemTemplate>
 													<DataTemplate>
 														<TextBlock Text="{Binding}" 
-																   FontSize="10" 
+																   FontSize="9" 
 																   Foreground="#888888" 
 																   TextWrapping="Wrap"
-																   Margin="0,2"/>
+																   Margin="0,1"/>
 													</DataTemplate>
 												</ItemsControl.ItemTemplate>
 											</ItemsControl>

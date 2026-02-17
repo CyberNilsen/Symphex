@@ -2545,13 +2545,35 @@ namespace Symphex.ViewModels
                 try
                 {
                     var fileName = Path.GetFileName(filePath);
+                    var sourceDir = Path.GetDirectoryName(filePath);
                     var outputPath = Path.Combine(ResizedFolderPath, fileName);
 
-                    // Copy the file to the resized folder
-                    File.Copy(filePath, outputPath, true);
+                    // Check if file is already in the Resized folder
+                    if (string.Equals(sourceDir, ResizedFolderPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        // File is already in Resized folder, work on it directly
+                        outputPath = filePath;
+                    }
+                    else
+                    {
+                        // Copy the file to the resized folder
+                        try
+                        {
+                            File.Copy(filePath, outputPath, true);
+                        }
+                        catch (IOException ex)
+                        {
+                            Debug.WriteLine($"[MainWindowViewModel] File copy error: {ex.Message}");
+                            // If copy fails, try working on original file
+                            outputPath = filePath;
+                        }
+                    }
 
                     // Extract and resize album art using TagLib
                     var file = TagLib.File.Create(outputPath);
+                    
+                    // Calculate new dimensions based on AlbumArtSize from settings
+                    int newSize = (int)AlbumArtSize;
                     
                     if (file.Tag.Pictures != null && file.Tag.Pictures.Length > 0)
                     {
@@ -2561,9 +2583,6 @@ namespace Symphex.ViewModels
                         using (var ms = new MemoryStream(picture.Data.Data))
                         {
                             var bitmap = new Bitmap(ms);
-                            
-                            // Calculate new dimensions based on AlbumArtSize
-                            int newSize = (int)AlbumArtSize;
                             
                             // Create scaled bitmap
                             var resized = bitmap.CreateScaledBitmap(new Avalonia.PixelSize(newSize, newSize), Avalonia.Media.Imaging.BitmapInterpolationMode.HighQuality);
@@ -2586,7 +2605,7 @@ namespace Symphex.ViewModels
                         }
                     }
 
-                    Debug.WriteLine($"[MainWindowViewModel] Resized album art for: {fileName}");
+                    Debug.WriteLine($"[MainWindowViewModel] Resized album art to {newSize}x{newSize} for: {fileName}");
                 }
                 catch (Exception ex)
                 {
