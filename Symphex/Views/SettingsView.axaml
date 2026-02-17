@@ -210,6 +210,51 @@
 							</StackPanel>
 						</Border>
 
+						<!-- Resize Album Art Card -->
+						<Border Classes="setting-card">
+							<StackPanel Spacing="16">
+								<StackPanel Orientation="Horizontal" Spacing="12">
+									<Border Width="48" Height="48" CornerRadius="12" Background="#ec4899">
+										<materialIcons:MaterialIcon Kind="ImageSizeSelectActual" Width="28" Height="28" Foreground="White"/>
+									</Border>
+									<StackPanel VerticalAlignment="Center">
+										<TextBlock Text="Resize Album Art" FontSize="18" FontWeight="Bold" Foreground="#ffffff"/>
+										<TextBlock Text="Output size for Resize Mode" FontSize="13" Foreground="#888888"/>
+									</StackPanel>
+								</StackPanel>
+
+								<StackPanel Spacing="12">
+									<TextBlock Text="{Binding AlbumArtSize, StringFormat='Output Size: {0}x{0}px'}" 
+											   FontSize="16" 
+											   Foreground="#ec4899" 
+											   HorizontalAlignment="Center"
+											   FontWeight="Bold"/>
+									<Slider Minimum="300" Maximum="1200" 
+											Value="{Binding AlbumArtSize}"
+											TickFrequency="100" 
+											IsSnapToTickEnabled="True"
+											HorizontalAlignment="Stretch"/>
+								</StackPanel>
+
+								<Border Background="#0a0a0a" CornerRadius="10" Padding="16">
+									<StackPanel Spacing="8">
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<materialIcons:MaterialIcon Kind="Check" Width="14" Height="14" Foreground="#ec4899"/>
+											<TextBlock Text="600x600: Recommended for most uses" FontSize="12" Foreground="#999999"/>
+										</StackPanel>
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<materialIcons:MaterialIcon Kind="ImageSizeSelectLarge" Width="14" Height="14" Foreground="#10b981"/>
+											<TextBlock Text="1200x1200: High quality for archival" FontSize="12" Foreground="#999999"/>
+										</StackPanel>
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<materialIcons:MaterialIcon Kind="ImageSizeSelectSmall" Width="14" Height="14" Foreground="#f59e0b"/>
+											<TextBlock Text="300x300: Smallest size for space saving" FontSize="12" Foreground="#999999"/>
+										</StackPanel>
+									</StackPanel>
+								</Border>
+							</StackPanel>
+						</Border>
+
 						<!-- Album Art Card -->
 						<Border Classes="setting-card">
 							<StackPanel Spacing="16">

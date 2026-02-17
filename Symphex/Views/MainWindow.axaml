@@ -150,6 +150,37 @@
 			<TextBlock Text="📜" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
 		</Button>
 
+		<!-- Resize Mode Toggle Button - Top Right (left of history) -->
+		<Button HorizontalAlignment="Right" VerticalAlignment="Top"
+				Margin="20,20,140,20"
+				Width="50" Height="50"
+				Background="{Binding IsResizeMode, Converter={x:Static converters:BoolToColorConverter.Instance}}"
+				BorderThickness="2"
+				BorderBrush="{Binding IsResizeMode, Converter={x:Static converters:BoolToBorderColorConverter.Instance}}"
+				CornerRadius="25"
+				Cursor="Hand"
+				ZIndex="100"
+				Command="{Binding ToggleResizeModeCommand}"
+				RenderTransformOrigin="0.5,0.5">
+			<Button.IsVisible>
+				<MultiBinding Converter="{x:Static converters:MultiBoolToVisibilityConverter.Instance}">
+					<Binding Path="IsHistoryPanelOpen"/>
+					<Binding Path="IsSettingsView"/>
+				</MultiBinding>
+			</Button.IsVisible>
+			<Button.Styles>
+				<Style Selector="Button:pointerover">
+					<Setter Property="Background" Value="#2a2a2a"/>
+					<Setter Property="BorderBrush" Value="#606060"/>
+					<Setter Property="RenderTransform" Value="scale(1.1)"/>
+				</Style>
+				<Style Selector="Button:pressed">
+					<Setter Property="RenderTransform" Value="scale(0.95)"/>
+				</Style>
+			</Button.Styles>
+			<TextBlock Text="🎨" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+		</Button>
+
 		<!-- Settings Gear Icon Button - Top Right -->
 		<Button HorizontalAlignment="Right" VerticalAlignment="Top"
 				Margin="20"
@@ -641,23 +672,83 @@
 							<TextBlock Text="Download Section" FontSize="18" FontWeight="Bold"
 									   Foreground="#ffffff" HorizontalAlignment="Center"/>
 
-							<StackPanel Spacing="10">
+							<StackPanel Spacing="10" IsVisible="{Binding !IsResizeMode}">
 								<TextBlock Text="Paste your music link here" FontSize="16" FontWeight="Medium"
 										   Foreground="#ffffff" HorizontalAlignment="Center"/>
 
-								<TextBox Name="UrlTextBox"
-										 Text="{Binding DownloadUrl}"
-										 Classes="large"
-										 Watermark="Paste YouTube/Spotify links here (multiple links supported)..."
-										 MinHeight="44"
-										 MaxHeight="120"
-										 Width="325"
-										 FontSize="13"
-										 AcceptsReturn="True"
-										 AcceptsTab="False"
-										 TextWrapping="Wrap"
-										 VerticalContentAlignment="Top"
-										 ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+								<Border DragDrop.AllowDrop="True"
+										Background="Transparent">
+									<TextBox Name="UrlTextBox"
+											 Text="{Binding DownloadUrl}"
+											 Classes="large"
+											 Watermark="Paste YouTube/Spotify links here (multiple links supported)..."
+											 MinHeight="44"
+											 MaxHeight="120"
+											 Width="325"
+											 FontSize="13"
+											 AcceptsReturn="True"
+											 AcceptsTab="False"
+											 TextWrapping="Wrap"
+											 VerticalContentAlignment="Top"
+											 ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+								</Border>
+							</StackPanel>
+
+							<!-- Resize Mode Drop Zone -->
+							<StackPanel Spacing="10" IsVisible="{Binding IsResizeMode}">
+								<TextBlock Text="Drag and drop files or folders here" FontSize="16" FontWeight="Medium"
+										   Foreground="#ffffff" HorizontalAlignment="Center"/>
+
+								<Border DragDrop.AllowDrop="True"
+										Background="#1a1a1a"
+										BorderBrush="#3b82f6"
+										BorderThickness="2"
+										CornerRadius="10"
+										MinHeight="100"
+										Width="325"
+										Padding="20">
+									<StackPanel Spacing="12" VerticalAlignment="Center" HorizontalAlignment="Center">
+										<TextBlock Text="📁" FontSize="48" HorizontalAlignment="Center" Foreground="#3b82f6"/>
+										<TextBlock Text="Drop music files or folders here" 
+												   FontSize="13" 
+												   Foreground="#888888" 
+												   HorizontalAlignment="Center"
+												   TextWrapping="Wrap"
+												   TextAlignment="Center"/>
+										<TextBlock Text="Supported: MP3, M4A, FLAC, WAV, OGG, OPUS" 
+												   FontSize="11" 
+												   Foreground="#666666" 
+												   HorizontalAlignment="Center"/>
+									</StackPanel>
+								</Border>
+
+								<!-- Queued Files List -->
+								<Border Background="#1a1a1a" 
+										CornerRadius="10" 
+										Padding="12"
+										Width="325"
+										Height="150"
+										IsVisible="{Binding QueuedFiles.Count}">
+									<StackPanel Spacing="8">
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<TextBlock Text="📋 Queued Files:" FontSize="13" FontWeight="SemiBold" Foreground="#3b82f6"/>
+											<TextBlock Text="{Binding QueuedFiles.Count}" FontSize="13" FontWeight="Bold" Foreground="#3b82f6"/>
+										</StackPanel>
+										<ScrollViewer Height="110" VerticalScrollBarVisibility="Auto">
+											<ItemsControl ItemsSource="{Binding QueuedFiles}">
+												<ItemsControl.ItemTemplate>
+													<DataTemplate>
+														<TextBlock Text="{Binding}" 
+																   FontSize="10" 
+																   Foreground="#888888" 
+																   TextWrapping="Wrap"
+																   Margin="0,2"/>
+													</DataTemplate>
+												</ItemsControl.ItemTemplate>
+											</ItemsControl>
+										</ScrollViewer>
+									</StackPanel>
+								</Border>
 							</StackPanel>
 
 							<StackPanel Spacing="6" IsVisible="{Binding IsDownloading}">
@@ -670,13 +761,25 @@
 								</Border>
 							</StackPanel>
 
-							<Button Content="🎵 Download My Music" Command="{Binding DownloadCommand}"
-									Classes="download" HorizontalAlignment="Center"/>
+							<Button Command="{Binding DownloadCommand}"
+									Classes="download" HorizontalAlignment="Center">
+								<Button.Content>
+									<MultiBinding Converter="{x:Static converters:ResizeModeToButtonTextConverter.Instance}">
+										<Binding Path="IsResizeMode"/>
+									</MultiBinding>
+								</Button.Content>
+							</Button>
 
 							<StackPanel Spacing="12" HorizontalAlignment="Center">
 								<StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
 									<Button Content="Clear" Command="{Binding ClearCommand}" Classes="simple"/>
-									<Button Content="📁 Open Downloads" Command="{Binding OpenFolderCommand}" Classes="simple"/>
+									<Button Command="{Binding OpenFolderCommand}" Classes="simple">
+										<Button.Content>
+											<MultiBinding Converter="{x:Static converters:ResizeModeToOpenButtonTextConverter.Instance}">
+												<Binding Path="IsResizeMode"/>
+											</MultiBinding>
+										</Button.Content>
+									</Button>
 								</StackPanel>
 							</StackPanel>
 						</StackPanel>
@@ -707,7 +810,11 @@
 
 								<StackPanel Spacing="12" IsVisible="{Binding CurrentTrack.Title, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
 
-									<Border Width="120" Height="120" CornerRadius="12" Background="#3a3a3a" HorizontalAlignment="Center">
+									<Border Width="120" 
+											Height="120" 
+											CornerRadius="12" 
+											Background="#3a3a3a" 
+											HorizontalAlignment="Center">
 										<Grid>
 											<StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="4">
 												<TextBlock Text="🎵" FontSize="40" Foreground="#777777" HorizontalAlignment="Center"/>

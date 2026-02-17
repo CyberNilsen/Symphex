@@ -1,7 +1,9 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform;
+using Avalonia.Input;
 using System;
+using System.Linq;
 
 namespace Symphex.Views
 {
@@ -18,6 +20,10 @@ namespace Symphex.Views
             SetWindowSizeBasedOnScreen();
 
             this.Loaded += MainWindow_Loaded;
+            
+            // Set up drag-and-drop for the URL input area
+            AddHandler(DragDrop.DragOverEvent, OnDragOver);
+            AddHandler(DragDrop.DropEvent, OnDrop);
         }
 
         private void SetWindowSizeBasedOnScreen()
@@ -147,6 +153,38 @@ namespace Symphex.Views
             if (DataContext is ViewModels.MainWindowViewModel viewModel)
             {
                 viewModel.SelectArtworkCommand.Execute(-2); // -2 = no picture
+            }
+        }
+
+        private void OnDragOver(object? sender, DragEventArgs e)
+        {
+            if (DataContext is ViewModels.MainWindowViewModel viewModel && viewModel.IsResizeMode)
+            {
+                // Check if the drag data contains files
+                #pragma warning disable CS0618
+                var files = e.Data?.GetFiles();
+                #pragma warning restore CS0618
+                if (files?.Any() == true)
+                {
+                    e.DragEffects = DragDropEffects.Copy;
+                    e.Handled = true;
+                }
+            }
+        }
+
+        private async void OnDrop(object? sender, DragEventArgs e)
+        {
+            if (DataContext is ViewModels.MainWindowViewModel viewModel && viewModel.IsResizeMode)
+            {
+                #pragma warning disable CS0618
+                var files = e.Data?.GetFiles();
+                #pragma warning restore CS0618
+                if (files != null && files.Any())
+                {
+                    var paths = files.Select(f => f.Path.LocalPath).ToList();
+                    await viewModel.ProcessDroppedFilesAsync(paths);
+                }
+                e.Handled = true;
             }
         }
     }

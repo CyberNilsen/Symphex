@@ -61,6 +61,9 @@ namespace Symphex.ViewModels
         [ObservableProperty]
         private int artworkSelectionTimeout = 5; // 5 seconds gives users time to decide
 
+        [ObservableProperty]
+        private double albumArtSize = 600; // Default resize size
+
         public IRelayCommand? BackCommand { get; set; }
 
         [ObservableProperty]
@@ -78,24 +81,86 @@ namespace Symphex.ViewModels
         // Red warning: Both album art and thumbnails disabled
         public bool ShowNoArtworkWarning => !EnableAlbumArtDownload && !SkipThumbnailDownload;
 
-        partial void OnEnableAlbumArtDownloadChanged(bool value)
-        {
-            OnPropertyChanged(nameof(ShowNoArtworkWarning));
-            OnPropertyChanged(nameof(ShowAlbumArtDisabledWarning));
-        }
-
-        partial void OnSkipThumbnailDownloadChanged(bool value)
-        {
-            OnPropertyChanged(nameof(ShowNoArtworkWarning));
-            OnPropertyChanged(nameof(ShowAlbumArtDisabledWarning));
-        }
-
         private string latestDownloadUrl = "";
         private string latestVersion = "";
 
         public SettingsViewModel()
         {
             CurrentVersionText = $"Current Version: v{CURRENT_VERSION}";
+            LoadSettings();
+        }
+
+        private void LoadSettings()
+        {
+            try
+            {
+                var settings = Services.SettingsService.LoadSettings();
+                EnableAlbumArtDownload = settings.EnableAlbumArtDownload;
+                SkipThumbnailDownload = settings.SkipThumbnailDownload;
+                SelectedThumbnailSize = settings.SelectedThumbnailSize;
+                EnableArtworkSelection = settings.EnableArtworkSelection;
+                ArtworkSelectionTimeout = settings.ArtworkSelectionTimeout;
+                AlbumArtSize = settings.AlbumArtSize;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[SettingsViewModel] Error loading settings: {ex.Message}");
+            }
+        }
+
+        private void SaveSettings()
+        {
+            try
+            {
+                var settings = new Services.UserSettings
+                {
+                    EnableAlbumArtDownload = EnableAlbumArtDownload,
+                    SkipThumbnailDownload = SkipThumbnailDownload,
+                    SelectedThumbnailSize = SelectedThumbnailSize,
+                    EnableArtworkSelection = EnableArtworkSelection,
+                    ArtworkSelectionTimeout = ArtworkSelectionTimeout,
+                    AlbumArtSize = AlbumArtSize
+                };
+                Services.SettingsService.SaveSettings(settings);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[SettingsViewModel] Error saving settings: {ex.Message}");
+            }
+        }
+
+        partial void OnEnableAlbumArtDownloadChanged(bool value)
+        {
+            OnPropertyChanged(nameof(ShowNoArtworkWarning));
+            OnPropertyChanged(nameof(ShowAlbumArtDisabledWarning));
+            SaveSettings();
+        }
+
+        partial void OnSkipThumbnailDownloadChanged(bool value)
+        {
+            OnPropertyChanged(nameof(ShowNoArtworkWarning));
+            OnPropertyChanged(nameof(ShowAlbumArtDisabledWarning));
+            SaveSettings();
+        }
+
+        partial void OnSelectedThumbnailSizeChanged(string value)
+        {
+            SaveSettings();
+        }
+
+        partial void OnEnableArtworkSelectionChanged(bool value)
+        {
+            SaveSettings();
+        }
+
+        partial void OnArtworkSelectionTimeoutChanged(int value)
+        {
+            SaveSettings();
+        }
+
+        partial void OnAlbumArtSizeChanged(double value)
+        {
+            SaveSettings();
         }
 
         [RelayCommand]
@@ -677,8 +742,8 @@ rm -- ""$0"" 2>/dev/null || true
         {
             if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                var settingsWindow = desktop.Windows.FirstOrDefault(w => w is Symphex.Views.SettingsWindow);
-                settingsWindow?.Close();
+                // Settings is now a UserControl, not a Window - no need to close
+                // Just trigger navigation back in the main window
             }
         }
 

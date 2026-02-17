@@ -179,6 +179,19 @@ namespace Symphex.ViewModels
 
         private readonly DownloadHistoryService historyService = new();
 
+        // Resize Mode for Album Art
+        [ObservableProperty]
+        private bool isResizeMode = false;
+
+        [ObservableProperty]
+        private double albumArtSize = 600; // Default size for resizing (600x600)
+
+        [ObservableProperty]
+        private string resizedFolderPath = "";
+
+        [ObservableProperty]
+        private ObservableCollection<string> queuedFiles = new ObservableCollection<string>();
+
         private readonly HttpClient httpClient = new();
 
         private readonly DependencyManager dependencyManager = new();
@@ -194,6 +207,7 @@ namespace Symphex.ViewModels
         {
             CurrentTrack = new TrackInfo();
             SetupDownloadFolder();
+            SetupResizedFolder();
 
             // Load saved settings
             LoadUserSettings();
@@ -291,6 +305,7 @@ namespace Symphex.ViewModels
                 SelectedThumbnailSize = settings.SelectedThumbnailSize;
                 EnableArtworkSelection = settings.EnableArtworkSelection;
                 ArtworkSelectionTimeout = settings.ArtworkSelectionTimeout;
+                AlbumArtSize = settings.AlbumArtSize;
 
                 Debug.WriteLine("[MainWindowViewModel] User settings loaded");
             }
@@ -310,7 +325,8 @@ namespace Symphex.ViewModels
                     SkipThumbnailDownload = this.SkipThumbnailDownload,
                     SelectedThumbnailSize = this.SelectedThumbnailSize,
                     EnableArtworkSelection = this.EnableArtworkSelection,
-                    ArtworkSelectionTimeout = this.ArtworkSelectionTimeout
+                    ArtworkSelectionTimeout = this.ArtworkSelectionTimeout,
+                    AlbumArtSize = this.AlbumArtSize
                 };
 
                 SettingsService.SaveSettings(settings);
@@ -319,6 +335,11 @@ namespace Symphex.ViewModels
             {
                 Debug.WriteLine($"[MainWindowViewModel] Error saving settings: {ex.Message}");
             }
+        }
+
+        partial void OnAlbumArtSizeChanged(double value)
+        {
+            SaveUserSettings();
         }
 
         [RelayCommand]
@@ -942,6 +963,49 @@ namespace Symphex.ViewModels
         [RelayCommand]
         private async Task Download()
         {
+            // Check if we're in resize mode
+            if (IsResizeMode)
+            {
+                if (QueuedFiles.Count == 0)
+                {
+                    ShowToast("❌ Please drag and drop files to resize");
+                    return;
+                }
+
+                // Reload settings to get latest AlbumArtSize
+                LoadUserSettings();
+
+                // Process the queued files
+                IsDownloading = true;
+                DownloadProgress = 0;
+                ShowToast($"🎨 Resizing to {AlbumArtSize}x{AlbumArtSize}px...");
+
+                int processed = 0;
+                int failed = 0;
+                int total = QueuedFiles.Count;
+
+                for (int i = 0; i < QueuedFiles.Count; i++)
+                {
+                    try
+                    {
+                        await ResizeAlbumArtForFile(QueuedFiles[i]);
+                        processed++;
+                        DownloadProgress = (double)(i + 1) / total * 100;
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[MainWindowViewModel] Error processing {QueuedFiles[i]}: {ex.Message}");
+                        failed++;
+                    }
+                }
+
+                QueuedFiles.Clear();
+                IsDownloading = false;
+                DownloadProgress = 0;
+                ShowToast($"✅ Resized: {processed}, Failed: {failed}");
+                return;
+            }
+
             if (string.IsNullOrWhiteSpace(DownloadUrl))
             {
                 StatusText = "Please enter a URL or search term.";
@@ -1919,6 +1983,13 @@ namespace Symphex.ViewModels
         [RelayCommand]
         private void Clear()
         {
+            if (IsResizeMode)
+            {
+                QueuedFiles.Clear();
+                ShowToast("🗑️ Queue cleared");
+                return;
+            }
+
             DownloadUrl = "";
             StatusText = "🎵 Ready to download music...";
             DownloadProgress = 0;
@@ -1949,15 +2020,18 @@ namespace Symphex.ViewModels
         {
             try
             {
+                // Determine which folder to open based on resize mode
+                var folderToOpen = IsResizeMode ? ResizedFolderPath : DownloadFolder;
+
                 // Ensure the directory exists first
-                if (!Directory.Exists(DownloadFolder))
+                if (!Directory.Exists(folderToOpen))
                 {
-                    Directory.CreateDirectory(DownloadFolder);
+                    Directory.CreateDirectory(folderToOpen);
                 }
 
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
-                    Process.Start("explorer.exe", DownloadFolder);
+                    Process.Start("explorer.exe", folderToOpen);
                 }
                 else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
@@ -1967,7 +2041,7 @@ namespace Symphex.ViewModels
                         var psi = new ProcessStartInfo
                         {
                             FileName = "open",
-                            Arguments = $"\"{DownloadFolder}\"", // Quote the path
+                            Arguments = $"\"{folderToOpen}\"", // Quote the path
                             UseShellExecute = false,
                             RedirectStandardOutput = true,
                             RedirectStandardError = true,
@@ -2385,6 +2459,141 @@ namespace Symphex.ViewModels
                 Debug.WriteLine($"[MainWindowViewModel] Error opening file: {ex.Message}");
                 ShowToast("❌ Could not open file");
             }
+        }
+
+        [RelayCommand]
+        private void ToggleResizeMode()
+        {
+            IsResizeMode = !IsResizeMode;
+            ShowToast(IsResizeMode ? "🎨 Resize Mode: Drag and drop files/folders" : "✅ Download Mode: Active");
+        }
+
+        private void SetupResizedFolder()
+        {
+            try
+            {
+                ResizedFolderPath = Path.Combine(DownloadFolder, "Resized");
+                if (!Directory.Exists(ResizedFolderPath))
+                {
+                    Directory.CreateDirectory(ResizedFolderPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindowViewModel] Error setting up resized folder: {ex.Message}");
+                ResizedFolderPath = DownloadFolder;
+            }
+        }
+
+        public async Task ProcessDroppedFilesAsync(List<string> paths)
+        {
+            try
+            {
+                var musicFiles = new List<string>();
+
+                foreach (var path in paths)
+                {
+                    if (Directory.Exists(path))
+                    {
+                        // It's a folder - get all music files
+                        var files = Directory.GetFiles(path, "*.*", SearchOption.AllDirectories)
+                            .Where(f => IsMusicFile(f))
+                            .ToList();
+                        musicFiles.AddRange(files);
+                    }
+                    else if (File.Exists(path) && IsMusicFile(path))
+                    {
+                        // It's a music file
+                        musicFiles.Add(path);
+                    }
+                }
+
+                if (musicFiles.Count == 0)
+                {
+                    ShowToast("❌ No music files found");
+                    return;
+                }
+
+                // Add files to queue
+                foreach (var file in musicFiles)
+                {
+                    if (!QueuedFiles.Contains(file))
+                    {
+                        QueuedFiles.Add(file);
+                    }
+                }
+
+                ShowToast($"✅ Added {musicFiles.Count} file(s) to queue");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindowViewModel] Error in ProcessDroppedFilesAsync: {ex.Message}");
+                ShowToast("❌ Error processing files");
+            }
+        }
+
+        private bool IsMusicFile(string filePath)
+        {
+            var ext = Path.GetExtension(filePath).ToLowerInvariant();
+            return ext == ".mp3" || ext == ".m4a" || ext == ".flac" || ext == ".wav" || ext == ".ogg" || ext == ".opus";
+        }
+
+        private async Task ResizeAlbumArtForFile(string filePath)
+        {
+            await Task.Run(() =>
+            {
+                try
+                {
+                    var fileName = Path.GetFileName(filePath);
+                    var outputPath = Path.Combine(ResizedFolderPath, fileName);
+
+                    // Copy the file to the resized folder
+                    File.Copy(filePath, outputPath, true);
+
+                    // Extract and resize album art using TagLib
+                    var file = TagLib.File.Create(outputPath);
+                    
+                    if (file.Tag.Pictures != null && file.Tag.Pictures.Length > 0)
+                    {
+                        var picture = file.Tag.Pictures[0];
+                        
+                        // Resize the image
+                        using (var ms = new MemoryStream(picture.Data.Data))
+                        {
+                            var bitmap = new Bitmap(ms);
+                            
+                            // Calculate new dimensions based on AlbumArtSize
+                            int newSize = (int)AlbumArtSize;
+                            
+                            // Create scaled bitmap
+                            var resized = bitmap.CreateScaledBitmap(new Avalonia.PixelSize(newSize, newSize), Avalonia.Media.Imaging.BitmapInterpolationMode.HighQuality);
+                            
+                            // Save resized image back to file
+                            using (var outputMs = new MemoryStream())
+                            {
+                                resized.Save(outputMs);
+                                
+                                var newPicture = new TagLib.Picture(new TagLib.ByteVector(outputMs.ToArray()))
+                                {
+                                    Type = picture.Type,
+                                    MimeType = picture.MimeType,
+                                    Description = picture.Description
+                                };
+                                
+                                file.Tag.Pictures = new TagLib.IPicture[] { newPicture };
+                                file.Save();
+                            }
+                        }
+                    }
+
+                    Debug.WriteLine($"[MainWindowViewModel] Resized album art for: {fileName}");
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[MainWindowViewModel] Error processing file: {ex.Message}");
+                    throw;
+                }
+            });
         }
     }
 }

@@ -12,6 +12,7 @@ namespace Symphex.Services
         public string SelectedThumbnailSize { get; set; } = "Medium Quality (600x600)";
         public bool EnableArtworkSelection { get; set; } = true; 
         public int ArtworkSelectionTimeout { get; set; } = 5;
+        public double AlbumArtSize { get; set; } = 600; // Resize mode album art size
     }
 
     public class SettingsService
