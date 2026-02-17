@@ -65,6 +65,13 @@ namespace Symphex.ViewModels
         private double albumArtSize = 600; // Default resize size
 
         public IRelayCommand? BackCommand { get; set; }
+        
+        private MainWindowViewModel? _mainWindowViewModel;
+        public MainWindowViewModel? MainWindowViewModel
+        {
+            get => _mainWindowViewModel;
+            set => _mainWindowViewModel = value;
+        }
 
         [ObservableProperty]
         private List<string> thumbnailSizeOptions = new List<string>
@@ -73,6 +80,21 @@ namespace Symphex.ViewModels
             "High Quality (1200x1200)",
             "Medium Quality (600x600)",
             "Low Quality (300x300)"
+        };
+
+        [ObservableProperty]
+        private string selectedAudioFormat = "MP3 (320kbps)";
+
+        [ObservableProperty]
+        private List<string> audioFormatOptions = new List<string>
+        {
+            "MP3 (320kbps)",
+            "FLAC (Lossless)",
+            "WAV (Uncompressed)",
+            "AAC (256kbps)",
+            "M4A (256kbps)",
+            "Opus (192kbps)",
+            "Vorbis (192kbps)"
         };
 
         // Orange warning: Album art disabled but thumbnails enabled
@@ -101,6 +123,7 @@ namespace Symphex.ViewModels
                 EnableArtworkSelection = settings.EnableArtworkSelection;
                 ArtworkSelectionTimeout = settings.ArtworkSelectionTimeout;
                 AlbumArtSize = settings.AlbumArtSize;
+                SelectedAudioFormat = settings.SelectedAudioFormat;
             }
             catch (Exception ex)
             {
@@ -119,7 +142,8 @@ namespace Symphex.ViewModels
                     SelectedThumbnailSize = SelectedThumbnailSize,
                     EnableArtworkSelection = EnableArtworkSelection,
                     ArtworkSelectionTimeout = ArtworkSelectionTimeout,
-                    AlbumArtSize = AlbumArtSize
+                    AlbumArtSize = AlbumArtSize,
+                    SelectedAudioFormat = SelectedAudioFormat
                 };
                 Services.SettingsService.SaveSettings(settings);
             }
@@ -161,6 +185,17 @@ namespace Symphex.ViewModels
         partial void OnAlbumArtSizeChanged(double value)
         {
             SaveSettings();
+        }
+
+        partial void OnSelectedAudioFormatChanged(string value)
+        {
+            SaveSettings();
+            
+            // Immediately update MainWindowViewModel if available
+            if (_mainWindowViewModel != null)
+            {
+                _mainWindowViewModel.SelectedAudioFormat = value;
+            }
         }
 
         [RelayCommand]

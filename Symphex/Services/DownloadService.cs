@@ -23,6 +23,7 @@ namespace Symphex.Services
         private bool _enableAlbumArt = true;
         private bool _skipThumbnailDownload = false; // false = download thumbnails (inverted logic)
         private string _selectedThumbnailSize = "Medium Quality (600x600)";
+        private string _selectedAudioFormat = "MP3 (320kbps)"; // Default audio format
 
         // Callback for download completion
         public Action<TrackInfo, string>? OnDownloadCompleted { get; set; }
@@ -53,6 +54,12 @@ namespace Symphex.Services
         {
             _selectedThumbnailSize = size;
             Debug.WriteLine($"[DownloadService] Thumbnail size set to: {size}");
+        }
+
+        public void UpdateAudioFormat(string format)
+        {
+            _selectedAudioFormat = format;
+            Debug.WriteLine($"[DownloadService] Audio format set to: {format}");
         }
 
         public async Task<TrackInfo?> ExtractMetadata(string url, string thumbnailSizePreference = "Maximum Quality", bool skipThumbnail = false)
@@ -339,12 +346,15 @@ namespace Symphex.Services
                 }
                 else filenameTemplate = Path.Combine(_downloadFolder, "%(uploader)s - %(title)s.%(ext)s");
 
+                // Parse audio format selection
+                var (audioFormat, audioQuality) = ParseAudioFormat(_selectedAudioFormat);
+
                 var argsList = new List<string>
         {
             fullUrl,
             "--extract-audio",
-            "--audio-format", "mp3",
-            "--audio-quality", "0",
+            "--audio-format", audioFormat,
+            "--audio-quality", audioQuality,
             "--no-playlist"
         };
 
@@ -809,12 +819,15 @@ namespace Symphex.Services
                     filenameTemplate = Path.Combine(_downloadFolder, "%(uploader)s - %(title)s.%(ext)s");
                 }
 
+                // Parse audio format selection
+                var (audioFormat, audioQuality) = ParseAudioFormat(_selectedAudioFormat);
+
                 List<string> argsList = new List<string>
         {
             fullUrl,
             "--extract-audio",
-            "--audio-format", "mp3",
-            "--audio-quality", "0",
+            "--audio-format", audioFormat,
+            "--audio-quality", audioQuality,
             "--no-playlist"
         };
 
@@ -1402,6 +1415,22 @@ namespace Symphex.Services
             }
 
             return filename.Trim();
+        }
+
+        private (string format, string quality) ParseAudioFormat(string formatOption)
+        {
+            // Parse format selection and return appropriate yt-dlp parameters
+            return formatOption switch
+            {
+                "MP3 (320kbps)" => ("mp3", "0"), // 0 = best quality for mp3
+                "FLAC (Lossless)" => ("flac", "0"),
+                "WAV (Uncompressed)" => ("wav", "0"),
+                "AAC (256kbps)" => ("aac", "256k"),
+                "M4A (256kbps)" => ("m4a", "256k"),
+                "Opus (192kbps)" => ("opus", "192k"),
+                "Vorbis (192kbps)" => ("vorbis", "192k"),
+                _ => ("mp3", "0") // Default to MP3 320kbps
+            };
         }
     }
 }

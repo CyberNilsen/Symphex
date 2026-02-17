@@ -210,6 +210,43 @@
 							</StackPanel>
 						</Border>
 
+						<!-- Audio Format Card -->
+						<Border Classes="setting-card">
+							<StackPanel Spacing="16">
+								<StackPanel Orientation="Horizontal" Spacing="12">
+									<Border Width="48" Height="48" CornerRadius="12" Background="#f59e0b">
+										<materialIcons:MaterialIcon Kind="MusicNote" Width="28" Height="28" Foreground="White"/>
+									</Border>
+									<StackPanel VerticalAlignment="Center">
+										<TextBlock Text="Audio Format" FontSize="18" FontWeight="Bold" Foreground="#ffffff"/>
+										<TextBlock Text="Choose output format for downloads" FontSize="13" Foreground="#888888"/>
+									</StackPanel>
+								</StackPanel>
+
+								<ComboBox SelectedItem="{Binding SelectedAudioFormat}"
+										  ItemsSource="{Binding AudioFormatOptions}"
+										  HorizontalAlignment="Stretch"
+										  FontSize="14"/>
+
+								<Border Background="#0a0a0a" CornerRadius="10" Padding="16">
+									<StackPanel Spacing="8">
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<materialIcons:MaterialIcon Kind="Check" Width="14" Height="14" Foreground="#3b82f6"/>
+											<TextBlock Text="MP3: Universal compatibility (320kbps)" FontSize="12" Foreground="#999999"/>
+										</StackPanel>
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<materialIcons:MaterialIcon Kind="Star" Width="14" Height="14" Foreground="#f59e0b"/>
+											<TextBlock Text="FLAC/WAV: Lossless quality (larger files)" FontSize="12" Foreground="#999999"/>
+										</StackPanel>
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<materialIcons:MaterialIcon Kind="Flash" Width="14" Height="14" Foreground="#10b981"/>
+											<TextBlock Text="AAC/M4A: Good quality, smaller size" FontSize="12" Foreground="#999999"/>
+										</StackPanel>
+									</StackPanel>
+								</Border>
+							</StackPanel>
+						</Border>
+
 						<!-- Resize Album Art Card -->
 						<Border Classes="setting-card">
 							<StackPanel Spacing="16">

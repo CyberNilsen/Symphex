@@ -1,4 +1,4 @@
-﻿using Avalonia;
+﻿﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input;
@@ -135,6 +135,21 @@ namespace Symphex.ViewModels
         };
 
         [ObservableProperty]
+        private string selectedAudioFormat = "MP3 (320kbps)"; // Default format
+
+        [ObservableProperty]
+        private List<string> audioFormatOptions = new List<string>
+        {
+            "MP3 (320kbps)",
+            "FLAC (Lossless)",
+            "WAV (Uncompressed)",
+            "AAC (256kbps)",
+            "M4A (256kbps)",
+            "Opus (192kbps)",
+            "Vorbis (192kbps)"
+        };
+
+        [ObservableProperty]
         private string lastDownloadedFileInfo = "";
 
         [ObservableProperty]
@@ -247,6 +262,9 @@ namespace Symphex.ViewModels
 
             );
             
+            // Set audio format
+            _downloadService.UpdateAudioFormat(SelectedAudioFormat);
+            
             // Set up download completion callback for history tracking
             _downloadService.OnDownloadCompleted = (track, filePath) =>
             {
@@ -306,6 +324,7 @@ namespace Symphex.ViewModels
                 EnableArtworkSelection = settings.EnableArtworkSelection;
                 ArtworkSelectionTimeout = settings.ArtworkSelectionTimeout;
                 AlbumArtSize = settings.AlbumArtSize;
+                SelectedAudioFormat = settings.SelectedAudioFormat;
 
                 Debug.WriteLine("[MainWindowViewModel] User settings loaded");
             }
@@ -326,7 +345,8 @@ namespace Symphex.ViewModels
                     SelectedThumbnailSize = this.SelectedThumbnailSize,
                     EnableArtworkSelection = this.EnableArtworkSelection,
                     ArtworkSelectionTimeout = this.ArtworkSelectionTimeout,
-                    AlbumArtSize = this.AlbumArtSize
+                    AlbumArtSize = this.AlbumArtSize,
+                    SelectedAudioFormat = this.SelectedAudioFormat
                 };
 
                 SettingsService.SaveSettings(settings);
@@ -342,6 +362,15 @@ namespace Symphex.ViewModels
             SaveUserSettings();
         }
 
+        partial void OnSelectedAudioFormatChanged(string value)
+        {
+            SaveUserSettings();
+            if (_downloadService != null)
+            {
+                _downloadService.UpdateAudioFormat(value);
+            }
+        }
+
         [RelayCommand]
         private void NavigateToSettings()
         {
@@ -353,7 +382,10 @@ namespace Symphex.ViewModels
                     SkipThumbnailDownload = this.SkipThumbnailDownload,
                     SelectedThumbnailSize = this.SelectedThumbnailSize,
                     EnableArtworkSelection = this.EnableArtworkSelection,
-                    ArtworkSelectionTimeout = this.ArtworkSelectionTimeout
+                    ArtworkSelectionTimeout = this.ArtworkSelectionTimeout,
+                    AlbumArtSize = this.AlbumArtSize,
+                    SelectedAudioFormat = this.SelectedAudioFormat,
+                    MainWindowViewModel = this
                 };
 
                 // Set up back command
@@ -381,6 +413,8 @@ namespace Symphex.ViewModels
                     this.SelectedThumbnailSize = settingsViewModel.SelectedThumbnailSize;
                     this.EnableArtworkSelection = settingsViewModel.EnableArtworkSelection;
                     this.ArtworkSelectionTimeout = settingsViewModel.ArtworkSelectionTimeout;
+                    this.AlbumArtSize = settingsViewModel.AlbumArtSize;
+                    this.SelectedAudioFormat = settingsViewModel.SelectedAudioFormat;
                 }
 
                 CurrentView = null;
@@ -2613,6 +2647,21 @@ namespace Symphex.ViewModels
                     throw;
                 }
             });
+        }
+        public void ReloadSettings()
+        {
+            LoadUserSettings();
+
+            // Update download service with new settings
+            if (_downloadService != null)
+            {
+                _downloadService.UpdateAlbumArtSetting(EnableAlbumArtDownload);
+                _downloadService.UpdateThumbnailSettings(SkipThumbnailDownload);
+                _downloadService.UpdateThumbnailSize(SelectedThumbnailSize);
+                _downloadService.UpdateAudioFormat(SelectedAudioFormat);
+            }
+
+            Debug.WriteLine("[MainWindowViewModel] Settings reloaded from storage");
         }
     }
 }
