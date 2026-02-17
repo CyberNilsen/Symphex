@@ -14,6 +14,7 @@ namespace Symphex.Services
         public int ArtworkSelectionTimeout { get; set; } = 5;
         public double AlbumArtSize { get; set; } = 600; // Resize mode album art size
         public string SelectedAudioFormat { get; set; } = "MP3"; // Audio format selection
+        public string SelectedBitrate { get; set; } = "320"; // Bitrate for lossy formats (kbps)
     }
 
     public class SettingsService

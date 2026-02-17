@@ -228,15 +228,30 @@
 										  HorizontalAlignment="Stretch"
 										  FontSize="14"/>
 
+								<!-- Bitrate Selection (only for lossy formats) -->
+								<Border IsVisible="{Binding ShowBitrateSelector}">
+									<StackPanel Spacing="12">
+										<TextBlock Text="Bitrate Quality" FontSize="14" Foreground="#ffffff" FontWeight="SemiBold"/>
+										<ComboBox SelectedItem="{Binding SelectedBitrate}"
+												  ItemsSource="{Binding BitrateOptions}"
+												  HorizontalAlignment="Stretch"
+												  FontSize="14"/>
+										<TextBlock Text="{Binding SelectedBitrate, StringFormat='{}{0} kbps - Higher is better quality'}" 
+												   FontSize="12" 
+												   Foreground="#888888"
+												   HorizontalAlignment="Center"/>
+									</StackPanel>
+								</Border>
+
 								<Border Background="#0a0a0a" CornerRadius="10" Padding="16">
 									<StackPanel Spacing="8">
 										<StackPanel Orientation="Horizontal" Spacing="8">
 											<materialIcons:MaterialIcon Kind="Check" Width="14" Height="14" Foreground="#3b82f6"/>
-											<TextBlock Text="MP3/FLAC/M4A: Full artwork support" FontSize="12" Foreground="#999999"/>
+											<TextBlock Text="MP3/FLAC: Full artwork support" FontSize="12" Foreground="#999999"/>
 										</StackPanel>
 										<StackPanel Orientation="Horizontal" Spacing="8">
-											<materialIcons:MaterialIcon Kind="Check" Width="14" Height="14" Foreground="#10b981"/>
-											<TextBlock Text="Opus/Vorbis: Artwork embedded via TagLib" FontSize="12" Foreground="#999999"/>
+											<materialIcons:MaterialIcon Kind="AlertCircle" Width="14" Height="14" Foreground="#f59e0b"/>
+											<TextBlock Text="M4A/Opus/Vorbis: Artwork may not embed reliably" FontSize="12" Foreground="#999999"/>
 										</StackPanel>
 										<StackPanel Orientation="Horizontal" Spacing="8">
 											<materialIcons:MaterialIcon Kind="AlertCircle" Width="14" Height="14" Foreground="#ef4444"/>

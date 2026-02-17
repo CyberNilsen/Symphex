@@ -149,6 +149,9 @@ namespace Symphex.ViewModels
         };
 
         [ObservableProperty]
+        private string selectedBitrate = "320"; // Default bitrate for lossy formats
+
+        [ObservableProperty]
         private string lastDownloadedFileInfo = "";
 
         [ObservableProperty]
@@ -263,6 +266,7 @@ namespace Symphex.ViewModels
             
             // Set audio format
             _downloadService.UpdateAudioFormat(SelectedAudioFormat);
+            _downloadService.UpdateBitrate(SelectedBitrate);
             
             // Set up download completion callback for history tracking
             _downloadService.OnDownloadCompleted = (track, filePath) =>
@@ -326,6 +330,7 @@ namespace Symphex.ViewModels
                 
                 // Migrate old format names to new ones
                 SelectedAudioFormat = MigrateAudioFormat(settings.SelectedAudioFormat);
+                SelectedBitrate = settings.SelectedBitrate;
 
                 Debug.WriteLine("[MainWindowViewModel] User settings loaded");
             }
@@ -365,7 +370,8 @@ namespace Symphex.ViewModels
                     EnableArtworkSelection = this.EnableArtworkSelection,
                     ArtworkSelectionTimeout = this.ArtworkSelectionTimeout,
                     AlbumArtSize = this.AlbumArtSize,
-                    SelectedAudioFormat = this.SelectedAudioFormat
+                    SelectedAudioFormat = this.SelectedAudioFormat,
+                    SelectedBitrate = this.SelectedBitrate
                 };
 
                 SettingsService.SaveSettings(settings);
@@ -390,6 +396,15 @@ namespace Symphex.ViewModels
             }
         }
 
+        partial void OnSelectedBitrateChanged(string value)
+        {
+            SaveUserSettings();
+            if (_downloadService != null)
+            {
+                _downloadService.UpdateBitrate(value);
+            }
+        }
+
         [RelayCommand]
         private void NavigateToSettings()
         {
@@ -404,6 +419,7 @@ namespace Symphex.ViewModels
                     ArtworkSelectionTimeout = this.ArtworkSelectionTimeout,
                     AlbumArtSize = this.AlbumArtSize,
                     SelectedAudioFormat = this.SelectedAudioFormat,
+                    SelectedBitrate = this.SelectedBitrate,
                     MainWindowViewModel = this
                 };
 
@@ -738,6 +754,9 @@ namespace Symphex.ViewModels
                     string cleanTitle = SanitizeFilename(CurrentTrack.Title);
                     string cleanArtist = SanitizeFilename(CurrentTrack.Artist);
                     filenameTemplate = Path.Combine(DownloadFolder, $"{cleanArtist} - {cleanTitle}.%(ext)s");
+                    
+                    // Delete existing files with the same name (any extension) to avoid duplicates
+                    DeleteExistingFile(cleanArtist, cleanTitle);
                 }
                 else
                 {
@@ -1951,6 +1970,50 @@ namespace Symphex.ViewModels
             return filename.Trim();
         }
 
+        private void DeleteExistingFile(string artist, string title)
+        {
+            try
+            {
+                // Get the current format's file extension
+                string extension = GetFileExtensionFromFormat(SelectedAudioFormat);
+                
+                // Look for files matching "Artist - Title.extension" pattern (same format only)
+                string searchPattern = $"{artist} - {title}.{extension}";
+                string[] existingFiles = Directory.GetFiles(DownloadFolder, searchPattern);
+                
+                foreach (string file in existingFiles)
+                {
+                    try
+                    {
+                        File.Delete(file);
+                        Debug.WriteLine($"[DeleteExistingFile] Deleted duplicate: {Path.GetFileName(file)}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[DeleteExistingFile] Failed to delete {file}: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[DeleteExistingFile] Error searching for duplicates: {ex.Message}");
+            }
+        }
+
+        private string GetFileExtensionFromFormat(string formatOption)
+        {
+            return formatOption switch
+            {
+                "MP3" => "mp3",
+                "FLAC (Lossless)" => "flac",
+                "WAV (Uncompressed)" => "wav",
+                "M4A (AAC)" => "m4a",
+                "Opus" => "opus",
+                "Vorbis (OGG)" => "ogg",
+                _ => "mp3"
+            };
+        }
+
         [RelayCommand]
         private async Task DownloadYtDlp()
         {
@@ -2678,6 +2741,7 @@ namespace Symphex.ViewModels
                 _downloadService.UpdateThumbnailSettings(SkipThumbnailDownload);
                 _downloadService.UpdateThumbnailSize(SelectedThumbnailSize);
                 _downloadService.UpdateAudioFormat(SelectedAudioFormat);
+                _downloadService.UpdateBitrate(SelectedBitrate);
             }
 
             Debug.WriteLine("[MainWindowViewModel] Settings reloaded from storage");

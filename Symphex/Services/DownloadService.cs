@@ -24,6 +24,7 @@ namespace Symphex.Services
         private bool _skipThumbnailDownload = false; // false = download thumbnails (inverted logic)
         private string _selectedThumbnailSize = "Medium Quality (600x600)";
         private string _selectedAudioFormat = "MP3 (320kbps)"; // Default audio format
+        private string _selectedBitrate = "320"; // Default bitrate for lossy formats
 
         // Callback for download completion
         public Action<TrackInfo, string>? OnDownloadCompleted { get; set; }
@@ -60,6 +61,12 @@ namespace Symphex.Services
         {
             _selectedAudioFormat = format;
             Debug.WriteLine($"[DownloadService] Audio format set to: {format}");
+        }
+
+        public void UpdateBitrate(string bitrate)
+        {
+            _selectedBitrate = bitrate;
+            Debug.WriteLine($"[DownloadService] Bitrate set to: {bitrate} kbps");
         }
 
         public async Task<TrackInfo?> ExtractMetadata(string url, string thumbnailSizePreference = "Maximum Quality", bool skipThumbnail = false)
@@ -343,6 +350,9 @@ namespace Symphex.Services
                     string cleanTitle = SanitizeFilename(trackInfo.Title);
                     string cleanArtist = SanitizeFilename(trackInfo.Artist);
                     filenameTemplate = Path.Combine(_downloadFolder, $"{cleanArtist} - {cleanTitle}.%(ext)s");
+                    
+                    // Delete existing files with the same name (any extension) to avoid duplicates
+                    DeleteExistingFile(cleanArtist, cleanTitle);
                 }
                 else filenameTemplate = Path.Combine(_downloadFolder, "%(uploader)s - %(title)s.%(ext)s");
 
@@ -362,8 +372,14 @@ namespace Symphex.Services
                 bool actuallySkipThumbnail = !_skipThumbnailDownload;
                 if (!actuallySkipThumbnail)
                 {
-                    // For formats that support embedded thumbnails
-                    if (audioFormat != "wav") // WAV doesn't support embedded metadata
+                    // For Opus and Vorbis, we'll handle artwork with TagLib after download
+                    // For other formats, use yt-dlp's embed-thumbnail
+                    if (audioFormat == "opus" || audioFormat == "vorbis")
+                    {
+                        // Don't use --embed-thumbnail, we'll handle it with TagLib
+                        argsList.Add("--write-thumbnail");
+                    }
+                    else if (audioFormat != "wav") // WAV doesn't support embedded metadata
                     {
                         argsList.Add("--embed-thumbnail");
                         
@@ -727,6 +743,9 @@ namespace Symphex.Services
             try
             {
                 Debug.WriteLine($"[ApplyMetadataWithTagLib] Processing {Path.GetFileName(audioFilePath)}");
+                Debug.WriteLine($"[ApplyMetadataWithTagLib] AlbumArt available: {trackInfo.AlbumArt != null}");
+                Debug.WriteLine($"[ApplyMetadataWithTagLib] Thumbnail available: {trackInfo.Thumbnail != null}");
+                Debug.WriteLine($"[ApplyMetadataWithTagLib] EnableAlbumArt: {_enableAlbumArt}");
                 
                 var file = TagLib.File.Create(audioFilePath);
                 
@@ -764,41 +783,131 @@ namespace Symphex.Services
                 // Embed artwork
                 Bitmap? artworkToUse = _enableAlbumArt ? (trackInfo.AlbumArt ?? trackInfo.Thumbnail) : trackInfo.Thumbnail;
                 
+                // If no artwork in TrackInfo, try to find downloaded thumbnail file (for Opus/Vorbis)
+                if (artworkToUse == null)
+                {
+                    Debug.WriteLine($"[ApplyMetadataWithTagLib] No artwork in TrackInfo, searching for thumbnail files...");
+                    string audioDir = Path.GetDirectoryName(audioFilePath) ?? "";
+                    string audioFileNameWithoutExt = Path.GetFileNameWithoutExtension(audioFilePath);
+                    
+                    Debug.WriteLine($"[ApplyMetadataWithTagLib] Audio directory: {audioDir}");
+                    Debug.WriteLine($"[ApplyMetadataWithTagLib] Looking for: {audioFileNameWithoutExt}.*");
+                    
+                    // yt-dlp saves thumbnails with various extensions
+                    string[] possibleThumbnails = new[]
+                    {
+                        Path.Combine(audioDir, $"{audioFileNameWithoutExt}.jpg"),
+                        Path.Combine(audioDir, $"{audioFileNameWithoutExt}.jpeg"),
+                        Path.Combine(audioDir, $"{audioFileNameWithoutExt}.png"),
+                        Path.Combine(audioDir, $"{audioFileNameWithoutExt}.webp")
+                    };
+                    
+                    foreach (string thumbPath in possibleThumbnails)
+                    {
+                        Debug.WriteLine($"[ApplyMetadataWithTagLib] Checking: {thumbPath} - Exists: {File.Exists(thumbPath)}");
+                        
+                        if (File.Exists(thumbPath))
+                        {
+                            try
+                            {
+                                Debug.WriteLine($"[ApplyMetadataWithTagLib] Found thumbnail file: {Path.GetFileName(thumbPath)}");
+                                
+                                // Try to load the image
+                                using (var stream = File.OpenRead(thumbPath))
+                                {
+                                    artworkToUse = new Bitmap(stream);
+                                }
+                                
+                                Debug.WriteLine($"[ApplyMetadataWithTagLib] Successfully loaded thumbnail: {artworkToUse.PixelSize.Width}x{artworkToUse.PixelSize.Height}");
+                                
+                                // Delete the thumbnail file after loading
+                                try 
+                                { 
+                                    File.Delete(thumbPath);
+                                    Debug.WriteLine($"[ApplyMetadataWithTagLib] Deleted thumbnail file: {Path.GetFileName(thumbPath)}");
+                                } 
+                                catch (Exception delEx) 
+                                {
+                                    Debug.WriteLine($"[ApplyMetadataWithTagLib] Could not delete thumbnail: {delEx.Message}");
+                                }
+                                break;
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[ApplyMetadataWithTagLib] Failed to load thumbnail {thumbPath}: {ex.Message}");
+                                // Try to delete corrupted file
+                                try { File.Delete(thumbPath); } catch { }
+                            }
+                        }
+                    }
+                    
+                    if (artworkToUse == null)
+                    {
+                        Debug.WriteLine($"[ApplyMetadataWithTagLib] No thumbnail files found in: {audioDir}");
+                    }
+                }
+                
                 if (artworkToUse != null)
                 {
-                    string tempArtwork = Path.Combine(Path.GetTempPath(), $"temp_artwork_{Guid.NewGuid():N}.png");
+                    Debug.WriteLine($"[ApplyMetadataWithTagLib] Starting artwork embedding process...");
+                    string tempArtwork = Path.Combine(Path.GetTempPath(), $"temp_artwork_{Guid.NewGuid():N}.jpg");
                     
                     try
                     {
-                        // Resize and save artwork
+                        // Resize and save artwork as JPEG (better compatibility with Opus/Vorbis)
                         var (targetWidth, targetHeight) = GetTargetDimensionsFromSize(_selectedThumbnailSize);
+                        Debug.WriteLine($"[ApplyMetadataWithTagLib] Resizing to: {targetWidth}x{targetHeight}");
                         var resizedArtwork = ResizeImage(artworkToUse, targetWidth, targetHeight);
                         
                         if (resizedArtwork != null)
                         {
+                            // Save as JPEG with high quality
                             using (var fileStream = new FileStream(tempArtwork, FileMode.Create))
                             {
-                                resizedArtwork.Save(fileStream);
+                                resizedArtwork.Save(fileStream, 95); // 95% quality JPEG
                             }
+                            
+                            Debug.WriteLine($"[ApplyMetadataWithTagLib] Saved artwork as JPEG: {new FileInfo(tempArtwork).Length} bytes");
                             
                             // Read and embed
                             var artworkData = File.ReadAllBytes(tempArtwork);
-                            var picture = new TagLib.Picture(new TagLib.ByteVector(artworkData))
-                            {
-                                Type = TagLib.PictureType.FrontCover,
-                                MimeType = "image/png",
-                                Description = "Cover"
-                            };
                             
-                            file.Tag.Pictures = new TagLib.IPicture[] { picture };
-                            Debug.WriteLine($"[ApplyMetadataWithTagLib] Embedded {artworkData.Length} bytes of artwork");
+                            if (artworkData.Length > 0)
+                            {
+                                var picture = new TagLib.Picture(new TagLib.ByteVector(artworkData))
+                                {
+                                    Type = TagLib.PictureType.FrontCover,
+                                    MimeType = "image/jpeg",
+                                    Description = "Cover"
+                                };
+                                
+                                file.Tag.Pictures = new TagLib.IPicture[] { picture };
+                                Debug.WriteLine($"[ApplyMetadataWithTagLib] Successfully embedded {artworkData.Length} bytes of JPEG artwork");
+                            }
+                            else
+                            {
+                                Debug.WriteLine($"[ApplyMetadataWithTagLib] Artwork file is empty!");
+                            }
                         }
+                        else
+                        {
+                            Debug.WriteLine($"[ApplyMetadataWithTagLib] Failed to resize artwork");
+                        }
+                    }
+                    catch (Exception embedEx)
+                    {
+                        Debug.WriteLine($"[ApplyMetadataWithTagLib] Failed to embed artwork: {embedEx.Message}");
+                        Debug.WriteLine($"[ApplyMetadataWithTagLib] Stack trace: {embedEx.StackTrace}");
                     }
                     finally
                     {
                         if (File.Exists(tempArtwork))
                             File.Delete(tempArtwork);
                     }
+                }
+                else
+                {
+                    Debug.WriteLine($"[ApplyMetadataWithTagLib] No artwork available to embed");
                 }
                 
                 // Save all changes
@@ -1065,6 +1174,9 @@ namespace Symphex.Services
                     string cleanTitle = SanitizeFilename(trackInfo.Title);
                     string cleanArtist = SanitizeFilename(trackInfo.Artist);
                     filenameTemplate = Path.Combine(_downloadFolder, $"{cleanArtist} - {cleanTitle}.%(ext)s");
+                    
+                    // Delete existing files with the same name (any extension) to avoid duplicates
+                    DeleteExistingFile(cleanArtist, cleanTitle);
                 }
                 else
                 {
@@ -1087,8 +1199,14 @@ namespace Symphex.Services
                 bool actuallySkipThumbnail = !_skipThumbnailDownload;
                 if (!actuallySkipThumbnail)
                 {
-                    // For formats that support embedded thumbnails
-                    if (audioFormat != "wav") // WAV doesn't support embedded metadata
+                    // For Opus and Vorbis, we'll handle artwork with TagLib after download
+                    // For other formats, use yt-dlp's embed-thumbnail
+                    if (audioFormat == "opus" || audioFormat == "vorbis")
+                    {
+                        // Don't use --embed-thumbnail, we'll handle it with TagLib
+                        argsList.Add("--write-thumbnail");
+                    }
+                    else if (audioFormat != "wav") // WAV doesn't support embedded metadata
                     {
                         argsList.Add("--embed-thumbnail");
                         
@@ -1688,29 +1806,90 @@ namespace Symphex.Services
         private (string format, string quality) ParseAudioFormat(string formatOption)
         {
             // Parse format selection and return appropriate yt-dlp parameters
-            // Quality "0" means best quality for the format
-            return formatOption switch
+            // For lossy formats, use the selected bitrate
+            // For lossless/uncompressed, use quality "0" (best)
+            
+            string format = formatOption switch
             {
-                // Current format names
-                "MP3" => ("mp3", "0"),
-                "FLAC (Lossless)" => ("flac", "0"),
-                "WAV (Uncompressed)" => ("wav", "0"),
-                "M4A (AAC)" => ("m4a", "0"),
-                "Opus" => ("opus", "0"),
-                "Vorbis (OGG)" => ("vorbis", "0"),
+                "MP3" => "mp3",
+                "FLAC (Lossless)" => "flac",
+                "WAV (Uncompressed)" => "wav",
+                "M4A (AAC)" => "m4a",
+                "Opus" => "opus",
+                "Vorbis (OGG)" => "vorbis",
                 
                 // Legacy format names (for backwards compatibility)
-                "MP3 (Best Quality)" => ("mp3", "0"),
-                "MP3 (320kbps)" => ("mp3", "0"),
-                "AAC (256kbps)" => ("m4a", "0"),
-                "M4A (256kbps)" => ("m4a", "0"),
-                "M4A (AAC - Best Quality)" => ("m4a", "0"),
-                "Opus (192kbps)" => ("opus", "0"),
-                "Opus (Best Quality)" => ("opus", "0"),
-                "Vorbis (192kbps)" => ("vorbis", "0"),
-                "Vorbis (OGG - Best Quality)" => ("vorbis", "0"),
+                "MP3 (Best Quality)" => "mp3",
+                "MP3 (320kbps)" => "mp3",
+                "AAC (256kbps)" => "m4a",
+                "M4A (256kbps)" => "m4a",
+                "M4A (AAC - Best Quality)" => "m4a",
+                "Opus (192kbps)" => "opus",
+                "Opus (Best Quality)" => "opus",
+                "Vorbis (192kbps)" => "vorbis",
+                "Vorbis (OGG - Best Quality)" => "vorbis",
                 
-                _ => ("mp3", "0") // Default to MP3
+                _ => "mp3" // Default to MP3
+            };
+
+            // Determine quality parameter based on format
+            string quality;
+            if (format == "flac" || format == "wav")
+            {
+                // Lossless/uncompressed - always use best quality
+                quality = "0";
+            }
+            else
+            {
+                // Lossy formats - use selected bitrate
+                quality = _selectedBitrate + "K";
+            }
+
+            return (format, quality);
+        }
+
+        private void DeleteExistingFile(string artist, string title)
+        {
+            try
+            {
+                // Get the current format's file extension
+                var (audioFormat, _) = ParseAudioFormat(_selectedAudioFormat);
+                string extension = GetFileExtension(audioFormat);
+                
+                // Look for files matching "Artist - Title.extension" pattern (same format only)
+                string searchPattern = $"{artist} - {title}.{extension}";
+                string[] existingFiles = Directory.GetFiles(_downloadFolder, searchPattern);
+                
+                foreach (string file in existingFiles)
+                {
+                    try
+                    {
+                        File.Delete(file);
+                        Debug.WriteLine($"[DeleteExistingFile] Deleted duplicate: {Path.GetFileName(file)}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[DeleteExistingFile] Failed to delete {file}: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[DeleteExistingFile] Error searching for duplicates: {ex.Message}");
+            }
+        }
+
+        private string GetFileExtension(string audioFormat)
+        {
+            return audioFormat switch
+            {
+                "mp3" => "mp3",
+                "flac" => "flac",
+                "wav" => "wav",
+                "m4a" => "m4a",
+                "opus" => "opus",
+                "vorbis" => "ogg",
+                _ => "mp3"
             };
         }
     }

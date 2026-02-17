@@ -96,6 +96,18 @@ namespace Symphex.ViewModels
             "Vorbis (OGG)"
         };
 
+        [ObservableProperty]
+        private string selectedBitrate = "320";
+
+        [ObservableProperty]
+        private List<string> bitrateOptions = new List<string>();
+
+        // Show bitrate selector only for lossy formats
+        public bool ShowBitrateSelector => SelectedAudioFormat == "MP3" || 
+                                           SelectedAudioFormat == "M4A (AAC)" || 
+                                           SelectedAudioFormat == "Opus" || 
+                                           SelectedAudioFormat == "Vorbis (OGG)";
+
         // Orange warning: Album art disabled but thumbnails enabled
         public bool ShowAlbumArtDisabledWarning => !EnableAlbumArtDownload && SkipThumbnailDownload;
 
@@ -108,6 +120,7 @@ namespace Symphex.ViewModels
         public SettingsViewModel()
         {
             CurrentVersionText = $"Current Version: v{CURRENT_VERSION}";
+            UpdateBitrateOptions(); // Initialize bitrate options
             LoadSettings();
         }
 
@@ -125,6 +138,7 @@ namespace Symphex.ViewModels
                 
                 // Migrate old format names to new ones
                 SelectedAudioFormat = MigrateAudioFormat(settings.SelectedAudioFormat);
+                SelectedBitrate = settings.SelectedBitrate;
             }
             catch (Exception ex)
             {
@@ -162,7 +176,8 @@ namespace Symphex.ViewModels
                     EnableArtworkSelection = EnableArtworkSelection,
                     ArtworkSelectionTimeout = ArtworkSelectionTimeout,
                     AlbumArtSize = AlbumArtSize,
-                    SelectedAudioFormat = SelectedAudioFormat
+                    SelectedAudioFormat = SelectedAudioFormat,
+                    SelectedBitrate = SelectedBitrate
                 };
                 Services.SettingsService.SaveSettings(settings);
             }
@@ -208,12 +223,46 @@ namespace Symphex.ViewModels
 
         partial void OnSelectedAudioFormatChanged(string value)
         {
+            UpdateBitrateOptions();
+            OnPropertyChanged(nameof(ShowBitrateSelector));
             SaveSettings();
             
             // Immediately update MainWindowViewModel if available
             if (_mainWindowViewModel != null)
             {
                 _mainWindowViewModel.SelectedAudioFormat = value;
+            }
+        }
+
+        partial void OnSelectedBitrateChanged(string value)
+        {
+            SaveSettings();
+            
+            // Immediately update MainWindowViewModel if available
+            if (_mainWindowViewModel != null)
+            {
+                _mainWindowViewModel.SelectedBitrate = value;
+            }
+        }
+
+        private void UpdateBitrateOptions()
+        {
+            BitrateOptions = SelectedAudioFormat switch
+            {
+                "MP3" => new List<string> { "128", "192", "256", "320" },
+                "M4A (AAC)" => new List<string> { "128", "192", "256", "320" },
+                "Opus" => new List<string> { "96", "128", "160", "192" },
+                "Vorbis (OGG)" => new List<string> { "128", "192", "256", "320" },
+                _ => new List<string>()
+            };
+
+            // Always default to highest quality (last item in list)
+            if (BitrateOptions.Count > 0)
+            {
+                if (!BitrateOptions.Contains(SelectedBitrate))
+                {
+                    SelectedBitrate = BitrateOptions.Last(); // Default to highest quality
+                }
             }
         }
 
