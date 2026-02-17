@@ -362,7 +362,23 @@ namespace Symphex.Services
                 bool actuallySkipThumbnail = !_skipThumbnailDownload;
                 if (!actuallySkipThumbnail)
                 {
-                    argsList.Add("--embed-thumbnail");
+                    // For formats that support embedded thumbnails
+                    if (audioFormat != "wav") // WAV doesn't support embedded metadata
+                    {
+                        argsList.Add("--embed-thumbnail");
+                        
+                        // For M4A/AAC, use specific postprocessor args to ensure thumbnail embedding works
+                        if (audioFormat == "m4a" || audioFormat == "aac")
+                        {
+                            argsList.Add("--ppa");
+                            argsList.Add("EmbedThumbnail+ffmpeg_o:-c:v mjpeg");
+                        }
+                    }
+                    else
+                    {
+                        // For WAV, we'll still download the thumbnail but won't embed it
+                        argsList.Add("--write-thumbnail");
+                    }
                 }
 
                 argsList.Add("--add-metadata");
@@ -455,7 +471,19 @@ namespace Symphex.Services
                     return;
                 }
 
-                string tempOutput = Path.Combine(_downloadFolder, $"temp_{Guid.NewGuid():N}.mp3");
+                // Get the file extension to preserve format
+                string fileExtension = Path.GetExtension(audioFilePath);
+                string lowerExt = fileExtension.ToLowerInvariant();
+                
+                // For Opus and OGG, use TagLib exclusively (FFmpeg doesn't handle artwork well)
+                if (lowerExt == ".opus" || lowerExt == ".ogg")
+                {
+                    ApplyMetadataWithTagLib(trackInfo, audioFilePath);
+                    return;
+                }
+
+                // For other formats, use FFmpeg
+                string tempOutput = Path.Combine(_downloadFolder, $"temp_{Guid.NewGuid():N}{fileExtension}");
                 var argsList = new List<string>();
                 argsList.AddRange(new[] { "-i", audioFilePath });
 
@@ -472,9 +500,13 @@ namespace Symphex.Services
                 }
 
                 string? tempArtwork = null;
+                bool hasArtwork = false;
+                
                 if (artworkToUse != null)
                 {
-                    tempArtwork = Path.Combine(Path.GetTempPath(), $"temp_artwork_{Guid.NewGuid():N}.jpg");
+                    // Determine image format based on audio format
+                    string imageExt = (lowerExt == ".flac" || lowerExt == ".m4a") ? ".png" : ".jpg";
+                    tempArtwork = Path.Combine(Path.GetTempPath(), $"temp_artwork_{Guid.NewGuid():N}{imageExt}");
 
                     try
                     {
@@ -489,18 +521,43 @@ namespace Symphex.Services
                                 resizedArtwork.Save(fileStream);
                             }
                             Debug.WriteLine($"[ApplyMetadata] Saved resized artwork: {resizedArtwork.PixelSize.Width}x{resizedArtwork.PixelSize.Height}");
+                            hasArtwork = true;
                         }
-
-                        argsList.AddRange(new[] { "-i", tempArtwork });
-                        argsList.AddRange(new[] { "-map", "0:a", "-map", "1:0" });
-                        argsList.AddRange(new[] { "-c:a", "copy", "-c:v", "mjpeg" });
-                        argsList.AddRange(new[] { "-disposition:v", "attached_pic" });
                     }
                     catch (Exception ex)
                     {
                         tempArtwork = null;
-                        argsList.AddRange(new[] { "-c", "copy" });
                         Debug.WriteLine($"[ApplyMetadata] Failed to process artwork: {ex}");
+                    }
+                }
+
+                // Add artwork input if available
+                if (hasArtwork && tempArtwork != null)
+                {
+                    argsList.AddRange(new[] { "-i", tempArtwork });
+                    argsList.AddRange(new[] { "-map", "0:a", "-map", "1:0" });
+                    
+                    // Format-specific encoding for artwork
+                    if (lowerExt == ".mp3")
+                    {
+                        argsList.AddRange(new[] { "-c:a", "copy", "-c:v", "mjpeg" });
+                        argsList.AddRange(new[] { "-disposition:v", "attached_pic" });
+                    }
+                    else if (lowerExt == ".m4a" || lowerExt == ".aac")
+                    {
+                        argsList.AddRange(new[] { "-c:a", "copy", "-c:v", "png" });
+                        argsList.AddRange(new[] { "-disposition:v", "attached_pic" });
+                    }
+                    else if (lowerExt == ".flac")
+                    {
+                        argsList.AddRange(new[] { "-c:a", "copy", "-c:v", "png" });
+                        argsList.AddRange(new[] { "-disposition:v", "attached_pic" });
+                    }
+                    else
+                    {
+                        // Default: try to copy and attach
+                        argsList.AddRange(new[] { "-c:a", "copy", "-c:v", "mjpeg" });
+                        argsList.AddRange(new[] { "-disposition:v", "attached_pic" });
                     }
                 }
                 else
@@ -593,6 +650,20 @@ namespace Symphex.Services
                         if (File.Exists(audioFilePath))
                             File.Delete(audioFilePath);
                         File.Move(tempOutput, audioFilePath);
+                        
+                        // For Opus and OGG, use TagLib to embed artwork since FFmpeg doesn't handle it well
+                        if ((lowerExt == ".opus" || lowerExt == ".ogg") && hasArtwork && tempArtwork != null && File.Exists(tempArtwork))
+                        {
+                            try
+                            {
+                                EmbedArtworkWithTagLib(audioFilePath, tempArtwork);
+                                Debug.WriteLine($"[ApplyMetadata] Embedded artwork using TagLib for {lowerExt}");
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[ApplyMetadata] TagLib embedding failed: {ex.Message}");
+                            }
+                        }
                     }
                     else
                     {
@@ -611,6 +682,133 @@ namespace Symphex.Services
             catch (Exception ex)
             {
                 Debug.WriteLine($"[ApplyMetadata] Exception: {ex}");
+            }
+        }
+
+        private void EmbedArtworkWithTagLib(string audioFilePath, string artworkPath)
+        {
+            try
+            {
+                var file = TagLib.File.Create(audioFilePath);
+                
+                // Read the artwork file
+                var artworkData = File.ReadAllBytes(artworkPath);
+                
+                // Determine MIME type based on extension
+                string mimeType = Path.GetExtension(artworkPath).ToLowerInvariant() == ".png" 
+                    ? "image/png" 
+                    : "image/jpeg";
+                
+                // Create picture
+                var picture = new TagLib.Picture(new TagLib.ByteVector(artworkData))
+                {
+                    Type = TagLib.PictureType.FrontCover,
+                    MimeType = mimeType,
+                    Description = "Cover"
+                };
+                
+                // Set the picture
+                file.Tag.Pictures = new TagLib.IPicture[] { picture };
+                
+                // Save the file
+                file.Save();
+                
+                Debug.WriteLine($"[EmbedArtworkWithTagLib] Successfully embedded artwork in {Path.GetFileName(audioFilePath)}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[EmbedArtworkWithTagLib] Error: {ex.Message}");
+                throw;
+            }
+        }
+
+        private void ApplyMetadataWithTagLib(TrackInfo trackInfo, string audioFilePath)
+        {
+            try
+            {
+                Debug.WriteLine($"[ApplyMetadataWithTagLib] Processing {Path.GetFileName(audioFilePath)}");
+                
+                var file = TagLib.File.Create(audioFilePath);
+                
+                // Apply text metadata
+                if (!string.IsNullOrEmpty(trackInfo.Title) && trackInfo.Title != "Unknown")
+                    file.Tag.Title = trackInfo.Title;
+                
+                if (!string.IsNullOrEmpty(trackInfo.Artist) && trackInfo.Artist != "Unknown")
+                    file.Tag.Performers = new[] { trackInfo.Artist };
+                
+                if (!string.IsNullOrEmpty(trackInfo.Album))
+                    file.Tag.Album = trackInfo.Album;
+                
+                if (!string.IsNullOrEmpty(trackInfo.AlbumArtist))
+                    file.Tag.AlbumArtists = new[] { trackInfo.AlbumArtist };
+                
+                if (!string.IsNullOrEmpty(trackInfo.Genre))
+                    file.Tag.Genres = new[] { trackInfo.Genre };
+                
+                if (!string.IsNullOrEmpty(trackInfo.Year) && uint.TryParse(trackInfo.Year, out uint year))
+                    file.Tag.Year = year;
+                
+                if (trackInfo.TrackNumber > 0)
+                    file.Tag.Track = (uint)trackInfo.TrackNumber;
+                
+                if (trackInfo.DiscNumber > 0)
+                    file.Tag.Disc = (uint)trackInfo.DiscNumber;
+                
+                if (!string.IsNullOrEmpty(trackInfo.Comment))
+                    file.Tag.Comment = trackInfo.Comment;
+                
+                if (!string.IsNullOrEmpty(trackInfo.Composer))
+                    file.Tag.Composers = new[] { trackInfo.Composer };
+                
+                // Embed artwork
+                Bitmap? artworkToUse = _enableAlbumArt ? (trackInfo.AlbumArt ?? trackInfo.Thumbnail) : trackInfo.Thumbnail;
+                
+                if (artworkToUse != null)
+                {
+                    string tempArtwork = Path.Combine(Path.GetTempPath(), $"temp_artwork_{Guid.NewGuid():N}.png");
+                    
+                    try
+                    {
+                        // Resize and save artwork
+                        var (targetWidth, targetHeight) = GetTargetDimensionsFromSize(_selectedThumbnailSize);
+                        var resizedArtwork = ResizeImage(artworkToUse, targetWidth, targetHeight);
+                        
+                        if (resizedArtwork != null)
+                        {
+                            using (var fileStream = new FileStream(tempArtwork, FileMode.Create))
+                            {
+                                resizedArtwork.Save(fileStream);
+                            }
+                            
+                            // Read and embed
+                            var artworkData = File.ReadAllBytes(tempArtwork);
+                            var picture = new TagLib.Picture(new TagLib.ByteVector(artworkData))
+                            {
+                                Type = TagLib.PictureType.FrontCover,
+                                MimeType = "image/png",
+                                Description = "Cover"
+                            };
+                            
+                            file.Tag.Pictures = new TagLib.IPicture[] { picture };
+                            Debug.WriteLine($"[ApplyMetadataWithTagLib] Embedded {artworkData.Length} bytes of artwork");
+                        }
+                    }
+                    finally
+                    {
+                        if (File.Exists(tempArtwork))
+                            File.Delete(tempArtwork);
+                    }
+                }
+                
+                // Save all changes
+                file.Save();
+                Debug.WriteLine($"[ApplyMetadataWithTagLib] Successfully saved metadata for {Path.GetFileName(audioFilePath)}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ApplyMetadataWithTagLib] Error: {ex.Message}");
+                Debug.WriteLine($"[ApplyMetadataWithTagLib] Stack trace: {ex.StackTrace}");
             }
         }
 
@@ -675,17 +873,32 @@ namespace Symphex.Services
                 if (string.IsNullOrEmpty(_ffmpegPath) || !File.Exists(audioFilePath))
                     return;
 
-                string tempOutput = Path.Combine(_downloadFolder, $"temp_{Guid.NewGuid():N}.mp3");
+                // Get the file extension to preserve format
+                string fileExtension = Path.GetExtension(audioFilePath);
+                string lowerExt = fileExtension.ToLowerInvariant();
+                
+                // For Opus and OGG, use TagLib exclusively (FFmpeg doesn't handle artwork well)
+                if (lowerExt == ".opus" || lowerExt == ".ogg")
+                {
+                    ApplyMetadataWithTagLib(trackInfo, audioFilePath);
+                    return;
+                }
+
+                // For other formats, use FFmpeg
+                string tempOutput = Path.Combine(_downloadFolder, $"temp_{Guid.NewGuid():N}{fileExtension}");
                 var argsList = new List<string>();
                 argsList.AddRange(new[] { "-i", audioFilePath });
 
                 // Handle album art embedding
                 Bitmap? artworkToUse = trackInfo.AlbumArt ?? trackInfo.Thumbnail;
                 string? tempArtwork = null;
+                bool hasArtwork = false;
 
                 if (artworkToUse != null)
                 {
-                    tempArtwork = Path.Combine(Path.GetTempPath(), $"temp_artwork_{Guid.NewGuid():N}.jpg");
+                    // Determine image format based on audio format
+                    string imageExt = (lowerExt == ".flac" || lowerExt == ".m4a") ? ".png" : ".jpg";
+                    tempArtwork = Path.Combine(Path.GetTempPath(), $"temp_artwork_{Guid.NewGuid():N}{imageExt}");
 
                     try
                     {
@@ -700,17 +913,42 @@ namespace Symphex.Services
                                 resizedArtwork.Save(fileStream);
                             }
                             Debug.WriteLine($"[ApplyMetadataForBatch] Saved resized artwork: {resizedArtwork.PixelSize.Width}x{resizedArtwork.PixelSize.Height}");
+                            hasArtwork = true;
                         }
-
-                        argsList.AddRange(new[] { "-i", tempArtwork });
-                        argsList.AddRange(new[] { "-map", "0:a", "-map", "1:0" });
-                        argsList.AddRange(new[] { "-c:a", "copy", "-c:v", "mjpeg" });
-                        argsList.AddRange(new[] { "-disposition:v", "attached_pic" });
                     }
                     catch
                     {
                         tempArtwork = null;
-                        argsList.AddRange(new[] { "-c", "copy" });
+                    }
+                }
+
+                // Add artwork input if available
+                if (hasArtwork && tempArtwork != null)
+                {
+                    argsList.AddRange(new[] { "-i", tempArtwork });
+                    argsList.AddRange(new[] { "-map", "0:a", "-map", "1:0" });
+                    
+                    // Format-specific encoding for artwork
+                    if (lowerExt == ".mp3")
+                    {
+                        argsList.AddRange(new[] { "-c:a", "copy", "-c:v", "mjpeg" });
+                        argsList.AddRange(new[] { "-disposition:v", "attached_pic" });
+                    }
+                    else if (lowerExt == ".m4a" || lowerExt == ".aac")
+                    {
+                        argsList.AddRange(new[] { "-c:a", "copy", "-c:v", "png" });
+                        argsList.AddRange(new[] { "-disposition:v", "attached_pic" });
+                    }
+                    else if (lowerExt == ".flac")
+                    {
+                        argsList.AddRange(new[] { "-c:a", "copy", "-c:v", "png" });
+                        argsList.AddRange(new[] { "-disposition:v", "attached_pic" });
+                    }
+                    else
+                    {
+                        // Default: try to copy and attach
+                        argsList.AddRange(new[] { "-c:a", "copy", "-c:v", "mjpeg" });
+                        argsList.AddRange(new[] { "-disposition:v", "attached_pic" });
                     }
                 }
                 else
@@ -769,6 +1007,20 @@ namespace Symphex.Services
                     {
                         File.Delete(audioFilePath);
                         File.Move(tempOutput, audioFilePath);
+                        
+                        // For Opus and OGG, use TagLib to embed artwork since FFmpeg doesn't handle it well
+                        if ((lowerExt == ".opus" || lowerExt == ".ogg") && hasArtwork && tempArtwork != null && File.Exists(tempArtwork))
+                        {
+                            try
+                            {
+                                EmbedArtworkWithTagLib(audioFilePath, tempArtwork);
+                                Debug.WriteLine($"[ApplyMetadataForBatch] Embedded artwork using TagLib for {lowerExt}");
+                            }
+                            catch (Exception ex)
+                            {
+                                Debug.WriteLine($"[ApplyMetadataForBatch] TagLib embedding failed: {ex.Message}");
+                            }
+                        }
                     }
                     else if (File.Exists(tempOutput))
                     {
@@ -835,7 +1087,23 @@ namespace Symphex.Services
                 bool actuallySkipThumbnail = !_skipThumbnailDownload;
                 if (!actuallySkipThumbnail)
                 {
-                    argsList.Add("--embed-thumbnail");
+                    // For formats that support embedded thumbnails
+                    if (audioFormat != "wav") // WAV doesn't support embedded metadata
+                    {
+                        argsList.Add("--embed-thumbnail");
+                        
+                        // For M4A/AAC, use specific postprocessor args to ensure thumbnail embedding works
+                        if (audioFormat == "m4a" || audioFormat == "aac")
+                        {
+                            argsList.Add("--ppa");
+                            argsList.Add("EmbedThumbnail+ffmpeg_o:-c:v mjpeg");
+                        }
+                    }
+                    else
+                    {
+                        // For WAV, we'll still download the thumbnail but won't embed it
+                        argsList.Add("--write-thumbnail");
+                    }
                 }
 
                 argsList.Add("--add-metadata");
@@ -1420,16 +1688,29 @@ namespace Symphex.Services
         private (string format, string quality) ParseAudioFormat(string formatOption)
         {
             // Parse format selection and return appropriate yt-dlp parameters
+            // Quality "0" means best quality for the format
             return formatOption switch
             {
-                "MP3 (320kbps)" => ("mp3", "0"), // 0 = best quality for mp3
+                // Current format names
+                "MP3" => ("mp3", "0"),
                 "FLAC (Lossless)" => ("flac", "0"),
                 "WAV (Uncompressed)" => ("wav", "0"),
-                "AAC (256kbps)" => ("aac", "256k"),
-                "M4A (256kbps)" => ("m4a", "256k"),
-                "Opus (192kbps)" => ("opus", "192k"),
-                "Vorbis (192kbps)" => ("vorbis", "192k"),
-                _ => ("mp3", "0") // Default to MP3 320kbps
+                "M4A (AAC)" => ("m4a", "0"),
+                "Opus" => ("opus", "0"),
+                "Vorbis (OGG)" => ("vorbis", "0"),
+                
+                // Legacy format names (for backwards compatibility)
+                "MP3 (Best Quality)" => ("mp3", "0"),
+                "MP3 (320kbps)" => ("mp3", "0"),
+                "AAC (256kbps)" => ("m4a", "0"),
+                "M4A (256kbps)" => ("m4a", "0"),
+                "M4A (AAC - Best Quality)" => ("m4a", "0"),
+                "Opus (192kbps)" => ("opus", "0"),
+                "Opus (Best Quality)" => ("opus", "0"),
+                "Vorbis (192kbps)" => ("vorbis", "0"),
+                "Vorbis (OGG - Best Quality)" => ("vorbis", "0"),
+                
+                _ => ("mp3", "0") // Default to MP3
             };
         }
     }

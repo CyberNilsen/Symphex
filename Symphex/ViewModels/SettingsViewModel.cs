@@ -83,18 +83,17 @@ namespace Symphex.ViewModels
         };
 
         [ObservableProperty]
-        private string selectedAudioFormat = "MP3 (320kbps)";
+        private string selectedAudioFormat = "MP3";
 
         [ObservableProperty]
         private List<string> audioFormatOptions = new List<string>
         {
-            "MP3 (320kbps)",
+            "MP3",
             "FLAC (Lossless)",
             "WAV (Uncompressed)",
-            "AAC (256kbps)",
-            "M4A (256kbps)",
-            "Opus (192kbps)",
-            "Vorbis (192kbps)"
+            "M4A (AAC)",
+            "Opus",
+            "Vorbis (OGG)"
         };
 
         // Orange warning: Album art disabled but thumbnails enabled
@@ -123,12 +122,32 @@ namespace Symphex.ViewModels
                 EnableArtworkSelection = settings.EnableArtworkSelection;
                 ArtworkSelectionTimeout = settings.ArtworkSelectionTimeout;
                 AlbumArtSize = settings.AlbumArtSize;
-                SelectedAudioFormat = settings.SelectedAudioFormat;
+                
+                // Migrate old format names to new ones
+                SelectedAudioFormat = MigrateAudioFormat(settings.SelectedAudioFormat);
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"[SettingsViewModel] Error loading settings: {ex.Message}");
             }
+        }
+
+        private string MigrateAudioFormat(string oldFormat)
+        {
+            // Migrate old format names to new simplified names
+            return oldFormat switch
+            {
+                "MP3 (Best Quality)" => "MP3",
+                "MP3 (320kbps)" => "MP3",
+                "AAC (256kbps)" => "M4A (AAC)",
+                "M4A (256kbps)" => "M4A (AAC)",
+                "M4A (AAC - Best Quality)" => "M4A (AAC)",
+                "Opus (192kbps)" => "Opus",
+                "Opus (Best Quality)" => "Opus",
+                "Vorbis (192kbps)" => "Vorbis (OGG)",
+                "Vorbis (OGG - Best Quality)" => "Vorbis (OGG)",
+                _ => AudioFormatOptions.Contains(oldFormat) ? oldFormat : "MP3" // Default to MP3 if unknown
+            };
         }
 
         private void SaveSettings()

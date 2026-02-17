@@ -232,15 +232,15 @@
 									<StackPanel Spacing="8">
 										<StackPanel Orientation="Horizontal" Spacing="8">
 											<materialIcons:MaterialIcon Kind="Check" Width="14" Height="14" Foreground="#3b82f6"/>
-											<TextBlock Text="MP3: Universal compatibility (320kbps)" FontSize="12" Foreground="#999999"/>
+											<TextBlock Text="MP3/FLAC/M4A: Full artwork support" FontSize="12" Foreground="#999999"/>
 										</StackPanel>
 										<StackPanel Orientation="Horizontal" Spacing="8">
-											<materialIcons:MaterialIcon Kind="Star" Width="14" Height="14" Foreground="#f59e0b"/>
-											<TextBlock Text="FLAC/WAV: Lossless quality (larger files)" FontSize="12" Foreground="#999999"/>
+											<materialIcons:MaterialIcon Kind="Check" Width="14" Height="14" Foreground="#10b981"/>
+											<TextBlock Text="Opus/Vorbis: Artwork embedded via TagLib" FontSize="12" Foreground="#999999"/>
 										</StackPanel>
 										<StackPanel Orientation="Horizontal" Spacing="8">
-											<materialIcons:MaterialIcon Kind="Flash" Width="14" Height="14" Foreground="#10b981"/>
-											<TextBlock Text="AAC/M4A: Good quality, smaller size" FontSize="12" Foreground="#999999"/>
+											<materialIcons:MaterialIcon Kind="AlertCircle" Width="14" Height="14" Foreground="#ef4444"/>
+											<TextBlock Text="WAV: No metadata support (raw audio)" FontSize="12" Foreground="#999999"/>
 										</StackPanel>
 									</StackPanel>
 								</Border>
