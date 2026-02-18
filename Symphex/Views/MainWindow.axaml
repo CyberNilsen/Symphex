@@ -130,7 +130,8 @@
 				Cursor="Hand"
 				ZIndex="100"
 				Command="{Binding ToggleHistoryPanelCommand}"
-				RenderTransformOrigin="0.5,0.5">
+				RenderTransformOrigin="0.5,0.5"
+				Padding="0">
 			<Button.IsVisible>
 				<MultiBinding Converter="{x:Static converters:MultiBoolToVisibilityConverter.Instance}">
 					<Binding Path="IsHistoryPanelOpen"/>
@@ -147,7 +148,9 @@
 					<Setter Property="RenderTransform" Value="scale(0.95)"/>
 				</Style>
 			</Button.Styles>
-			<TextBlock Text="📜" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+			<Viewbox Width="28" Height="28">
+				<TextBlock Text="📜" TextAlignment="Center"/>
+			</Viewbox>
 		</Button>
 
 		<!-- Resize Mode Toggle Button - Top Right (left of history) -->
@@ -161,7 +164,8 @@
 				Cursor="Hand"
 				ZIndex="100"
 				Command="{Binding ToggleResizeModeCommand}"
-				RenderTransformOrigin="0.5,0.5">
+				RenderTransformOrigin="0.5,0.5"
+				Padding="0">
 			<Button.IsVisible>
 				<MultiBinding Converter="{x:Static converters:MultiBoolToVisibilityConverter.Instance}">
 					<Binding Path="IsHistoryPanelOpen"/>
@@ -178,7 +182,9 @@
 					<Setter Property="RenderTransform" Value="scale(0.95)"/>
 				</Style>
 			</Button.Styles>
-			<TextBlock Text="🎨" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+			<Viewbox Width="28" Height="28">
+				<TextBlock Text="🎨" TextAlignment="Center"/>
+			</Viewbox>
 		</Button>
 
 		<!-- Settings Gear Icon Button - Top Right -->
