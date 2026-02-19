@@ -1,6 +1,8 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:Symphex.ViewModels"
+             xmlns:converters="using:Symphex.Converters"
+             xmlns:services="using:Symphex.Services"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
@@ -13,6 +15,36 @@
 	</Design.DataContext>
 
 	<UserControl.Styles>
+		<!-- Button styles with custom template -->
+		<Style Selector="Button.settings-button">
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="Foreground" Value="#3b82f6"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="CornerRadius" Value="8"/>
+			<Setter Property="Padding" Value="8"/>
+			<Setter Property="Cursor" Value="Hand"/>
+			<Setter Property="Template">
+				<ControlTemplate>
+					<Border Background="{TemplateBinding Background}"
+							BorderBrush="{TemplateBinding BorderBrush}"
+							BorderThickness="{TemplateBinding BorderThickness}"
+							CornerRadius="{TemplateBinding CornerRadius}"
+							Padding="{TemplateBinding Padding}">
+						<ContentPresenter Content="{TemplateBinding Content}"
+										  Foreground="{TemplateBinding Foreground}"
+										  HorizontalContentAlignment="Center"
+										  VerticalContentAlignment="Center"/>
+					</Border>
+				</ControlTemplate>
+			</Setter>
+		</Style>
+		<Style Selector="Button.settings-button:pointerover">
+			<Setter Property="Background" Value="#1a1a1a"/>
+		</Style>
+		<Style Selector="Button.settings-button:pressed">
+			<Setter Property="Background" Value="#2a2a2a"/>
+		</Style>
+		
 		<Style Selector="Button.primary">
 			<Setter Property="Background" Value="#3b82f6"/>
 			<Setter Property="Foreground" Value="White"/>
@@ -24,6 +56,20 @@
 			<Setter Property="Cursor" Value="Hand"/>
 			<Setter Property="Effect">
 				<DropShadowEffect Color="#3b82f6" Opacity="0.4" BlurRadius="20" OffsetX="0" OffsetY="4"/>
+			</Setter>
+			<Setter Property="Template">
+				<ControlTemplate>
+					<Border Background="{TemplateBinding Background}"
+							BorderBrush="{TemplateBinding BorderBrush}"
+							BorderThickness="{TemplateBinding BorderThickness}"
+							CornerRadius="{TemplateBinding CornerRadius}"
+							Padding="{TemplateBinding Padding}">
+						<ContentPresenter Content="{TemplateBinding Content}"
+										  Foreground="{TemplateBinding Foreground}"
+										  HorizontalContentAlignment="Center"
+										  VerticalContentAlignment="Center"/>
+					</Border>
+				</ControlTemplate>
 			</Setter>
 		</Style>
 		<Style Selector="Button.primary:pointerover">
@@ -84,6 +130,20 @@
 			<Setter Property="Margin" Value="0,0,8,0"/>
 			<Setter Property="Background" Value="Transparent"/>
 			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="Template">
+				<ControlTemplate>
+					<Border Background="{TemplateBinding Background}"
+							BorderBrush="{TemplateBinding BorderBrush}"
+							BorderThickness="{TemplateBinding BorderThickness}"
+							CornerRadius="12,12,0,0"
+							Padding="{TemplateBinding Padding}">
+						<ContentPresenter Content="{TemplateBinding Header}"
+										  Foreground="{TemplateBinding Foreground}"
+										  HorizontalContentAlignment="Center"
+										  VerticalContentAlignment="Center"/>
+					</Border>
+				</ControlTemplate>
+			</Setter>
 		</Style>
 		
 		<Style Selector="TabItem:selected">
@@ -94,16 +154,24 @@
 					<GradientStop Color="#151515" Offset="1"/>
 				</LinearGradientBrush>
 			</Setter>
-			<Setter Property="CornerRadius" Value="12,12,0,0"/>
 		</Style>
 		
 		<Style Selector="TabItem:pointerover">
-			<Setter Property="Background" Value="#0f0f0f"/>
-			<Setter Property="CornerRadius" Value="12,12,0,0"/>
+			<Setter Property="Background" Value="#1a1a1a"/>
 		</Style>
 		
 		<Style Selector="TabItem:pointerover:not(:selected)">
 			<Setter Property="Foreground" Value="#999999"/>
+		</Style>
+		
+		<Style Selector="TabItem:pointerover:selected">
+			<Setter Property="Foreground" Value="#60a5fa"/>
+			<Setter Property="Background">
+				<LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+					<GradientStop Color="#1a1a1a" Offset="0"/>
+					<GradientStop Color="#151515" Offset="1"/>
+				</LinearGradientBrush>
+			</Setter>
 		</Style>
 
 		<Style Selector="ProgressBar">
@@ -135,19 +203,10 @@
 				</StackPanel>
 
 				<!-- Back Button - Right Side -->
-				<Button Grid.Column="1" 
+				<Button Classes="settings-button"
+						Grid.Column="1" 
 						Command="{Binding BackCommand}"
-						Background="Transparent"
-						BorderThickness="0"
-						Padding="8"
-						Cursor="Hand"
-						VerticalAlignment="Center"
-						CornerRadius="8">
-					<Button.Styles>
-						<Style Selector="Button:pointerover">
-							<Setter Property="Background" Value="#1a1a1a"/>
-						</Style>
-					</Button.Styles>
+						VerticalAlignment="Center">
 					<StackPanel Orientation="Horizontal" Spacing="10">
 						<TextBlock Text="Back" FontSize="14" Foreground="#3b82f6" FontWeight="SemiBold" VerticalAlignment="Center"/>
 						<Border Width="36" Height="36" CornerRadius="18" Background="#0a0a0a">
@@ -423,12 +482,30 @@
 										HorizontalAlignment="Center"
 										Padding="20,10"
 										Background="#ef4444"
+										Foreground="White"
 										CornerRadius="10"
 										BorderThickness="0"
 										Cursor="Hand">
+									<Button.Template>
+										<ControlTemplate>
+											<Border Background="{TemplateBinding Background}"
+													BorderBrush="{TemplateBinding BorderBrush}"
+													BorderThickness="{TemplateBinding BorderThickness}"
+													CornerRadius="{TemplateBinding CornerRadius}"
+													Padding="{TemplateBinding Padding}">
+												<ContentPresenter Content="{TemplateBinding Content}"
+																  Foreground="{TemplateBinding Foreground}"
+																  HorizontalContentAlignment="Center"
+																  VerticalContentAlignment="Center"/>
+											</Border>
+										</ControlTemplate>
+									</Button.Template>
 									<Button.Styles>
 										<Style Selector="Button:pointerover">
 											<Setter Property="Background" Value="#dc2626"/>
+										</Style>
+										<Style Selector="Button:pressed">
+											<Setter Property="Background" Value="#b91c1c"/>
 										</Style>
 									</Button.Styles>
 									<StackPanel Orientation="Horizontal" Spacing="8">

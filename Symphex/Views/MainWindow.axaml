@@ -3,6 +3,7 @@
 		xmlns:vm="using:Symphex.ViewModels"
 		xmlns:views="using:Symphex.Views"
 		xmlns:converters="using:Symphex.Converters"
+		xmlns:services="using:Symphex.Services"
 		xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
 		xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
 		mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="700"
@@ -19,6 +20,41 @@
 
 	<Window.Styles>
 		
+		<Style Selector="Button.icon-button">
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=ButtonBackground}"/>
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=ButtonForeground}"/>
+			<Setter Property="BorderThickness" Value="2"/>
+			<Setter Property="BorderBrush" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=ButtonBorder}"/>
+			<Setter Property="CornerRadius" Value="25"/>
+			<Setter Property="Width" Value="50"/>
+			<Setter Property="Height" Value="50"/>
+			<Setter Property="Padding" Value="0"/>
+			<Setter Property="Cursor" Value="Hand"/>
+			<Setter Property="Template">
+				<ControlTemplate>
+					<Border Background="{TemplateBinding Background}"
+							BorderBrush="{TemplateBinding BorderBrush}"
+							BorderThickness="{TemplateBinding BorderThickness}"
+							CornerRadius="{TemplateBinding CornerRadius}"
+							Padding="{TemplateBinding Padding}">
+						<ContentPresenter Content="{TemplateBinding Content}"
+										  Foreground="{TemplateBinding Foreground}"
+										  HorizontalContentAlignment="Center"
+										  VerticalContentAlignment="Center"/>
+					</Border>
+				</ControlTemplate>
+			</Setter>
+		</Style>
+		<Style Selector="Button.icon-button:pointerover">
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=HoverBackground}"/>
+			<Setter Property="BorderBrush" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=HoverBorder}"/>
+			<Setter Property="RenderTransform" Value="scale(1.1)"/>
+		</Style>
+		<Style Selector="Button.icon-button:pressed">
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=PressedBackground}"/>
+			<Setter Property="RenderTransform" Value="scale(0.95)"/>
+		</Style>
+		
 		<Style Selector="Button.download">
 			<Setter Property="Background" Value="#1e40af"/>
 			<Setter Property="Foreground" Value="White"/>
@@ -31,6 +67,20 @@
 			<Setter Property="Effect">
 				<DropShadowEffect Color="#1e40af" Opacity="0.3" BlurRadius="15" OffsetX="0" OffsetY="5"/>
 			</Setter>
+			<Setter Property="Template">
+				<ControlTemplate>
+					<Border Background="{TemplateBinding Background}"
+							BorderBrush="{TemplateBinding BorderBrush}"
+							BorderThickness="{TemplateBinding BorderThickness}"
+							CornerRadius="{TemplateBinding CornerRadius}"
+							Padding="{TemplateBinding Padding}">
+						<ContentPresenter Content="{TemplateBinding Content}"
+										  Foreground="{TemplateBinding Foreground}"
+										  HorizontalContentAlignment="Center"
+										  VerticalContentAlignment="Center"/>
+					</Border>
+				</ControlTemplate>
+			</Setter>
 		</Style>
 		<Style Selector="Button.download:pointerover">
 			<Setter Property="Background" Value="#1d4ed8"/>
@@ -42,24 +92,86 @@
 		</Style>
 
 		<Style Selector="Button.simple">
-			<Setter Property="Background" Value="#1f1f1f"/>
-			<Setter Property="Foreground" Value="#ffffff"/>
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=ButtonBackground}"/>
+			<Setter Property="Foreground" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=ButtonForeground}"/>
 			<Setter Property="BorderThickness" Value="2"/>
-			<Setter Property="BorderBrush" Value="#666666"/>
+			<Setter Property="BorderBrush" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=ButtonBorder}"/>
 			<Setter Property="CornerRadius" Value="8"/>
 			<Setter Property="Padding" Value="16,8"/>
 			<Setter Property="FontSize" Value="13"/>
 			<Setter Property="FontWeight" Value="Medium"/>
 			<Setter Property="Cursor" Value="Hand"/>
+			<Setter Property="Template">
+				<ControlTemplate>
+					<Border Background="{TemplateBinding Background}"
+							BorderBrush="{TemplateBinding BorderBrush}"
+							BorderThickness="{TemplateBinding BorderThickness}"
+							CornerRadius="{TemplateBinding CornerRadius}"
+							Padding="{TemplateBinding Padding}">
+						<ContentPresenter Content="{TemplateBinding Content}"
+										  Foreground="{TemplateBinding Foreground}"
+										  HorizontalContentAlignment="Center"
+										  VerticalContentAlignment="Center"/>
+					</Border>
+				</ControlTemplate>
+			</Setter>
 		</Style>
 		<Style Selector="Button.simple:pointerover">
-			<Setter Property="Background" Value="#333333"/>
-			<Setter Property="BorderBrush" Value="#888888"/>
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=HoverBackground}"/>
+			<Setter Property="BorderBrush" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=HoverBorder}"/>
 			<Setter Property="RenderTransform" Value="scale(1.02)"/>
 		</Style>
 		<Style Selector="Button.simple:pressed">
-			<Setter Property="Background" Value="#0f0f0f"/>
+			<Setter Property="Background" Value="{Binding Source={x:Static services:ThemeManager.Instance}, Path=PressedBackground}"/>
 			<Setter Property="RenderTransform" Value="scale(0.98)"/>
+		</Style>
+		
+		<!-- Small action buttons (Load, Delete, Play, etc.) -->
+		<Style Selector="Button.action-button">
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="CornerRadius" Value="6"/>
+			<Setter Property="Padding" Value="8,4"/>
+			<Setter Property="FontSize" Value="10"/>
+			<Setter Property="Cursor" Value="Hand"/>
+			<Setter Property="Foreground" Value="White"/>
+			<Setter Property="Template">
+				<ControlTemplate>
+					<Border Background="{TemplateBinding Background}"
+							BorderBrush="{TemplateBinding BorderBrush}"
+							BorderThickness="{TemplateBinding BorderThickness}"
+							CornerRadius="{TemplateBinding CornerRadius}"
+							Padding="{TemplateBinding Padding}">
+						<ContentPresenter Content="{TemplateBinding Content}"
+										  Foreground="{TemplateBinding Foreground}"
+										  HorizontalContentAlignment="Center"
+										  VerticalContentAlignment="Center"/>
+					</Border>
+				</ControlTemplate>
+			</Setter>
+		</Style>
+		
+		<!-- Close button style -->
+		<Style Selector="Button.close-button">
+			<Setter Property="Background" Value="Transparent"/>
+			<Setter Property="BorderThickness" Value="0"/>
+			<Setter Property="Cursor" Value="Hand"/>
+			<Setter Property="Template">
+				<ControlTemplate>
+					<Border Background="{TemplateBinding Background}"
+							BorderBrush="{TemplateBinding BorderBrush}"
+							BorderThickness="{TemplateBinding BorderThickness}"
+							CornerRadius="{TemplateBinding CornerRadius}"
+							Padding="{TemplateBinding Padding}">
+						<ContentPresenter Content="{TemplateBinding Content}"
+										  Foreground="{TemplateBinding Foreground}"
+										  HorizontalContentAlignment="Center"
+										  VerticalContentAlignment="Center"/>
+					</Border>
+				</ControlTemplate>
+			</Setter>
+		</Style>
+		<Style Selector="Button.close-button:pointerover">
+			<Setter Property="Background" Value="#2a2a2a"/>
 		</Style>
 
 		<Style Selector="TextBox.large">
@@ -120,102 +232,54 @@
 	<Grid>
 		
 		<!-- History Icon Button - Top Right (left of settings) -->
-		<Button HorizontalAlignment="Right" VerticalAlignment="Top"
+		<Button Classes="icon-button"
+				HorizontalAlignment="Right" VerticalAlignment="Top"
 				Margin="20,20,80,20"
-				Width="50" Height="50"
-				Background="#1a1a1a"
-				BorderThickness="2"
-				BorderBrush="#404040"
-				CornerRadius="25"
-				Cursor="Hand"
 				ZIndex="100"
 				Command="{Binding ToggleHistoryPanelCommand}"
-				RenderTransformOrigin="0.5,0.5"
-				Padding="0">
+				RenderTransformOrigin="0.5,0.5">
 			<Button.IsVisible>
 				<MultiBinding Converter="{x:Static converters:MultiBoolToVisibilityConverter.Instance}">
 					<Binding Path="IsHistoryPanelOpen"/>
 					<Binding Path="IsSettingsView"/>
 				</MultiBinding>
 			</Button.IsVisible>
-			<Button.Styles>
-				<Style Selector="Button:pointerover">
-					<Setter Property="Background" Value="#2a2a2a"/>
-					<Setter Property="BorderBrush" Value="#606060"/>
-					<Setter Property="RenderTransform" Value="scale(1.1)"/>
-				</Style>
-				<Style Selector="Button:pressed">
-					<Setter Property="RenderTransform" Value="scale(0.95)"/>
-				</Style>
-			</Button.Styles>
 			<Viewbox Width="28" Height="28">
 				<TextBlock Text="📜" TextAlignment="Center"/>
 			</Viewbox>
 		</Button>
 
 		<!-- Resize Mode Toggle Button - Top Right (left of history) -->
-		<Button HorizontalAlignment="Right" VerticalAlignment="Top"
+		<Button Classes="icon-button"
+				HorizontalAlignment="Right" VerticalAlignment="Top"
 				Margin="20,20,140,20"
-				Width="50" Height="50"
-				Background="{Binding IsResizeMode, Converter={x:Static converters:BoolToColorConverter.Instance}}"
-				BorderThickness="2"
-				BorderBrush="{Binding IsResizeMode, Converter={x:Static converters:BoolToBorderColorConverter.Instance}}"
-				CornerRadius="25"
-				Cursor="Hand"
 				ZIndex="100"
 				Command="{Binding ToggleResizeModeCommand}"
-				RenderTransformOrigin="0.5,0.5"
-				Padding="0">
+				RenderTransformOrigin="0.5,0.5">
 			<Button.IsVisible>
 				<MultiBinding Converter="{x:Static converters:MultiBoolToVisibilityConverter.Instance}">
 					<Binding Path="IsHistoryPanelOpen"/>
 					<Binding Path="IsSettingsView"/>
 				</MultiBinding>
 			</Button.IsVisible>
-			<Button.Styles>
-				<Style Selector="Button:pointerover">
-					<Setter Property="Background" Value="#2a2a2a"/>
-					<Setter Property="BorderBrush" Value="#606060"/>
-					<Setter Property="RenderTransform" Value="scale(1.1)"/>
-				</Style>
-				<Style Selector="Button:pressed">
-					<Setter Property="RenderTransform" Value="scale(0.95)"/>
-				</Style>
-			</Button.Styles>
 			<Viewbox Width="28" Height="28">
 				<TextBlock Text="🎨" TextAlignment="Center"/>
 			</Viewbox>
 		</Button>
 
 		<!-- Settings Gear Icon Button - Top Right -->
-		<Button HorizontalAlignment="Right" VerticalAlignment="Top"
+		<Button Classes="icon-button"
+				HorizontalAlignment="Right" VerticalAlignment="Top"
 				Margin="20"
-				Width="50" Height="50"
-				Background="#1a1a1a"
-				BorderThickness="2"
-				BorderBrush="#404040"
-				CornerRadius="25"
-				Cursor="Hand"
 				ZIndex="100"
 				Command="{Binding NavigateToSettingsCommand}"
-				RenderTransformOrigin="0.5,0.5"
-				Padding="0">
+				RenderTransformOrigin="0.5,0.5">
 			<Button.IsVisible>
 				<MultiBinding Converter="{x:Static converters:MultiBoolToVisibilityConverter.Instance}">
 					<Binding Path="IsSettingsView"/>
 					<Binding Path="IsHistoryPanelOpen"/>
 				</MultiBinding>
 			</Button.IsVisible>
-			<Button.Styles>
-				<Style Selector="Button:pointerover">
-					<Setter Property="Background" Value="#2a2a2a"/>
-					<Setter Property="BorderBrush" Value="#606060"/>
-					<Setter Property="RenderTransform" Value="scale(1.1)"/>
-				</Style>
-				<Style Selector="Button:pressed">
-					<Setter Property="RenderTransform" Value="scale(0.95)"/>
-				</Style>
-			</Button.Styles>
 			<Viewbox Width="28" Height="28">
 				<TextBlock Text="⚙️" TextAlignment="Center"/>
 			</Viewbox>
@@ -234,27 +298,12 @@
 		<Grid IsVisible="{Binding CurrentView, Converter={x:Static ObjectConverters.IsNull}}">
 		
 		<!-- Hamburger Menu Button - Floating when closed -->
-		<Button HorizontalAlignment="Left" VerticalAlignment="Top"
+		<Button Classes="icon-button"
+				HorizontalAlignment="Left" VerticalAlignment="Top"
 				Margin="20"
-				Width="50" Height="50"
-				Background="#1a1a1a"
-				BorderThickness="2"
-				BorderBrush="#404040"
-				CornerRadius="25"
-				Cursor="Hand"
 				ZIndex="100"
 				Command="{Binding ToggleSidePanelCommand}"
 				IsVisible="{Binding !IsSidePanelOpen}">
-			<Button.Styles>
-				<Style Selector="Button:pointerover">
-					<Setter Property="Background" Value="#2a2a2a"/>
-					<Setter Property="BorderBrush" Value="#606060"/>
-					<Setter Property="RenderTransform" Value="scale(1.1)"/>
-				</Style>
-				<Style Selector="Button:pressed">
-					<Setter Property="RenderTransform" Value="scale(0.95)"/>
-				</Style>
-			</Button.Styles>
 			<TextBlock Text="☰" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
 		</Button>
 		
@@ -315,18 +364,11 @@
 						</StackPanel>
 						
 						<!-- Close Button -->
-						<Button HorizontalAlignment="Right" VerticalAlignment="Top"
+						<Button Classes="close-button"
+								HorizontalAlignment="Right" VerticalAlignment="Top"
 								Width="32" Height="32"
-								Background="Transparent"
-								BorderThickness="0"
 								CornerRadius="16"
-								Cursor="Hand"
 								Command="{Binding ToggleSidePanelCommand}">
-							<Button.Styles>
-								<Style Selector="Button:pointerover">
-									<Setter Property="Background" Value="#2a2a2a"/>
-								</Style>
-							</Button.Styles>
 							<TextBlock Text="✕" FontSize="18" Foreground="#888888" HorizontalAlignment="Center" VerticalAlignment="Center"/>
 						</Button>
 					</Grid>
@@ -394,32 +436,22 @@
 
 										<!-- Actions -->
 										<StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
-											<Button Content="📋 Load" 
+											<Button Classes="action-button"
+													Content="📋 Load" 
 													Command="{Binding $parent[Window].DataContext.LoadSavedLinkCommand}"
 													CommandParameter="{Binding}"
-													Background="#3b82f6"
-													Foreground="White"
-													BorderThickness="0"
-													CornerRadius="6"
-													Padding="8,4"
-													FontSize="10"
-													Cursor="Hand">
+													Background="#3b82f6">
 												<Button.Styles>
 													<Style Selector="Button:pointerover">
 														<Setter Property="Background" Value="#2563eb"/>
 													</Style>
 												</Button.Styles>
 											</Button>
-											<Button Content="🗑️" 
+											<Button Classes="action-button"
+													Content="🗑️" 
 													Command="{Binding $parent[Window].DataContext.DeleteSavedLinkCommand}"
 													CommandParameter="{Binding Id}"
-													Background="#dc2626"
-													Foreground="White"
-													BorderThickness="0"
-													CornerRadius="6"
-													Padding="8,4"
-													FontSize="10"
-													Cursor="Hand">
+													Background="#dc2626">
 												<Button.Styles>
 													<Style Selector="Button:pointerover">
 														<Setter Property="Background" Value="#b91c1c"/>
@@ -436,17 +468,14 @@
 
 				<!-- Save Current Button -->
 				<Border Grid.Row="2" Background="#151515" Padding="12" BorderBrush="#1a1a1a" BorderThickness="0,1,0,0">
-					<Button Content="💾 Save Current Link" 
+					<Button Classes="action-button"
+							Content="💾 Save Current Link" 
 							Command="{Binding SaveCurrentLinkCommand}"
 							Background="#10b981"
-							Foreground="White"
-							BorderThickness="0"
-							CornerRadius="8"
-							Padding="12,10"
 							FontSize="12"
 							FontWeight="SemiBold"
-							HorizontalAlignment="Stretch"
-							Cursor="Hand">
+							Padding="12,10"
+							HorizontalAlignment="Stretch">
 						<Button.Styles>
 							<Style Selector="Button:pointerover">
 								<Setter Property="Background" Value="#059669"/>
@@ -482,27 +511,21 @@
 							<TextBox Text="{Binding HistorySearchText}"
 									 Watermark="Search downloads..."
 									 Background="#0a0a0a"
-									 Foreground="#ffffff"
+									 Foreground="{Binding Source={x:Static services:ThemeManager.Instance}, Path=PrimaryText}"
 									 BorderBrush="#3b82f6"
 									 BorderThickness="2"
 									 CornerRadius="8"
 									 Padding="12,8"
-									 FontSize="12"/>
+									 FontSize="12"
+									 CaretBrush="{Binding Source={x:Static services:ThemeManager.Instance}, Path=PrimaryText}"/>
 						</StackPanel>
 						
 						<!-- Close Button -->
-						<Button HorizontalAlignment="Right" VerticalAlignment="Top"
+						<Button Classes="close-button"
+								HorizontalAlignment="Right" VerticalAlignment="Top"
 								Width="32" Height="32"
-								Background="Transparent"
-								BorderThickness="0"
 								CornerRadius="16"
-								Cursor="Hand"
 								Command="{Binding ToggleHistoryPanelCommand}">
-							<Button.Styles>
-								<Style Selector="Button:pointerover">
-									<Setter Property="Background" Value="#2a2a2a"/>
-								</Style>
-							</Button.Styles>
 							<TextBlock Text="✕" FontSize="18" Foreground="#888888" HorizontalAlignment="Center" VerticalAlignment="Center"/>
 						</Button>
 					</Grid>
@@ -545,32 +568,22 @@
 
 										<!-- Actions -->
 										<StackPanel Orientation="Horizontal" Spacing="8">
-											<Button Content="▶️ Play" 
+											<Button Classes="action-button"
+													Content="▶️ Play" 
 													Command="{Binding $parent[Window].DataContext.OpenHistoryFileCommand}"
 													CommandParameter="{Binding FilePath}"
-													Background="#10b981"
-													Foreground="White"
-													BorderThickness="0"
-													CornerRadius="6"
-													Padding="8,4"
-													FontSize="10"
-													Cursor="Hand">
+													Background="#10b981">
 												<Button.Styles>
 													<Style Selector="Button:pointerover">
 														<Setter Property="Background" Value="#059669"/>
 													</Style>
 												</Button.Styles>
 											</Button>
-											<Button Content="🗑️" 
+											<Button Classes="action-button"
+													Content="🗑️" 
 													Command="{Binding $parent[Window].DataContext.DeleteHistoryItemCommand}"
 													CommandParameter="{Binding Id}"
-													Background="#dc2626"
-													Foreground="White"
-													BorderThickness="0"
-													CornerRadius="6"
-													Padding="8,4"
-													FontSize="10"
-													Cursor="Hand">
+													Background="#dc2626">
 												<Button.Styles>
 													<Style Selector="Button:pointerover">
 														<Setter Property="Background" Value="#b91c1c"/>
@@ -587,17 +600,14 @@
 
 				<!-- Clear History Button -->
 				<Border Grid.Row="2" Background="#151515" Padding="12" BorderBrush="#1a1a1a" BorderThickness="0,1,0,0">
-					<Button Content="🗑️ Clear All History" 
+					<Button Classes="action-button"
+							Content="🗑️ Clear All History" 
 							Command="{Binding ClearHistoryCommand}"
 							Background="#dc2626"
-							Foreground="White"
-							BorderThickness="0"
-							CornerRadius="8"
-							Padding="12,10"
 							FontSize="12"
 							FontWeight="SemiBold"
-							HorizontalAlignment="Stretch"
-							Cursor="Hand">
+							Padding="12,10"
+							HorizontalAlignment="Stretch">
 						<Button.Styles>
 							<Style Selector="Button:pointerover">
 								<Setter Property="Background" Value="#b91c1c"/>
@@ -1041,7 +1051,6 @@
 		</Border>
 
 		</Grid>
-		<!-- End of Main Download View -->
 
 	</Grid>
 </Window>
