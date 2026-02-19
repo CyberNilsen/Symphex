@@ -370,8 +370,8 @@
 						<Border Background="#8B4513" CornerRadius="12" Padding="20"
 								IsVisible="{Binding ShowAlbumArtDisabledWarning}">
 							<StackPanel Orientation="Horizontal" Spacing="16">
-								<Border Width="48" Height="48" CornerRadius="24" Background="#FFFFFF20">
-									<materialIcons:MaterialIcon Kind="Alert" Width="28" Height="28" Foreground="White"/>
+								<Border Width="48" Height="48" CornerRadius="24" Background="#FFFFFF">
+									<materialIcons:MaterialIcon Kind="Alert" Width="28" Height="28" Foreground="#8B4513"/>
 								</Border>
 								<StackPanel VerticalAlignment="Center">
 									<TextBlock Text="Album Art Disabled" FontSize="16" FontWeight="Bold" Foreground="White"/>
@@ -383,8 +383,8 @@
 						<Border Background="#DC143C" CornerRadius="12" Padding="20"
 								IsVisible="{Binding ShowNoArtworkWarning}">
 							<StackPanel Orientation="Horizontal" Spacing="16">
-								<Border Width="48" Height="48" CornerRadius="24" Background="#FFFFFF20">
-									<materialIcons:MaterialIcon Kind="Close" Width="28" Height="28" Foreground="White"/>
+								<Border Width="48" Height="48" CornerRadius="24" Background="#FFFFFF">
+									<materialIcons:MaterialIcon Kind="Close" Width="28" Height="28" Foreground="#DC143C"/>
 								</Border>
 								<StackPanel VerticalAlignment="Center">
 									<TextBlock Text="No Artwork Enabled" FontSize="16" FontWeight="Bold" Foreground="White"/>
