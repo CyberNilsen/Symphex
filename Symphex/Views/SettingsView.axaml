@@ -291,12 +291,12 @@
 								<Border Background="#0a0a0a" CornerRadius="10" Padding="16">
 									<StackPanel Spacing="8">
 										<StackPanel Orientation="Horizontal" Spacing="8">
-											<materialIcons:MaterialIcon Kind="Check" Width="14" Height="14" Foreground="#ec4899"/>
-											<TextBlock Text="600x600: Recommended for most uses" FontSize="12" Foreground="#999999"/>
-										</StackPanel>
-										<StackPanel Orientation="Horizontal" Spacing="8">
 											<materialIcons:MaterialIcon Kind="ImageSizeSelectLarge" Width="14" Height="14" Foreground="#10b981"/>
 											<TextBlock Text="1200x1200: High quality for archival" FontSize="12" Foreground="#999999"/>
+										</StackPanel>
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<materialIcons:MaterialIcon Kind="Check" Width="14" Height="14" Foreground="#ec4899"/>
+											<TextBlock Text="600x600: Recommended for most uses" FontSize="12" Foreground="#999999"/>
 										</StackPanel>
 										<StackPanel Orientation="Horizontal" Spacing="8">
 											<materialIcons:MaterialIcon Kind="ImageSizeSelectSmall" Width="14" Height="14" Foreground="#f59e0b"/>
