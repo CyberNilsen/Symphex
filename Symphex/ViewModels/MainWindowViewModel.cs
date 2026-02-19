@@ -2660,6 +2660,12 @@ namespace Symphex.ViewModels
             {
                 try
                 {
+                    // Ensure the resized folder exists before processing
+                    if (!Directory.Exists(ResizedFolderPath))
+                    {
+                        Directory.CreateDirectory(ResizedFolderPath);
+                    }
+
                     var fileName = Path.GetFileName(filePath);
                     var sourceDir = Path.GetDirectoryName(filePath);
                     var outputPath = Path.Combine(ResizedFolderPath, fileName);
