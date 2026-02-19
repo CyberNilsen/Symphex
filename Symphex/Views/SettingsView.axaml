@@ -393,6 +393,52 @@
 							</StackPanel>
 						</Border>
 
+						<!-- Reset All Settings Card -->
+						<Border Classes="setting-card">
+							<StackPanel Spacing="16">
+								<StackPanel Orientation="Horizontal" Spacing="12">
+									<Border Width="48" Height="48" CornerRadius="12" Background="#ef4444">
+										<materialIcons:MaterialIcon Kind="Restore" Width="28" Height="28" Foreground="White"/>
+									</Border>
+									<StackPanel VerticalAlignment="Center">
+										<TextBlock Text="Reset Settings" FontSize="18" FontWeight="Bold" Foreground="#ffffff"/>
+										<TextBlock Text="Restore all settings to defaults" FontSize="13" Foreground="#888888"/>
+									</StackPanel>
+								</StackPanel>
+
+								<Border Background="#0a0a0a" CornerRadius="10" Padding="16">
+									<StackPanel Spacing="8">
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<materialIcons:MaterialIcon Kind="AlertCircle" Width="14" Height="14" Foreground="#ef4444"/>
+											<TextBlock Text="This will reset all settings to their default values" FontSize="12" Foreground="#999999"/>
+										</StackPanel>
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<materialIcons:MaterialIcon Kind="Information" Width="14" Height="14" Foreground="#3b82f6"/>
+											<TextBlock Text="Your download folder and files will not be affected" FontSize="12" Foreground="#999999"/>
+										</StackPanel>
+									</StackPanel>
+								</Border>
+
+								<Button Command="{Binding ResetAllSettingsCommand}"
+										HorizontalAlignment="Center"
+										Padding="20,10"
+										Background="#ef4444"
+										CornerRadius="10"
+										BorderThickness="0"
+										Cursor="Hand">
+									<Button.Styles>
+										<Style Selector="Button:pointerover">
+											<Setter Property="Background" Value="#dc2626"/>
+										</Style>
+									</Button.Styles>
+									<StackPanel Orientation="Horizontal" Spacing="8">
+										<materialIcons:MaterialIcon Kind="Restore" Width="18" Height="18" Foreground="White"/>
+										<TextBlock Text="Reset All Settings" FontSize="14" FontWeight="SemiBold" Foreground="White"/>
+									</StackPanel>
+								</Button>
+							</StackPanel>
+						</Border>
+
 						<!-- Bottom spacer to ensure scrolling works -->
 						<Border Height="100" Background="Transparent"/>
 

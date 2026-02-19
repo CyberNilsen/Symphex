@@ -53,7 +53,7 @@ namespace Symphex.ViewModels
         private bool skipThumbnailDownload = false;
 
         [ObservableProperty]
-        private string selectedThumbnailSize = "Maximum Quality";
+        private string selectedThumbnailSize = "Medium Quality (600x600)";
 
         [ObservableProperty]
         private bool enableArtworkSelection = true; // Default ON
@@ -219,6 +219,34 @@ namespace Symphex.ViewModels
         partial void OnAlbumArtSizeChanged(double value)
         {
             SaveSettings();
+        }
+
+        [RelayCommand]
+        private void ResetAlbumArtSize()
+        {
+            AlbumArtSize = 600; // Reset to default
+        }
+
+        [RelayCommand]
+        private void ResetAllSettings()
+        {
+            // Reset all settings to defaults
+            EnableAlbumArtDownload = true;
+            SkipThumbnailDownload = true; // Video thumbnails ON (skip = false means download thumbnails)
+            SelectedThumbnailSize = "Medium Quality (600x600)"; // Medium quality
+            EnableArtworkSelection = true;
+            ArtworkSelectionTimeout = 5;
+            AlbumArtSize = 600;
+            SelectedAudioFormat = "MP3";
+            SelectedBitrate = "320";
+            
+            SaveSettings();
+            
+            // Update MainWindowViewModel if available
+            if (_mainWindowViewModel != null)
+            {
+                _mainWindowViewModel.ReloadSettings();
+            }
         }
 
         partial void OnSelectedAudioFormatChanged(string value)
