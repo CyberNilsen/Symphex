@@ -230,10 +230,9 @@ namespace Symphex.ViewModels
         [RelayCommand]
         private void ResetAllSettings()
         {
-            // Reset all settings to defaults
             EnableAlbumArtDownload = true;
-            SkipThumbnailDownload = true; // Video thumbnails ON (skip = false means download thumbnails)
-            SelectedThumbnailSize = "Medium Quality (600x600)"; // Medium quality
+            SkipThumbnailDownload = true; 
+            SelectedThumbnailSize = "Medium Quality (600x600)";
             EnableArtworkSelection = true;
             ArtworkSelectionTimeout = 5;
             AlbumArtSize = 600;

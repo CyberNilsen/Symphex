@@ -209,6 +209,8 @@ namespace Symphex.ViewModels
         [ObservableProperty]
         private ObservableCollection<string> queuedFiles = new ObservableCollection<string>();
 
+        private CancellationTokenSource? _downloadCancellationTokenSource;
+
         private readonly HttpClient httpClient = new();
 
         private readonly DependencyManager dependencyManager = new();
@@ -475,11 +477,13 @@ namespace Symphex.ViewModels
                         CurrentTrack.Thumbnail = null;
                         Debug.WriteLine("[SelectArtwork] User selected NO PICTURE");
                     }
+                    ShowMetadata = false; // Hide song preview
                 }
                 // -1 means skip/use default
                 else if (index == -1)
                 {
                     Debug.WriteLine("[SelectArtwork] User skipped - using default");
+                    ShowMetadata = false; // Hide song preview
                 }
                 else if (index >= 0 && index < ArtworkOptions.Count && ArtworkOptions[index] != null)
                 {
@@ -501,7 +505,7 @@ namespace Symphex.ViewModels
             }
         }
 
-        private async Task ShowArtworkSelectionDialog()
+        private async Task ShowArtworkSelectionDialog(CancellationToken cancellationToken = default)
         {
             try
             {
@@ -537,6 +541,8 @@ namespace Symphex.ViewModels
                     int loaded = 0;
                     for (int i = 0; i < thumbnails.Count && loaded < 2; i++)
                     {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        
                         try
                         {
                             Debug.WriteLine($"[ShowArtworkSelectionDialog] Loading thumbnail {i + 1}: {thumbnails[i].Url}");
@@ -573,8 +579,10 @@ namespace Symphex.ViewModels
                 {
                     if (!IsSelectingArtwork) break; // User made a selection
                     
+                    cancellationToken.ThrowIfCancellationRequested();
+                    
                     SelectionCountdown = i;
-                    await Task.Delay(1000);
+                    await Task.Delay(1000, cancellationToken);
                 }
 
                 // Auto-select first option if user didn't choose
@@ -584,6 +592,13 @@ namespace Symphex.ViewModels
                     IsSelectingArtwork = false;
                     SelectionCountdown = 0;
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                Debug.WriteLine("[ShowArtworkSelectionDialog] Cancelled");
+                IsSelectingArtwork = false;
+                SelectionCountdown = 0;
+                throw;
             }
             catch (Exception ex)
             {
@@ -1035,66 +1050,76 @@ namespace Symphex.ViewModels
         [RelayCommand]
         private async Task Download()
         {
-            // Check if we're in resize mode
-            if (IsResizeMode)
+            // Create new cancellation token source for this download
+            _downloadCancellationTokenSource?.Cancel();
+            _downloadCancellationTokenSource?.Dispose();
+            _downloadCancellationTokenSource = new CancellationTokenSource();
+            var cancellationToken = _downloadCancellationTokenSource.Token;
+
+            try
             {
-                if (QueuedFiles.Count == 0)
+                // Check if we're in resize mode
+                if (IsResizeMode)
                 {
-                    ShowToast("❌ Please drag and drop files to resize");
+                    if (QueuedFiles.Count == 0)
+                    {
+                        ShowToast("❌ Please drag and drop files to resize");
+                        return;
+                    }
+
+                    // Reload settings to get latest AlbumArtSize
+                    LoadUserSettings();
+
+                    // Process the queued files
+                    IsDownloading = true;
+                    DownloadProgress = 0;
+                    ShowToast($"🎨 Resizing to {AlbumArtSize}x{AlbumArtSize}px...");
+
+                    int processed = 0;
+                    int failed = 0;
+                    int total = QueuedFiles.Count;
+
+                    for (int i = 0; i < QueuedFiles.Count; i++)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        
+                        try
+                        {
+                            await ResizeAlbumArtForFile(QueuedFiles[i]);
+                            processed++;
+                            DownloadProgress = (double)(i + 1) / total * 100;
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine($"[MainWindowViewModel] Error processing {QueuedFiles[i]}: {ex.Message}");
+                            failed++;
+                        }
+                    }
+
+                    QueuedFiles.Clear();
+                    IsDownloading = false;
+                    DownloadProgress = 0;
+                    ShowToast($"✅ Resized: {processed}, Failed: {failed}");
                     return;
                 }
 
-                // Reload settings to get latest AlbumArtSize
-                LoadUserSettings();
-
-                // Process the queued files
-                IsDownloading = true;
-                DownloadProgress = 0;
-                ShowToast($"🎨 Resizing to {AlbumArtSize}x{AlbumArtSize}px...");
-
-                int processed = 0;
-                int failed = 0;
-                int total = QueuedFiles.Count;
-
-                for (int i = 0; i < QueuedFiles.Count; i++)
+                if (string.IsNullOrWhiteSpace(DownloadUrl))
                 {
-                    try
-                    {
-                        await ResizeAlbumArtForFile(QueuedFiles[i]);
-                        processed++;
-                        DownloadProgress = (double)(i + 1) / total * 100;
-                    }
-                    catch (Exception ex)
-                    {
-                        Debug.WriteLine($"[MainWindowViewModel] Error processing {QueuedFiles[i]}: {ex.Message}");
-                        failed++;
-                    }
+                    StatusText = "Please enter a URL or search term.";
+                    return;
                 }
 
-                QueuedFiles.Clear();
-                IsDownloading = false;
-                DownloadProgress = 0;
-                ShowToast($"✅ Resized: {processed}, Failed: {failed}");
-                return;
-            }
+                if (string.IsNullOrEmpty(YtDlpPath))
+                {
+                    StatusText = "yt-dlp not available. Please download it first.";
+                    return;
+                }
 
-            if (string.IsNullOrWhiteSpace(DownloadUrl))
-            {
-                StatusText = "Please enter a URL or search term.";
-                return;
-            }
+                // Extract all URLs from the input - this is the key fix
+                var urls = ExtractAllUrls(DownloadUrl);
 
-            if (string.IsNullOrEmpty(YtDlpPath))
-            {
-                StatusText = "yt-dlp not available. Please download it first.";
-                return;
-            }
-
-            // Extract all URLs from the input - this is the key fix
-            var urls = ExtractAllUrls(DownloadUrl);
-
-            CliOutput += $"DEBUG: Found {urls.Count} URLs in input: {DownloadUrl}\n";
-            foreach (var url in urls)
+                CliOutput += $"DEBUG: Found {urls.Count} URLs in input: {DownloadUrl}\n";
+                foreach (var url in urls)
             {
                 CliOutput += $"  - {url}\n";
             }
@@ -1102,14 +1127,18 @@ namespace Symphex.ViewModels
             // If multiple URLs detected, process as batch
             if (urls.Count > 1)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+                
                 StatusText = $"Multiple URLs detected ({urls.Count})! Setting up batch processing...";
                 CliOutput += $"Multiple URLs detected, starting batch processing...\n";
                 IsDownloading = true;
 
-                await Task.Delay(1000); // Brief pause for UI update
+                await Task.Delay(1000, cancellationToken); // Brief pause for UI update
                 await ProcessMultipleUrlsList(urls);
                 return;
             }
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             // Single URL processing
             string singleUrl = urls.Count == 1 ? urls[0] : DownloadUrl;
@@ -1119,6 +1148,8 @@ namespace Symphex.ViewModels
                 await ProcessSpotifyDownload(singleUrl);
                 return;
             }
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             // Continue with existing single download logic
             IsDownloading = true;
@@ -1130,8 +1161,12 @@ namespace Symphex.ViewModels
 
             try
             {
+                cancellationToken.ThrowIfCancellationRequested();
+                
                 DownloadProgress = 5;
                 var extractedTrack = await ExtractMetadata(singleUrl);
+
+                cancellationToken.ThrowIfCancellationRequested();
 
                 if (extractedTrack != null)
                 {
@@ -1140,13 +1175,15 @@ namespace Symphex.ViewModels
                     StatusText = $"Found: {CurrentTrack.Title} by {CurrentTrack.Artist}";
                     DownloadProgress = 15;
 
+                    cancellationToken.ThrowIfCancellationRequested();
+
                     // Show artwork size info
                     UpdateArtworkSizeInfo();
 
                     // Show artwork selection if enabled
                     if (EnableArtworkSelection && CurrentTrack.AvailableThumbnails != null && CurrentTrack.AvailableThumbnails.Count > 0)
                     {
-                        await ShowArtworkSelectionDialog();
+                        await ShowArtworkSelectionDialog(cancellationToken);
                     }
                 }
                 else
@@ -1155,7 +1192,12 @@ namespace Symphex.ViewModels
                     DownloadProgress = 10;
                 }
 
-                await RealDownload();
+                await RealDownload(cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                StatusText = "❌ Download cancelled.";
+                ShowMetadata = false;
             }
             catch (Exception ex)
             {
@@ -1166,6 +1208,14 @@ namespace Symphex.ViewModels
             {
                 IsDownloading = false;
                 DownloadProgress = 0;
+            }
+            }
+            catch (OperationCanceledException)
+            {
+                StatusText = "❌ Download cancelled.";
+                IsDownloading = false;
+                DownloadProgress = 0;
+                ShowMetadata = false;
             }
         }
 
@@ -1744,7 +1794,7 @@ namespace Symphex.ViewModels
             }
         }
 
-        private async Task RealDownload()
+        private async Task RealDownload(CancellationToken cancellationToken = default)
         {
             try
             {
@@ -1758,7 +1808,7 @@ namespace Symphex.ViewModels
                 StatusText = DownloadUrl.StartsWith("http") ? "Downloading audio..." : "Searching and downloading audio...";
                 DownloadProgress = 30;
 
-                string actualFilePath = await _downloadService.PerformDownload(DownloadUrl, CurrentTrack);
+                string actualFilePath = await _downloadService.PerformDownload(DownloadUrl, CurrentTrack, cancellationToken);
 
                 DownloadProgress = 90;
 
@@ -2099,6 +2149,21 @@ namespace Symphex.ViewModels
         [RelayCommand]
         private void Clear()
         {
+            // Immediately hide UI elements first
+            ShowMetadata = false;
+            IsSelectingArtwork = false;
+            SelectionCountdown = 0;
+            IsDownloading = false;
+            DownloadProgress = 0;
+
+            // Cancel any ongoing downloads
+            if (_downloadCancellationTokenSource != null && !_downloadCancellationTokenSource.IsCancellationRequested)
+            {
+                _downloadCancellationTokenSource.Cancel();
+                _downloadCancellationTokenSource.Dispose();
+                _downloadCancellationTokenSource = null;
+            }
+
             if (IsResizeMode)
             {
                 QueuedFiles.Clear();
@@ -2108,8 +2173,6 @@ namespace Symphex.ViewModels
 
             DownloadUrl = "";
             StatusText = "🎵 Ready to download music...";
-            DownloadProgress = 0;
-            ShowMetadata = false;
             CurrentTrack = new TrackInfo();
 
             // Clear batch processing state
@@ -2119,7 +2182,7 @@ namespace Symphex.ViewModels
                 CurrentBatchIndex = 0;
                 TotalBatchCount = 0;
                 PendingUrls.Clear();
-                StatusText = "Batch processing cancelled.";
+                StatusText = "❌ Download cancelled.";
             }
         }
 

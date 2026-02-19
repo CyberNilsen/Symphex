@@ -10,6 +10,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Symphex.Services
@@ -325,7 +326,7 @@ namespace Symphex.Services
             }
         }
 
-        public async Task<string> PerformDownload(string url, TrackInfo? trackInfo)
+        public async Task<string> PerformDownload(string url, TrackInfo? trackInfo, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -435,7 +436,7 @@ namespace Symphex.Services
                         errorLines.Add(line);
                     }))
                     .WithValidation(CommandResultValidation.None)
-                    .ExecuteAsync();
+                    .ExecuteAsync(cancellationToken);
 
                 if (result.ExitCode != 0)
                 {
@@ -1150,7 +1151,7 @@ namespace Symphex.Services
             }
         }
 
-        public async Task<string> DownloadForBatch(string url, TrackInfo trackInfo, int index)
+        public async Task<string> DownloadForBatch(string url, TrackInfo trackInfo, int index, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -1245,7 +1246,7 @@ namespace Symphex.Services
                     .WithStandardOutputPipe(PipeTarget.ToStringBuilder(output))
                     .WithStandardErrorPipe(PipeTarget.ToStringBuilder(error))
                     .WithValidation(CommandResultValidation.None)
-                    .ExecuteAsync();
+                    .ExecuteAsync(cancellationToken);
 
                 if (result.ExitCode == 0)
                 {
