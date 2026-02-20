@@ -277,7 +277,7 @@ namespace Symphex.ViewModels
         }
 
         [RelayCommand]
-        private async Task CheckForUpdates()
+        private void CheckForUpdates()
         {
             try
             {
@@ -295,11 +295,9 @@ namespace Symphex.ViewModels
                     return;
                 }
 
-                // Check for updates and show UI
-                await Task.Run(() =>
-                {
-                    updater.CheckForUpdatesAtUserRequest();
-                });
+                // Check for updates on UI thread (required for macOS)
+                // NetSparkle will handle the async operations internally
+                updater.CheckForUpdatesAtUserRequest();
 
                 // NetSparkle will show its own UI, so we just update our status
                 UpdateStatusText = "Update check complete. NetSparkle will show a dialog if updates are available.";
