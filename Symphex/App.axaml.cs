@@ -57,7 +57,7 @@ namespace Symphex
                 new Ed25519Checker(SecurityMode.Strict, publicKey)
             )
             {
-                UIFactory = new NetSparkleUpdater.UI.Avalonia.UIFactory(mainWindow.Icon),
+                UIFactory = new NetSparkleUpdater.UI.Avalonia.UIFactory(mainWindow.Icon ?? new WindowIcon(new System.IO.MemoryStream())),
                 RelaunchAfterUpdate = true // Set to true if you want auto-restart after update
             };
 

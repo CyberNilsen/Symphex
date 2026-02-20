@@ -1600,7 +1600,7 @@ namespace Symphex.ViewModels
         }
 
         // Cleanup method for batch processing
-        private async Task CleanupBatchProcessing()
+        private Task CleanupBatchProcessing()
         {
             try
             {
@@ -1637,6 +1637,8 @@ namespace Symphex.ViewModels
             {
                 CliOutput += $"Cleanup error: {ex.Message}\n";
             }
+            
+            return Task.CompletedTask;
         }
 
         private async Task ProcessNextBatchUrl()
@@ -1808,7 +1810,7 @@ namespace Symphex.ViewModels
                 StatusText = DownloadUrl.StartsWith("http") ? "Downloading audio..." : "Searching and downloading audio...";
                 DownloadProgress = 30;
 
-                string actualFilePath = await _downloadService.PerformDownload(DownloadUrl, CurrentTrack, cancellationToken);
+                string actualFilePath = await _downloadService!.PerformDownload(DownloadUrl, CurrentTrack, cancellationToken);
 
                 DownloadProgress = 90;
 
@@ -2344,7 +2346,12 @@ namespace Symphex.ViewModels
                     
                     try
                     {
-                        var trackInfo = await _downloadService?.ExtractMetadata(DownloadUrl.Trim(), SelectedThumbnailSize, !SkipThumbnailDownload);
+                        if (_downloadService == null)
+                        {
+                            InitializeDownloadService();
+                        }
+                        
+                        var trackInfo = await _downloadService!.ExtractMetadata(DownloadUrl.Trim(), SelectedThumbnailSize, !SkipThumbnailDownload);
                         if (trackInfo != null)
                         {
                             title = trackInfo.Title;
@@ -2664,7 +2671,7 @@ namespace Symphex.ViewModels
             }
         }
 
-        public async Task ProcessDroppedFilesAsync(List<string> paths)
+        public Task ProcessDroppedFilesAsync(List<string> paths)
         {
             try
             {
@@ -2690,7 +2697,7 @@ namespace Symphex.ViewModels
                 if (musicFiles.Count == 0)
                 {
                     ShowToast("❌ No music files found");
-                    return;
+                    return Task.CompletedTask;
                 }
 
                 // Add files to queue
@@ -2709,6 +2716,8 @@ namespace Symphex.ViewModels
                 Debug.WriteLine($"[MainWindowViewModel] Error in ProcessDroppedFilesAsync: {ex.Message}");
                 ShowToast("❌ Error processing files");
             }
+            
+            return Task.CompletedTask;
         }
 
         private bool IsMusicFile(string filePath)
