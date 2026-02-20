@@ -188,7 +188,18 @@ Filename: "{{app}}\\{PROJECT_NAME}.exe"; Description: "{{cm:LaunchProgram,{PROJE
                     sys.exit(1)
     
     return created_files if created_files else None
-    """Create macOS PKG installer"""
+
+def create_macos_pkg(publish_dir, version, output_dir, arch, package_type="pkg"):
+    """Create macOS PKG installer or ZIP"""
+    
+    # If user wants ZIP only, create it
+    if package_type == "zip":
+        print_header(f"Creating macOS ZIP ({arch})")
+        zip_file = Path(output_dir) / f"{PROJECT_NAME}-{version}-osx-{arch}.zip"
+        shutil.make_archive(str(zip_file.with_suffix('')), 'zip', publish_dir)
+        print_success(f"ZIP created: {zip_file}")
+        return zip_file
+    
     print_header(f"Creating macOS PKG ({arch})")
     
     if platform.system() != "Darwin":
@@ -391,13 +402,13 @@ def main():
     if build_macos:
         print_header("Building macOS Intel")
         mac_x64_publish = publish_app(csproj_path, "osx-x64", args.version, publish_base / "osx-x64")
-        mac_x64_installer = create_macos_pkg(mac_x64_publish, args.version, output_dir, "x64")
+        mac_x64_installer = create_macos_pkg(mac_x64_publish, args.version, output_dir, "x64", args.package_type)
         installers.append(mac_x64_installer)
         
         # Build macOS ARM64
         print_header("Building macOS Apple Silicon")
         mac_arm_publish = publish_app(csproj_path, "osx-arm64", args.version, publish_base / "osx-arm64")
-        mac_arm_installer = create_macos_pkg(mac_arm_publish, args.version, output_dir, "arm64")
+        mac_arm_installer = create_macos_pkg(mac_arm_publish, args.version, output_dir, "arm64", args.package_type)
         installers.append(mac_arm_installer)
     
     # Build Linux
