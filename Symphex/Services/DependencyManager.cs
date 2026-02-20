@@ -41,12 +41,8 @@ namespace Symphex.Services
         {
             try
             {
-                // Use AppData for dependencies when installed
-                string appDataDir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "Symphex",
-                    "tools"
-                );
+                // Use appropriate data directory based on OS
+                string appDataDir = GetAppDataDirectory();
                 
                 string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
 
@@ -92,12 +88,8 @@ namespace Symphex.Services
         {
             try
             {
-                // Use AppData for dependencies when installed
-                string appDataDir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "Symphex",
-                    "tools"
-                );
+                // Use appropriate data directory based on OS
+                string appDataDir = GetAppDataDirectory();
                 
                 string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
 
@@ -152,12 +144,8 @@ namespace Symphex.Services
 
         public async Task DownloadYtDlp()
         {
-            // Use AppData for dependencies
-            string appDataDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "Symphex",
-                "tools"
-            );
+            // Use appropriate data directory based on OS
+            string appDataDir = GetAppDataDirectory();
 
             if (!Directory.Exists(appDataDir))
             {
@@ -193,12 +181,8 @@ namespace Symphex.Services
                 throw new InvalidOperationException("Linux users should install FFmpeg via package manager (apt install ffmpeg)");
             }
 
-            // Use AppData for dependencies
-            string appDataDir = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "Symphex",
-                "tools"
-            );
+            // Use appropriate data directory based on OS
+            string appDataDir = GetAppDataDirectory();
 
             if (!Directory.Exists(appDataDir))
             {
@@ -330,6 +314,47 @@ namespace Symphex.Services
                 return "Linux";
             else
                 return "Unknown OS";
+        }
+
+        private string GetAppDataDirectory()
+        {
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                return Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "Symphex",
+                    "tools"
+                );
+            }
+            else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                return Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                    "Library",
+                    "Application Support",
+                    "Symphex",
+                    "tools"
+                );
+            }
+            else // Linux
+            {
+                // Use XDG_DATA_HOME if set, otherwise ~/.local/share
+                var xdgDataHome = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
+                if (!string.IsNullOrEmpty(xdgDataHome))
+                {
+                    return Path.Combine(xdgDataHome, "Symphex", "tools");
+                }
+                else
+                {
+                    return Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                        ".local",
+                        "share",
+                        "Symphex",
+                        "tools"
+                    );
+                }
+            }
         }
 
         private Task ExtractFfmpegWindows(string zipPath, string toolsDir)

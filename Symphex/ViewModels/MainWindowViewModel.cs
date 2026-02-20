@@ -633,9 +633,29 @@ namespace Symphex.ViewModels
             {
                 DownloadFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Music", "Symphex Downloads");
             }
-            else
+            else // Linux
             {
-                DownloadFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Music", "Symphex Downloads");
+                var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                var musicFolder = Path.Combine(userProfile, "Music");
+                
+                // Check if Music folder exists, otherwise use Downloads or Home
+                if (Directory.Exists(musicFolder))
+                {
+                    DownloadFolder = Path.Combine(musicFolder, "Symphex Downloads");
+                }
+                else
+                {
+                    var downloadsFolder = Path.Combine(userProfile, "Downloads");
+                    if (Directory.Exists(downloadsFolder))
+                    {
+                        DownloadFolder = Path.Combine(downloadsFolder, "Symphex Downloads");
+                    }
+                    else
+                    {
+                        // Fallback to home directory
+                        DownloadFolder = Path.Combine(userProfile, "Symphex Downloads");
+                    }
+                }
             }
         }
 
@@ -2262,13 +2282,35 @@ namespace Symphex.ViewModels
                 }
                 else // Linux
                 {
-                    var psi = new ProcessStartInfo
+                    try
                     {
-                        FileName = "xdg-open",
-                        Arguments = DownloadFolder,
-                        UseShellExecute = true
-                    };
-                    Process.Start(psi);
+                        var psi = new ProcessStartInfo
+                        {
+                            FileName = "xdg-open",
+                            Arguments = $"\"{folderToOpen}\"",
+                            UseShellExecute = false,
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            CreateNoWindow = true
+                        };
+                        
+                        var process = Process.Start(psi);
+                        if (process != null)
+                        {
+                            await process.WaitForExitAsync();
+                        }
+                    }
+                    catch
+                    {
+                        // Fallback: try without quotes
+                        var psi = new ProcessStartInfo
+                        {
+                            FileName = "xdg-open",
+                            Arguments = folderToOpen,
+                            UseShellExecute = true
+                        };
+                        Process.Start(psi);
+                    }
                 }
             }
             catch (Exception ex)
