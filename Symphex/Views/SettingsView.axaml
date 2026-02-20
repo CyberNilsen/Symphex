@@ -626,12 +626,12 @@
 										<StackPanel Spacing="8" HorizontalAlignment="Center">
 											<materialIcons:MaterialIcon Kind="CheckCircle" Width="48" Height="48" Foreground="White"/>
 											<TextBlock Text="Update Available!" FontSize="18" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
-											<TextBlock Text="{Binding LatestVersionText}" FontSize="14" Foreground="#e6fffa" HorizontalAlignment="Center"/>
+											<TextBlock Text="NetSparkle will show update details" FontSize="14" Foreground="#e6fffa" HorizontalAlignment="Center"/>
 										</StackPanel>
 
 										<Button HorizontalAlignment="Center"
-												Command="{Binding UpdateCommand}"
-												IsEnabled="{Binding !IsUpdating}"
+												Command="{Binding CheckForUpdatesCommand}"
+												IsEnabled="{Binding !IsCheckingForUpdates}"
 												Background="White"
 												Foreground="#10b981"
 												BorderThickness="0"
@@ -647,16 +647,16 @@
 											</Button.Styles>
 											<StackPanel Orientation="Horizontal" Spacing="8">
 												<materialIcons:MaterialIcon Kind="Download" Width="20" Height="20" Foreground="#10b981"/>
-												<TextBlock Text="Download and Install" VerticalAlignment="Center"/>
+												<TextBlock Text="Check for Updates" VerticalAlignment="Center"/>
 											</StackPanel>
 										</Button>
 									</StackPanel>
 								</Border>
 
 								<!-- Update Progress -->
-								<StackPanel Spacing="12" IsVisible="{Binding IsUpdating}">
-									<TextBlock Text="{Binding UpdateProgressText}" FontSize="13" Foreground="#888888" HorizontalAlignment="Center"/>
-									<ProgressBar Value="{Binding UpdateProgress}" Maximum="100"/>
+								<StackPanel Spacing="12" IsVisible="{Binding IsCheckingForUpdates}">
+									<TextBlock Text="Checking for updates..." FontSize="13" Foreground="#888888" HorizontalAlignment="Center"/>
+									<ProgressBar IsIndeterminate="True"/>
 								</StackPanel>
 							</StackPanel>
 						</Border>

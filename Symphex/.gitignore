@@ -1,0 +1,12 @@
+build/
+releases/
+publish/
+*.signature
+release_notes.md
+
+*.priv
+NetSparkle_Ed25519.priv
+
+__pycache__/
+*.pyc
+*.pyo

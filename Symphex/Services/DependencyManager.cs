@@ -41,9 +41,17 @@ namespace Symphex.Services
         {
             try
             {
+                // Use AppData for dependencies when installed
+                string appDataDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "Symphex",
+                    "tools"
+                );
+                
                 string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
 
                 string[] possiblePaths = {
+                    Path.Combine(appDataDir, YtDlpExecutableName),
                     Path.Combine(appDirectory, "tools", YtDlpExecutableName),
                     Path.Combine(appDirectory, YtDlpExecutableName)
                 };
@@ -84,9 +92,19 @@ namespace Symphex.Services
         {
             try
             {
+                // Use AppData for dependencies when installed
+                string appDataDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "Symphex",
+                    "tools"
+                );
+                
                 string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
 
                 string[] possiblePaths = {
+                    Path.Combine(appDataDir, FfmpegExecutableName),
+                    Path.Combine(appDataDir, "ffmpeg", "bin", FfmpegExecutableName),
+                    Path.Combine(appDataDir, "bin", FfmpegExecutableName),
                     Path.Combine(appDirectory, "tools", FfmpegExecutableName),
                     Path.Combine(appDirectory, "tools", "ffmpeg", "bin", FfmpegExecutableName),
                     Path.Combine(appDirectory, "tools", "bin", FfmpegExecutableName),
@@ -134,15 +152,19 @@ namespace Symphex.Services
 
         public async Task DownloadYtDlp()
         {
-            string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
-            string toolsDir = Path.Combine(appDirectory, "tools");
+            // Use AppData for dependencies
+            string appDataDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Symphex",
+                "tools"
+            );
 
-            if (!Directory.Exists(toolsDir))
+            if (!Directory.Exists(appDataDir))
             {
-                Directory.CreateDirectory(toolsDir);
+                Directory.CreateDirectory(appDataDir);
             }
 
-            string ytDlpPath = Path.Combine(toolsDir, YtDlpExecutableName);
+            string ytDlpPath = Path.Combine(appDataDir, YtDlpExecutableName);
             string downloadUrl = GetYtDlpDownloadUrl();
 
             using (var localHttpClient = new HttpClient())
@@ -171,12 +193,16 @@ namespace Symphex.Services
                 throw new InvalidOperationException("Linux users should install FFmpeg via package manager (apt install ffmpeg)");
             }
 
-            string appDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? "";
-            string toolsDir = Path.Combine(appDirectory, "tools");
+            // Use AppData for dependencies
+            string appDataDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Symphex",
+                "tools"
+            );
 
-            if (!Directory.Exists(toolsDir))
+            if (!Directory.Exists(appDataDir))
             {
-                Directory.CreateDirectory(toolsDir);
+                Directory.CreateDirectory(appDataDir);
             }
 
             using (var localHttpClient = new HttpClient())
@@ -188,16 +214,16 @@ namespace Symphex.Services
 
                 var zipBytes = await response.Content.ReadAsByteArrayAsync();
 
-                string zipPath = Path.Combine(toolsDir, "ffmpeg.zip");
+                string zipPath = Path.Combine(appDataDir, "ffmpeg.zip");
                 await File.WriteAllBytesAsync(zipPath, zipBytes);
 
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
-                    await ExtractFfmpegWindows(zipPath, toolsDir);
+                    await ExtractFfmpegWindows(zipPath, appDataDir);
                 }
                 else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
                 {
-                    await ExtractFfmpegMacOS(zipPath, toolsDir);
+                    await ExtractFfmpegMacOS(zipPath, appDataDir);
                 }
 
                 File.Delete(zipPath);
