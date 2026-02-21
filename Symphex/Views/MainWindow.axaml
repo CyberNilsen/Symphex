@@ -644,6 +644,114 @@
 			</StackPanel>
 		</Border>
 
+		<!-- Update Notification Overlay -->
+		<Border IsVisible="{Binding ShowUpdateNotification}"
+				HorizontalAlignment="Center"
+				VerticalAlignment="Center"
+				CornerRadius="20"
+				Padding="40,32"
+				ZIndex="1001"
+				MinWidth="600">
+			<Border.Background>
+				<LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+					<GradientStop Color="#0a0a0a" Offset="0"/>
+					<GradientStop Color="#1a1a1a" Offset="1"/>
+				</LinearGradientBrush>
+			</Border.Background>
+			<Border.Effect>
+				<DropShadowEffect Color="Black" Opacity="0.8" BlurRadius="40" OffsetX="0" OffsetY="15"/>
+			</Border.Effect>
+			<StackPanel Spacing="24">
+				<!-- Header with Logo -->
+				<StackPanel Orientation="Horizontal" Spacing="16" HorizontalAlignment="Center">
+					<Border Width="64" Height="64" CornerRadius="32" Background="#000000" Padding="12">
+						<Image Source="/Assets/SymphexLogo.png" Stretch="Uniform"/>
+					</Border>
+					<StackPanel VerticalAlignment="Center">
+						<TextBlock Text="Update Available!" FontSize="24" FontWeight="Bold" Foreground="White"/>
+						<TextBlock Text="{Binding UpdateVersion, StringFormat='Version {0} is ready to install'}" 
+								   FontSize="15" Foreground="#888888"/>
+					</StackPanel>
+				</StackPanel>
+
+				<!-- Progress (when downloading) -->
+				<StackPanel Spacing="12" IsVisible="{Binding IsDownloadingUpdate}">
+					<TextBlock Text="Downloading update..." FontSize="15" Foreground="White" HorizontalAlignment="Center" FontWeight="SemiBold"/>
+					<ProgressBar IsIndeterminate="True" Height="6" Foreground="#3b82f6" Background="#2a2a2a" CornerRadius="3"/>
+				</StackPanel>
+
+				<!-- Buttons -->
+				<StackPanel Orientation="Horizontal" Spacing="16" HorizontalAlignment="Center" IsVisible="{Binding !IsDownloadingUpdate}">
+					<Button Content="Later" 
+							Command="{Binding DismissUpdateCommand}"
+							Background="#2a2a2a"
+							Foreground="#888888"
+							BorderThickness="2"
+							BorderBrush="#3a3a3a"
+							CornerRadius="12"
+							Padding="32,14"
+							FontSize="15"
+							FontWeight="SemiBold"
+							Cursor="Hand">
+						<Button.Template>
+							<ControlTemplate>
+								<Border Background="{TemplateBinding Background}"
+										BorderBrush="{TemplateBinding BorderBrush}"
+										BorderThickness="{TemplateBinding BorderThickness}"
+										CornerRadius="{TemplateBinding CornerRadius}"
+										Padding="{TemplateBinding Padding}">
+									<ContentPresenter Content="{TemplateBinding Content}"
+													  Foreground="{TemplateBinding Foreground}"
+													  HorizontalContentAlignment="Center"
+													  VerticalContentAlignment="Center"/>
+								</Border>
+							</ControlTemplate>
+						</Button.Template>
+						<Button.Styles>
+							<Style Selector="Button:pointerover">
+								<Setter Property="Background" Value="#3a3a3a"/>
+								<Setter Property="BorderBrush" Value="#4a4a4a"/>
+								<Setter Property="Foreground" Value="#aaaaaa"/>
+							</Style>
+						</Button.Styles>
+					</Button>
+					<Button Content="Install Now" 
+							Command="{Binding InstallUpdateCommand}"
+							Background="#3b82f6"
+							Foreground="White"
+							BorderThickness="0"
+							CornerRadius="12"
+							Padding="40,14"
+							FontSize="15"
+							FontWeight="Bold"
+							Cursor="Hand">
+						<Button.Effect>
+							<DropShadowEffect Color="#3b82f6" Opacity="0.5" BlurRadius="20" OffsetX="0" OffsetY="4"/>
+						</Button.Effect>
+						<Button.Template>
+							<ControlTemplate>
+								<Border Background="{TemplateBinding Background}"
+										BorderBrush="{TemplateBinding BorderBrush}"
+										BorderThickness="{TemplateBinding BorderThickness}"
+										CornerRadius="{TemplateBinding CornerRadius}"
+										Padding="{TemplateBinding Padding}">
+									<ContentPresenter Content="{TemplateBinding Content}"
+													  Foreground="{TemplateBinding Foreground}"
+													  HorizontalContentAlignment="Center"
+													  VerticalContentAlignment="Center"/>
+								</Border>
+							</ControlTemplate>
+						</Button.Template>
+						<Button.Styles>
+							<Style Selector="Button:pointerover">
+								<Setter Property="Background" Value="#2563eb"/>
+							</Style>
+						</Button.Styles>
+					</Button>
+				</StackPanel>
+			</StackPanel>
+		</Border>
+
 		<ScrollViewer VerticalScrollBarVisibility="Auto" Padding="40">
 			
 			<Grid MaxWidth="800" HorizontalAlignment="Center">

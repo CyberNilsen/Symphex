@@ -13,6 +13,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Velopack;
 
 namespace Symphex.ViewModels
 {
@@ -24,7 +25,7 @@ namespace Symphex.ViewModels
         private string currentVersionText = $"Current Version: v{CURRENT_VERSION}";
 
         [ObservableProperty]
-        private string updateStatusText = "NetSparkle checks for updates automatically on startup.";
+        private string updateStatusText = "Click 'Check for Updates' to see if a new version is available.";
 
         [ObservableProperty]
         private bool isCheckingForUpdates = false;
@@ -105,6 +106,52 @@ namespace Symphex.ViewModels
             CurrentVersionText = $"Current Version: v{CURRENT_VERSION}";
             UpdateBitrateOptions(); // Initialize bitrate options
             LoadSettings();
+        }
+
+        private async Task CheckForUpdatesOnStartup()
+        {
+            try
+            {
+                await Task.Delay(2000); // Wait 2 seconds after startup
+                
+                var updateManager = new Velopack.UpdateManager("https://github.com/CyberNilsen/Symphex/releases/latest/download");
+                var updateInfo = await updateManager.CheckForUpdatesAsync();
+
+                if (updateInfo != null)
+                {
+                    UpdateStatusText = $"Update available: v{updateInfo.TargetFullRelease.Version}";
+                    IsUpdateAvailable = true;
+                    
+                    // Show update dialog to user
+                    var result = await ShowUpdateDialog(updateInfo.TargetFullRelease.Version.ToString());
+                    
+                    if (result)
+                    {
+                        UpdateStatusText = "Downloading update...";
+                        IsCheckingForUpdates = true;
+                        
+                        await updateManager.DownloadUpdatesAsync(updateInfo);
+                        
+                        UpdateStatusText = "Update downloaded! Restarting...";
+                        await Task.Delay(1000); // Brief pause to show message
+                        
+                        updateManager.ApplyUpdatesAndRestart(updateInfo);
+                    }
+                    else
+                    {
+                        UpdateStatusText = $"Update available: v{updateInfo.TargetFullRelease.Version} (skipped)";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[SettingsViewModel] Startup update check failed: {ex.Message}");
+                // Silently fail - don't bother the user on startup
+            }
+            finally
+            {
+                IsCheckingForUpdates = false;
+            }
         }
 
         private void LoadSettings()
@@ -277,7 +324,7 @@ namespace Symphex.ViewModels
         }
 
         [RelayCommand]
-        private void CheckForUpdates()
+        private async Task CheckForUpdates()
         {
             try
             {
@@ -285,30 +332,111 @@ namespace Symphex.ViewModels
                 UpdateStatusText = "Checking for updates...";
                 IsUpdateAvailable = false;
 
-                // Use NetSparkle to check for updates
-                var updater = App.Updater;
-                
-                if (updater == null)
+                var updateManager = new Velopack.UpdateManager("https://github.com/CyberNilsen/Symphex/releases/latest/download");
+
+                var updateInfo = await updateManager.CheckForUpdatesAsync();
+
+                if (updateInfo == null)
                 {
-                    UpdateStatusText = "Update system not initialized.";
-                    IsCheckingForUpdates = false;
-                    return;
+                    UpdateStatusText = "You're running the latest version!";
+                    IsUpdateAvailable = false;
                 }
+                else
+                {
+                    UpdateStatusText = $"Update available: v{updateInfo.TargetFullRelease.Version}";
+                    IsUpdateAvailable = true;
 
-                // Check for updates on UI thread (required for macOS)
-                // NetSparkle will handle the async operations internally
-                updater.CheckForUpdatesAtUserRequest();
-
-                // NetSparkle will show its own UI, so we just update our status
-                UpdateStatusText = "Update check complete. NetSparkle will show a dialog if updates are available.";
+                    // Ask user if they want to download and install
+                    var result = await ShowUpdateDialog(updateInfo.TargetFullRelease.Version.ToString());
+                    
+                    if (result)
+                    {
+                        UpdateStatusText = "Downloading update...";
+                        await updateManager.DownloadUpdatesAsync(updateInfo);
+                        
+                        UpdateStatusText = "Update downloaded! Restarting...";
+                        updateManager.ApplyUpdatesAndRestart(updateInfo);
+                    }
+                }
             }
             catch (Exception ex)
             {
                 UpdateStatusText = $"Error checking for updates: {ex.Message}";
+                Debug.WriteLine($"[SettingsViewModel] Update check error: {ex}");
             }
             finally
             {
                 IsCheckingForUpdates = false;
+            }
+        }
+
+        private async Task<bool> ShowUpdateDialog(string version)
+        {
+            try
+            {
+                if (Avalonia.Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+                {
+                    var dialog = new Window
+                    {
+                        Title = "Update Available",
+                        Width = 400,
+                        Height = 200,
+                        WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                        CanResize = false
+                    };
+
+                    var result = false;
+                    var panel = new StackPanel { Margin = new Avalonia.Thickness(20) };
+                    
+                    panel.Children.Add(new TextBlock 
+                    { 
+                        Text = $"A new version (v{version}) is available!",
+                        FontSize = 16,
+                        Margin = new Avalonia.Thickness(0, 0, 0, 20)
+                    });
+                    
+                    panel.Children.Add(new TextBlock 
+                    { 
+                        Text = "Would you like to download and install it now?",
+                        Margin = new Avalonia.Thickness(0, 0, 0, 20)
+                    });
+
+                    var buttonPanel = new StackPanel 
+                    { 
+                        Orientation = Avalonia.Layout.Orientation.Horizontal,
+                        HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right
+                    };
+
+                    var yesButton = new Button 
+                    { 
+                        Content = "Yes", 
+                        Width = 80,
+                        Margin = new Avalonia.Thickness(0, 0, 10, 0)
+                    };
+                    yesButton.Click += (s, e) => { result = true; dialog.Close(); };
+
+                    var noButton = new Button 
+                    { 
+                        Content = "No", 
+                        Width = 80 
+                    };
+                    noButton.Click += (s, e) => { result = false; dialog.Close(); };
+
+                    buttonPanel.Children.Add(yesButton);
+                    buttonPanel.Children.Add(noButton);
+                    panel.Children.Add(buttonPanel);
+
+                    dialog.Content = panel;
+
+                    await dialog.ShowDialog(desktop.MainWindow!);
+                    return result;
+                }
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[SettingsViewModel] Error showing update dialog: {ex}");
+                return false;
             }
         }
     }

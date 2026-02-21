@@ -25,6 +25,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
+using Velopack;
 
 namespace Symphex.ViewModels
 {
@@ -166,6 +167,16 @@ namespace Symphex.ViewModels
         [ObservableProperty]
         private bool isSettingsView = false;
 
+        // Update notification
+        [ObservableProperty]
+        private bool showUpdateNotification = false;
+
+        [ObservableProperty]
+        private string updateVersion = "";
+
+        [ObservableProperty]
+        private bool isDownloadingUpdate = false;
+
         // Playlist Management
         [ObservableProperty]
         private bool isSidePanelOpen = false;
@@ -253,6 +264,9 @@ namespace Symphex.ViewModels
                 // Initialize download service after dependencies are ready
                 InitializeDownloadService();
             });
+
+            // Check for updates on startup
+            _ = CheckForUpdatesOnStartup();
         }
 
         private void InitializeDownloadService()
@@ -2865,6 +2879,58 @@ namespace Symphex.ViewModels
             }
 
             Debug.WriteLine("[MainWindowViewModel] Settings reloaded from storage");
+        }
+
+        // Update notification methods
+        private async Task CheckForUpdatesOnStartup()
+        {
+            try
+            {
+                await Task.Delay(3000); // Wait 3 seconds after startup
+                
+                var updateManager = new Velopack.UpdateManager("https://github.com/CyberNilsen/Symphex/releases/latest/download");
+                var updateInfo = await updateManager.CheckForUpdatesAsync();
+
+                if (updateInfo != null)
+                {
+                    UpdateVersion = updateInfo.TargetFullRelease.Version.ToString();
+                    ShowUpdateNotification = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindowViewModel] Startup update check failed: {ex.Message}");
+            }
+        }
+
+        [RelayCommand]
+        private async Task InstallUpdate()
+        {
+            try
+            {
+                IsDownloadingUpdate = true;
+                
+                var updateManager = new Velopack.UpdateManager("https://github.com/CyberNilsen/Symphex/releases/latest/download");
+                var updateInfo = await updateManager.CheckForUpdatesAsync();
+
+                if (updateInfo != null)
+                {
+                    await updateManager.DownloadUpdatesAsync(updateInfo);
+                    updateManager.ApplyUpdatesAndRestart(updateInfo);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindowViewModel] Update installation failed: {ex.Message}");
+                ShowToast($"Update failed: {ex.Message}");
+                IsDownloadingUpdate = false;
+            }
+        }
+
+        [RelayCommand]
+        private void DismissUpdate()
+        {
+            ShowUpdateNotification = false;
         }
     }
 }
