@@ -1036,11 +1036,13 @@
 
             // Find assets for each platform
             platforms.forEach(platform => {
-                const asset = assets.find(asset => 
-                    platform.keywords.some(keyword => 
-                        asset.name.toLowerCase().includes(keyword)
-                    )
-                );
+                // Filter to only show Setup files (not .nupkg, RELEASES, etc.)
+                const asset = assets.find(asset => {
+                    const name = asset.name.toLowerCase();
+                    const matchesPlatform = platform.keywords.some(keyword => name.includes(keyword));
+                    const isSetupFile = name.includes('setup') && (name.endsWith('.exe') || name.endsWith('.pkg'));
+                    return matchesPlatform && isSetupFile;
+                });
 
                 if (asset) {
                     const isPrimary = platform.name === detectedOS;
