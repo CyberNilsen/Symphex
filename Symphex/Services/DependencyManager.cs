@@ -338,21 +338,57 @@ namespace Symphex.Services
             }
             else // Linux
             {
-                // Use XDG_DATA_HOME if set, otherwise ~/.local/share
-                var xdgDataHome = Environment.GetEnvironmentVariable("XDG_DATA_HOME");
-                if (!string.IsNullOrEmpty(xdgDataHome))
+                var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                
+                // Priority 1: ~/.config/Symphex/tools (XDG_CONFIG_HOME or fallback)
+                var xdgConfigHome = Environment.GetEnvironmentVariable("XDG_CONFIG_HOME");
+                var configDir = !string.IsNullOrEmpty(xdgConfigHome) 
+                    ? Path.Combine(xdgConfigHome, "Symphex", "tools")
+                    : Path.Combine(userProfile, ".config", "Symphex", "tools");
+                
+                // Try to create config directory
+                try
                 {
-                    return Path.Combine(xdgDataHome, "Symphex", "tools");
+                    if (!Directory.Exists(configDir))
+                    {
+                        Directory.CreateDirectory(configDir);
+                    }
+                    return configDir;
                 }
-                else
+                catch
                 {
-                    return Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                        ".local",
-                        "share",
-                        "Symphex",
-                        "tools"
-                    );
+                    // Config directory creation failed, try fallback
+                }
+                
+                // Priority 2: ~/Documents/Symphex/tools
+                var documentsDir = Path.Combine(userProfile, "Documents", "Symphex", "tools");
+                try
+                {
+                    if (!Directory.Exists(documentsDir))
+                    {
+                        Directory.CreateDirectory(documentsDir);
+                    }
+                    return documentsDir;
+                }
+                catch
+                {
+                    // Documents directory creation failed, try final fallback
+                }
+                
+                // Priority 3: ~/Desktop/Symphex/tools (last resort)
+                var desktopDir = Path.Combine(userProfile, "Desktop", "Symphex", "tools");
+                try
+                {
+                    if (!Directory.Exists(desktopDir))
+                    {
+                        Directory.CreateDirectory(desktopDir);
+                    }
+                    return desktopDir;
+                }
+                catch
+                {
+                    // If all else fails, use home directory
+                    return Path.Combine(userProfile, "Symphex", "tools");
                 }
             }
         }
