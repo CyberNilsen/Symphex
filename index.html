@@ -1036,12 +1036,35 @@
 
             // Find assets for each platform
             platforms.forEach(platform => {
-                // Filter to only show Setup files (not .nupkg, RELEASES, etc.)
+                // Filter to only show main installer files (not .nupkg, RELEASES, etc.)
                 const asset = assets.find(asset => {
                     const name = asset.name.toLowerCase();
-                    const matchesPlatform = platform.keywords.some(keyword => name.includes(keyword));
-                    const isSetupFile = name.includes('setup') && (name.endsWith('.exe') || name.endsWith('.pkg'));
-                    return matchesPlatform && isSetupFile;
+                    
+                    // Check for platform-specific installer files
+                    let isInstallerFile = false;
+                    let matchesPlatform = false;
+                    
+                    if (platform.name === 'Windows') {
+                        matchesPlatform = platform.keywords.some(keyword => name.includes(keyword));
+                        isInstallerFile = name.includes('setup') && name.endsWith('.exe');
+                    } else if (platform.name === 'macOS') {
+                        matchesPlatform = platform.keywords.some(keyword => name.includes(keyword));
+                        isInstallerFile = name.includes('setup') && name.endsWith('.pkg');
+                    } else if (platform.name === 'Linux') {
+                        // For Linux, AppImage files don't need to contain "linux" in the name
+                        // Just check if it's an AppImage, deb, or tar.gz
+                        if (name.includes('appimage')) {
+                            matchesPlatform = true;
+                            isInstallerFile = true;
+                        } else {
+                            matchesPlatform = platform.keywords.some(keyword => name.includes(keyword));
+                            isInstallerFile = name.endsWith('.deb') || 
+                                            name.endsWith('.tar.gz') ||
+                                            (name.endsWith('.zip') && name.includes('linux'));
+                        }
+                    }
+                    
+                    return matchesPlatform && isInstallerFile;
                 });
 
                 if (asset) {
