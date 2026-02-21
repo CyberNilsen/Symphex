@@ -6,7 +6,8 @@ We actively provide security updates for the following versions of Symphex:
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.2.x   | :white_check_mark: |
+| 1.3.x   | :white_check_mark: |
+| 1.2.x   | :x:                |
 | 1.1.x   | :x:                |
 | 1.0.x   | :x:                |
 | < 1.0   | :x:                |
@@ -17,7 +18,7 @@ We take the security of Symphex seriously. If you believe you have found a secur
 
 ### How to Report
 
-- **Email**: Send details to andreasnilsen07@hotmail.com (or your preferred email)
+- **Email**: Send details to cybernilsen@gmail.com (or your preferred email)
 - **Subject**: Use "SECURITY: [Brief Description]" in the subject line
 - **GitHub**: For non-sensitive issues, you can also create a private security advisory
 
