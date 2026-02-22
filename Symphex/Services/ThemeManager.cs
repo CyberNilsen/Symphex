@@ -17,29 +17,49 @@ namespace Symphex.Services
         
         private ThemeManager()
         {
-            // Subscribe to theme changes
-            if (Application.Current != null)
+            // Subscribe to theme changes - with null check
+            try
             {
-                Application.Current.ActualThemeVariantChanged += (s, e) =>
+                if (Application.Current != null)
                 {
-                    OnPropertyChanged(nameof(IsDarkMode));
-                    OnPropertyChanged(nameof(ButtonBackground));
-                    OnPropertyChanged(nameof(ButtonForeground));
-                    OnPropertyChanged(nameof(ButtonBorder));
-                    OnPropertyChanged(nameof(HoverBackground));
-                    OnPropertyChanged(nameof(HoverBorder));
-                    OnPropertyChanged(nameof(PressedBackground));
-                    OnPropertyChanged(nameof(CardBackground));
-                    OnPropertyChanged(nameof(PageBackground));
-                    OnPropertyChanged(nameof(SecondaryBackground));
-                    OnPropertyChanged(nameof(PrimaryText));
-                    OnPropertyChanged(nameof(SecondaryText));
-                    OnPropertyChanged(nameof(TertiaryText));
-                };
+                    Application.Current.ActualThemeVariantChanged += (s, e) =>
+                    {
+                        OnPropertyChanged(nameof(IsDarkMode));
+                        OnPropertyChanged(nameof(ButtonBackground));
+                        OnPropertyChanged(nameof(ButtonForeground));
+                        OnPropertyChanged(nameof(ButtonBorder));
+                        OnPropertyChanged(nameof(HoverBackground));
+                        OnPropertyChanged(nameof(HoverBorder));
+                        OnPropertyChanged(nameof(PressedBackground));
+                        OnPropertyChanged(nameof(CardBackground));
+                        OnPropertyChanged(nameof(PageBackground));
+                        OnPropertyChanged(nameof(SecondaryBackground));
+                        OnPropertyChanged(nameof(PrimaryText));
+                        OnPropertyChanged(nameof(SecondaryText));
+                        OnPropertyChanged(nameof(TertiaryText));
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ThemeManager] Error subscribing to theme changes: {ex.Message}");
             }
         }
         
-        public bool IsDarkMode => Application.Current?.ActualThemeVariant == ThemeVariant.Dark;
+        public bool IsDarkMode
+        {
+            get
+            {
+                try
+                {
+                    return Application.Current?.ActualThemeVariant == ThemeVariant.Dark;
+                }
+                catch
+                {
+                    return true; // Default to dark mode if error
+                }
+            }
+        }
         
         // Button colors
         public IBrush ButtonBackground => new SolidColorBrush(

@@ -11,6 +11,9 @@ namespace Symphex.Views
     {
         public MainWindow()
         {
+            // Set background immediately before anything else
+            Background = Avalonia.Media.Brushes.Black;
+            
             InitializeComponent();
 
             // Center the window when it starts

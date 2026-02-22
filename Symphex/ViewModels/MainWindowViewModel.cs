@@ -236,37 +236,51 @@ namespace Symphex.ViewModels
         public MainWindowViewModel()
         {
             CurrentTrack = new TrackInfo();
-            SetupDownloadFolder();
-            SetupResizedFolder();
-
-            // Load saved settings
-            LoadUserSettings();
-
-            // Load saved links
-            LoadSavedLinks();
-
-            // Load download history
-            LoadDownloadHistory();
-
-            // Initialize the album art search service
+            
+            // Minimal initialization only
             albumArtSearchService = new AlbumArtSearchService(httpClient);
+            
+            // Do everything else async after window shows
+            _ = InitializeAsync();
+        }
 
-            if (!Directory.Exists(DownloadFolder))
+        private async Task InitializeAsync()
+        {
+            try
             {
-                Directory.CreateDirectory(DownloadFolder);
-            }
+                // Setup folders
+                await Task.Run(() =>
+                {
+                    SetupDownloadFolder();
+                    SetupResizedFolder();
+                    
+                    if (!Directory.Exists(DownloadFolder))
+                    {
+                        Directory.CreateDirectory(DownloadFolder);
+                    }
+                });
 
-            // Start auto-installation in background
-            _ = Task.Run(async () =>
-            {
+                // Load settings and data
+                await Task.Run(() =>
+                {
+                    try { LoadUserSettings(); } catch { }
+                    try { LoadSavedLinks(); } catch { }
+                    try { LoadDownloadHistory(); } catch { }
+                });
+
+                // Install dependencies
                 await dependencyManager.AutoInstallDependencies();
+                
+                // Initialize download service
+                await Dispatcher.UIThread.InvokeAsync(() => InitializeDownloadService());
 
-                // Initialize download service after dependencies are ready
-                InitializeDownloadService();
-            });
-
-            // Check for updates on startup
-            _ = CheckForUpdatesOnStartup();
+                // Check for updates
+                await CheckForUpdatesOnStartup();
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindowViewModel] Initialization error: {ex.Message}");
+            }
         }
 
         private void InitializeDownloadService()

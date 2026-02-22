@@ -1,5 +1,6 @@
 ﻿using System;
 using Avalonia;
+using Avalonia.Win32;
 using Velopack;
 
 namespace Symphex
@@ -23,6 +24,14 @@ namespace Symphex
             => AppBuilder.Configure<App>()
                 .UsePlatformDetect()
                 .WithInterFont()
-                .LogToTrace();
+                .LogToTrace()
+                .With(new Win32PlatformOptions
+                {
+                    RenderingMode = new[] 
+                    { 
+                        Win32RenderingMode.Wgl,
+                        Win32RenderingMode.Software 
+                    }
+                });
     }
 }
