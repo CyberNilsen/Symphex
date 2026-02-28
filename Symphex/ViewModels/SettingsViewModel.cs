@@ -19,7 +19,7 @@ namespace Symphex.ViewModels
 {
     public partial class SettingsViewModel : ViewModelBase
     {
-        private const string CURRENT_VERSION = "1.3.1";
+        private const string CURRENT_VERSION = "1.4.0";
 
         [ObservableProperty]
         private string currentVersionText = $"Current Version: v{CURRENT_VERSION}";

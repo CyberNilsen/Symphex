@@ -122,7 +122,10 @@ namespace Symphex.ViewModels
         [ObservableProperty]
         private int selectionCountdown = 0; // Countdown timer
 
-        private ObservableCollection<Bitmap?> artworkOptions = new ObservableCollection<Bitmap?>(); // 4 artwork options to display
+        private ObservableCollection<Bitmap?> artworkOptions = new ObservableCollection<Bitmap?> 
+        { 
+            null, null, null, null // Initialize with 4 null items to prevent binding errors
+        };
         public ObservableCollection<Bitmap?> ArtworkOptions => artworkOptions;
 
         [ObservableProperty]
@@ -220,6 +223,24 @@ namespace Symphex.ViewModels
         [ObservableProperty]
         private ObservableCollection<string> queuedFiles = new ObservableCollection<string>();
 
+        // Metadata Enhancement Mode
+        [ObservableProperty]
+        private bool isMetadataMode = false;
+
+        [ObservableProperty]
+        private ObservableCollection<string> metadataFiles = new ObservableCollection<string>();
+
+        [ObservableProperty]
+        private bool downloadMissingArtwork = true;
+
+        [ObservableProperty]
+        private bool forceRedownloadArtwork = false;
+
+        [ObservableProperty]
+        private string metadataFolderPath = "";
+
+        private readonly MetadataEnhancementService metadataEnhancementService;
+
         private CancellationTokenSource? _downloadCancellationTokenSource;
 
         private readonly HttpClient httpClient = new();
@@ -239,6 +260,7 @@ namespace Symphex.ViewModels
             
             // Minimal initialization only
             albumArtSearchService = new AlbumArtSearchService(httpClient);
+            metadataEnhancementService = new MetadataEnhancementService(albumArtSearchService);
             
             // Do everything else async after window shows
             _ = InitializeAsync();
@@ -253,6 +275,7 @@ namespace Symphex.ViewModels
                 {
                     SetupDownloadFolder();
                     SetupResizedFolder();
+                    SetupMetadataFolder();
                     
                     if (!Directory.Exists(DownloadFolder))
                     {
@@ -1106,6 +1129,58 @@ namespace Symphex.ViewModels
 
             try
             {
+                // Check if we're in metadata enhancement mode
+                if (IsMetadataMode)
+                {
+                    if (MetadataFiles.Count == 0)
+                    {
+                        ShowToast("❌ Please drag and drop files to enhance");
+                        return;
+                    }
+
+                    IsDownloading = true;
+                    DownloadProgress = 0;
+                    CliOutput += "🎵 Starting metadata enhancement...\n";
+                    CliOutput += $"📁 Output folder: {MetadataFolderPath}\n";
+                    CliOutput += $"🎨 Artwork size: {SelectedThumbnailSize}\n\n";
+                    ShowToast("🎵 Searching and adding metadata...");
+
+                    // Parse and set artwork size in the service
+                    var targetSize = ParseThumbnailSize(SelectedThumbnailSize);
+                    metadataEnhancementService.SetArtworkSize(targetSize);
+
+                    var progress = new Progress<(int current, int total, string fileName)>(p =>
+                    {
+                        DownloadProgress = (double)p.current / p.total * 100;
+                        StatusText = $"Processing: {p.fileName} ({p.current}/{p.total})";
+                    });
+
+                    var result = await metadataEnhancementService.EnhanceMetadataAsync(
+                        MetadataFiles.ToList(),
+                        MetadataFolderPath,
+                        DownloadMissingArtwork,
+                        ForceRedownloadArtwork,
+                        progress,
+                        logMessage => CliOutput += logMessage + "\n");
+
+                    IsDownloading = false;
+                    DownloadProgress = 0;
+                    
+                    CliOutput += $"\n✅ Complete - Enhanced: {result.success}, Failed: {result.failed}\n";
+                    
+                    if (result.success > 0)
+                    {
+                        CliOutput += $"\n📁 Enhanced files saved to:\n";
+                        CliOutput += $"   {MetadataFolderPath}\n\n";
+                        CliOutput += $"⚠️ NOTE: Original files are NOT modified!\n";
+                        CliOutput += $"   Enhanced copies are in the folder above.\n";
+                    }
+                    
+                    ShowToast($"✅ Enhanced: {result.success}, Failed: {result.failed}");
+                    MetadataFiles.Clear();
+                    return;
+                }
+
                 // Check if we're in resize mode
                 if (IsResizeMode)
                 {
@@ -2249,8 +2324,10 @@ namespace Symphex.ViewModels
         {
             try
             {
-                // Determine which folder to open based on resize mode
-                var folderToOpen = IsResizeMode ? ResizedFolderPath : DownloadFolder;
+                // Determine which folder to open based on mode
+                var folderToOpen = IsMetadataMode ? MetadataFolderPath : 
+                                   IsResizeMode ? ResizedFolderPath : 
+                                   DownloadFolder;
 
                 // Ensure the directory exists first
                 if (!Directory.Exists(folderToOpen))
@@ -2721,7 +2798,43 @@ namespace Symphex.ViewModels
         private void ToggleResizeMode()
         {
             IsResizeMode = !IsResizeMode;
+            if (IsResizeMode)
+            {
+                IsMetadataMode = false; // Turn off metadata mode
+            }
             ShowToast(IsResizeMode ? "🎨 Resize Mode: Drag and drop files/folders" : "✅ Download Mode: Active");
+        }
+
+        [RelayCommand]
+        private void ToggleMetadataMode()
+        {
+            IsMetadataMode = !IsMetadataMode;
+            if (IsMetadataMode)
+            {
+                IsResizeMode = false; // Turn off resize mode
+                MetadataFiles.Clear();
+            }
+            ShowToast(IsMetadataMode ? "🎵 Metadata Mode: Drag files to enhance" : "✅ Download Mode: Active");
+        }
+
+        [RelayCommand]
+        private void ClearMetadataFiles()
+        {
+            MetadataFiles.Clear();
+            ShowToast("🗑️ Files cleared");
+        }
+
+        private int ParseThumbnailSize(string sizeOption)
+        {
+            return sizeOption switch
+            {
+                "None (No Thumbnails)" => 0,
+                "Low Quality (300x300)" => 300,
+                "Medium Quality (600x600)" => 600,
+                "High Quality (1200x1200)" => 1200,
+                "Maximum Quality" => int.MaxValue, // No resize
+                _ => 600 // Default to medium
+            };
         }
 
         private void SetupResizedFolder()
@@ -2738,6 +2851,23 @@ namespace Symphex.ViewModels
             {
                 Debug.WriteLine($"[MainWindowViewModel] Error setting up resized folder: {ex.Message}");
                 ResizedFolderPath = DownloadFolder;
+            }
+        }
+
+        private void SetupMetadataFolder()
+        {
+            try
+            {
+                MetadataFolderPath = Path.Combine(DownloadFolder, "Enhanced Metadata");
+                if (!Directory.Exists(MetadataFolderPath))
+                {
+                    Directory.CreateDirectory(MetadataFolderPath);
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindowViewModel] Error setting up metadata folder: {ex.Message}");
+                MetadataFolderPath = DownloadFolder;
             }
         }
 
@@ -2788,6 +2918,58 @@ namespace Symphex.ViewModels
             }
             
             return Task.CompletedTask;
+        }
+
+        public Task ProcessMetadataSourceFilesAsync(List<string> paths)
+        {
+            try
+            {
+                var musicFiles = new List<string>();
+
+                foreach (var path in paths)
+                {
+                    if (Directory.Exists(path))
+                    {
+                        var files = Directory.GetFiles(path, "*.*", SearchOption.AllDirectories)
+                            .Where(f => IsMusicFile(f))
+                            .ToList();
+                        musicFiles.AddRange(files);
+                    }
+                    else if (File.Exists(path) && IsMusicFile(path))
+                    {
+                        musicFiles.Add(path);
+                    }
+                }
+
+                if (musicFiles.Count == 0)
+                {
+                    ShowToast("❌ No music files found");
+                    return Task.CompletedTask;
+                }
+
+                foreach (var file in musicFiles)
+                {
+                    if (!MetadataFiles.Contains(file))
+                    {
+                        MetadataFiles.Add(file);
+                    }
+                }
+
+                ShowToast($"📁 Added {musicFiles.Count} file(s)");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindowViewModel] Error processing files: {ex.Message}");
+                ShowToast("❌ Error processing files");
+            }
+            
+            return Task.CompletedTask;
+        }
+
+        public Task ProcessMetadataTargetFilesAsync(List<string> paths)
+        {
+            // In the new design, we only have one drop zone, so this just calls the source method
+            return ProcessMetadataSourceFilesAsync(paths);
         }
 
         private bool IsMusicFile(string filePath)

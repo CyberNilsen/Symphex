@@ -267,6 +267,24 @@
 			</Viewbox>
 		</Button>
 
+		<!-- Metadata Mode Toggle Button - Top Right (left of resize) -->
+		<Button Classes="icon-button"
+				HorizontalAlignment="Right" VerticalAlignment="Top"
+				Margin="20,20,200,20"
+				ZIndex="100"
+				Command="{Binding ToggleMetadataModeCommand}"
+				RenderTransformOrigin="0.5,0.5">
+			<Button.IsVisible>
+				<MultiBinding Converter="{x:Static converters:MultiBoolToVisibilityConverter.Instance}">
+					<Binding Path="IsHistoryPanelOpen"/>
+					<Binding Path="IsSettingsView"/>
+				</MultiBinding>
+			</Button.IsVisible>
+			<Viewbox Width="28" Height="28">
+				<TextBlock Text="🎵" TextAlignment="Center"/>
+			</Viewbox>
+		</Button>
+
 		<!-- Settings Gear Icon Button - Top Right -->
 		<Button Classes="icon-button"
 				HorizontalAlignment="Right" VerticalAlignment="Top"
@@ -796,7 +814,13 @@
 							<TextBlock Text="Download Section" FontSize="18" FontWeight="Bold"
 									   Foreground="#ffffff" HorizontalAlignment="Center"/>
 
-							<StackPanel Spacing="10" IsVisible="{Binding !IsResizeMode}">
+							<StackPanel Spacing="10">
+								<StackPanel.IsVisible>
+									<MultiBinding Converter="{x:Static converters:BothModesOffConverter.Instance}">
+										<Binding Path="IsResizeMode"/>
+										<Binding Path="IsMetadataMode"/>
+									</MultiBinding>
+								</StackPanel.IsVisible>
 								<TextBlock Text="Paste your music link here" FontSize="16" FontWeight="Medium"
 										   Foreground="#ffffff" HorizontalAlignment="Center"/>
 
@@ -875,6 +899,66 @@
 								</Border>
 							</StackPanel>
 
+							<!-- Metadata Enhancement Mode -->
+							<StackPanel Spacing="10" IsVisible="{Binding IsMetadataMode}">
+								<TextBlock Text="Enhance Missing Metadata" FontSize="16" FontWeight="Medium"
+										   Foreground="#ffffff" HorizontalAlignment="Center"/>
+
+								<!-- Drop Zone -->
+								<Border DragDrop.AllowDrop="True"
+										Background="#1a1a1a"
+										BorderBrush="#10b981"
+										BorderThickness="2"
+										CornerRadius="10"
+										Height="120"
+										Width="325"
+										Padding="15">
+									<StackPanel Spacing="8" VerticalAlignment="Center" HorizontalAlignment="Center">
+										<TextBlock Text="🎵" FontSize="32" HorizontalAlignment="Center" Foreground="#10b981"/>
+										<TextBlock Text="Drop files missing metadata here" 
+												   FontSize="12" 
+												   Foreground="#cccccc" 
+												   HorizontalAlignment="Center"
+												   TextWrapping="Wrap"
+												   TextAlignment="Center"/>
+										<TextBlock Text="We'll search and add artwork automatically" 
+												   FontSize="10" 
+												   Foreground="#999999" 
+												   HorizontalAlignment="Center"
+												   TextWrapping="Wrap"
+												   TextAlignment="Center"/>
+									</StackPanel>
+								</Border>
+
+								<!-- Queued Files List -->
+								<Border Background="#1a1a1a" 
+										CornerRadius="10" 
+										Padding="10"
+										Width="325"
+										MaxHeight="80"
+										IsVisible="{Binding MetadataFiles.Count}">
+									<StackPanel Spacing="6">
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<TextBlock Text="📋 Queued:" FontSize="12" FontWeight="SemiBold" Foreground="#10b981"/>
+											<TextBlock Text="{Binding MetadataFiles.Count}" FontSize="12" FontWeight="Bold" Foreground="#10b981"/>
+										</StackPanel>
+										<ScrollViewer MaxHeight="50" VerticalScrollBarVisibility="Auto">
+											<ItemsControl ItemsSource="{Binding MetadataFiles}">
+												<ItemsControl.ItemTemplate>
+													<DataTemplate>
+														<TextBlock Text="{Binding}" 
+																   FontSize="9" 
+																   Foreground="#888888" 
+																   TextWrapping="Wrap"
+																   Margin="0,1"/>
+													</DataTemplate>
+												</ItemsControl.ItemTemplate>
+											</ItemsControl>
+										</ScrollViewer>
+									</StackPanel>
+								</Border>
+							</StackPanel>
+
 							<StackPanel Spacing="6" IsVisible="{Binding IsDownloading}">
 								<TextBlock Text="Downloading..." FontSize="14" FontWeight="Medium"
 										   Foreground="#ffffff" HorizontalAlignment="Center"/>
@@ -890,6 +974,7 @@
 								<Button.Content>
 									<MultiBinding Converter="{x:Static converters:ResizeModeToButtonTextConverter.Instance}">
 										<Binding Path="IsResizeMode"/>
+										<Binding Path="IsMetadataMode"/>
 									</MultiBinding>
 								</Button.Content>
 							</Button>
@@ -901,6 +986,7 @@
 										<Button.Content>
 											<MultiBinding Converter="{x:Static converters:ResizeModeToOpenButtonTextConverter.Instance}">
 												<Binding Path="IsResizeMode"/>
+												<Binding Path="IsMetadataMode"/>
 											</MultiBinding>
 										</Button.Content>
 									</Button>
@@ -1020,7 +1106,7 @@
 							</Style>
 						</Border.Styles>
 						<Grid>
-							<Image Source="{Binding ArtworkOptions[0]}" Stretch="UniformToFill"/>
+							<Image Source="{Binding ArtworkOptions[0], TargetNullValue={x:Null}}" Stretch="UniformToFill"/>
 							<!-- Number badge -->
 							<Border Background="#3b82f6" Width="28" Height="28" CornerRadius="14"
 									VerticalAlignment="Top" HorizontalAlignment="Right" Margin="6">
@@ -1029,7 +1115,8 @@
 							</Border>
 							<!-- Resolution label -->
 							<Border Background="#000000AA" CornerRadius="6" Padding="8,4"
-									VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="6">
+									VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="6"
+									IsVisible="{Binding ArtworkOptions[0], Converter={x:Static ObjectConverters.IsNotNull}}">
 								<TextBlock Text="{Binding ArtworkOptions[0].PixelSize, StringFormat='{}{0.Width}x{0.Height}'}"
 										   FontSize="11" FontWeight="SemiBold" Foreground="White"/>
 							</Border>
@@ -1047,14 +1134,15 @@
 							</Style>
 						</Border.Styles>
 						<Grid>
-							<Image Source="{Binding ArtworkOptions[1]}" Stretch="UniformToFill"/>
+							<Image Source="{Binding ArtworkOptions[1], TargetNullValue={x:Null}}" Stretch="UniformToFill"/>
 							<Border Background="#3b82f6" Width="28" Height="28" CornerRadius="14"
 									VerticalAlignment="Top" HorizontalAlignment="Right" Margin="6">
 								<TextBlock Text="2" FontSize="18" FontWeight="Bold" Foreground="White"
 										   TextAlignment="Center" VerticalAlignment="Center"/>
 							</Border>
 							<Border Background="#000000AA" CornerRadius="6" Padding="8,4"
-									VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="6">
+									VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="6"
+									IsVisible="{Binding ArtworkOptions[1], Converter={x:Static ObjectConverters.IsNotNull}}">
 								<TextBlock Text="{Binding ArtworkOptions[1].PixelSize, StringFormat='{}{0.Width}x{0.Height}'}"
 										   FontSize="11" FontWeight="SemiBold" Foreground="White"/>
 							</Border>
@@ -1072,14 +1160,15 @@
 							</Style>
 						</Border.Styles>
 						<Grid>
-							<Image Source="{Binding ArtworkOptions[2]}" Stretch="UniformToFill"/>
+							<Image Source="{Binding ArtworkOptions[2], TargetNullValue={x:Null}}" Stretch="UniformToFill"/>
 							<Border Background="#3b82f6" Width="28" Height="28" CornerRadius="14"
 									VerticalAlignment="Top" HorizontalAlignment="Right" Margin="6">
 								<TextBlock Text="3" FontSize="18" FontWeight="Bold" Foreground="White"
 										   TextAlignment="Center" VerticalAlignment="Center"/>
 							</Border>
 							<Border Background="#000000AA" CornerRadius="6" Padding="8,4"
-									VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="6">
+									VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="6"
+									IsVisible="{Binding ArtworkOptions[2], Converter={x:Static ObjectConverters.IsNotNull}}">
 								<TextBlock Text="{Binding ArtworkOptions[2].PixelSize, StringFormat='{}{0.Width}x{0.Height}'}"
 										   FontSize="11" FontWeight="SemiBold" Foreground="White"/>
 							</Border>
@@ -1097,14 +1186,15 @@
 							</Style>
 						</Border.Styles>
 						<Grid>
-							<Image Source="{Binding ArtworkOptions[3]}" Stretch="UniformToFill"/>
+							<Image Source="{Binding ArtworkOptions[3], TargetNullValue={x:Null}}" Stretch="UniformToFill"/>
 							<Border Background="#3b82f6" Width="28" Height="28" CornerRadius="14"
 									VerticalAlignment="Top" HorizontalAlignment="Right" Margin="6">
 								<TextBlock Text="4" FontSize="18" FontWeight="Bold" Foreground="White"
 										   TextAlignment="Center" VerticalAlignment="Center"/>
 							</Border>
 							<Border Background="#000000AA" CornerRadius="6" Padding="8,4"
-									VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="6">
+									VerticalAlignment="Bottom" HorizontalAlignment="Left" Margin="6"
+									IsVisible="{Binding ArtworkOptions[3], Converter={x:Static ObjectConverters.IsNotNull}}">
 								<TextBlock Text="{Binding ArtworkOptions[3].PixelSize, StringFormat='{}{0.Width}x{0.Height}'}"
 										   FontSize="11" FontWeight="SemiBold" Foreground="White"/>
 							</Border>

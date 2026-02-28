@@ -111,7 +111,7 @@ namespace Symphex.Views
             }
         }
 
-        private void OnArtworkOption1Tapped(object sender, RoutedEventArgs e)
+        private void OnArtworkOption1Tapped(object sender, TappedEventArgs e)
         {
             if (DataContext is ViewModels.MainWindowViewModel viewModel)
             {
@@ -119,7 +119,7 @@ namespace Symphex.Views
             }
         }
 
-        private void OnArtworkOption2Tapped(object sender, RoutedEventArgs e)
+        private void OnArtworkOption2Tapped(object sender, TappedEventArgs e)
         {
             if (DataContext is ViewModels.MainWindowViewModel viewModel)
             {
@@ -127,7 +127,7 @@ namespace Symphex.Views
             }
         }
 
-        private void OnArtworkOption3Tapped(object sender, RoutedEventArgs e)
+        private void OnArtworkOption3Tapped(object sender, TappedEventArgs e)
         {
             if (DataContext is ViewModels.MainWindowViewModel viewModel)
             {
@@ -135,7 +135,7 @@ namespace Symphex.Views
             }
         }
 
-        private void OnArtworkOption4Tapped(object sender, RoutedEventArgs e)
+        private void OnArtworkOption4Tapped(object sender, TappedEventArgs e)
         {
             if (DataContext is ViewModels.MainWindowViewModel viewModel)
             {
@@ -143,7 +143,7 @@ namespace Symphex.Views
             }
         }
 
-        private void OnSkipArtworkSelection(object sender, RoutedEventArgs e)
+        private void OnSkipArtworkSelection(object sender, TappedEventArgs e)
         {
             if (DataContext is ViewModels.MainWindowViewModel viewModel)
             {
@@ -151,7 +151,7 @@ namespace Symphex.Views
             }
         }
 
-        private void OnNoPictureSelected(object sender, RoutedEventArgs e)
+        private void OnNoPictureSelected(object sender, TappedEventArgs e)
         {
             if (DataContext is ViewModels.MainWindowViewModel viewModel)
             {
@@ -161,34 +161,52 @@ namespace Symphex.Views
 
         private void OnDragOver(object? sender, DragEventArgs e)
         {
-            if (DataContext is ViewModels.MainWindowViewModel viewModel && viewModel.IsResizeMode)
+            if (DataContext is ViewModels.MainWindowViewModel viewModel)
             {
-                // Check if the drag data contains files
-                #pragma warning disable CS0618
-                var files = e.Data?.GetFiles();
-                #pragma warning restore CS0618
-                if (files?.Any() == true)
+                if (viewModel.IsResizeMode || viewModel.IsMetadataMode)
                 {
-                    e.DragEffects = DragDropEffects.Copy;
-                    e.Handled = true;
+                    // Check if the drag data contains files
+                    #pragma warning disable CS0618
+                    var files = e.Data?.GetFiles();
+                    #pragma warning restore CS0618
+                    if (files?.Any() == true)
+                    {
+                        e.DragEffects = DragDropEffects.Copy;
+                        e.Handled = true;
+                    }
                 }
             }
         }
 
         private async void OnDrop(object? sender, DragEventArgs e)
         {
-            if (DataContext is ViewModels.MainWindowViewModel viewModel && viewModel.IsResizeMode)
+            if (DataContext is ViewModels.MainWindowViewModel viewModel)
             {
                 #pragma warning disable CS0618
                 var files = e.Data?.GetFiles();
                 #pragma warning restore CS0618
+                
                 if (files != null && files.Any())
                 {
                     var paths = files.Select(f => f.Path.LocalPath).ToList();
-                    await viewModel.ProcessDroppedFilesAsync(paths);
+                    
+                    if (viewModel.IsResizeMode)
+                    {
+                        await viewModel.ProcessDroppedFilesAsync(paths);
+                    }
+                    else if (viewModel.IsMetadataMode)
+                    {
+                        await viewModel.ProcessMetadataSourceFilesAsync(paths);
+                    }
                 }
                 e.Handled = true;
             }
+        }
+
+        private bool IsWithinSourceDropZone(Control? control)
+        {
+            // No longer needed - keeping for compatibility
+            return false;
         }
     }
 }
