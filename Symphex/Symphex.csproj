@@ -10,16 +10,15 @@
 		<ApplicationIcon>Assets\SymphexLogo.ico</ApplicationIcon>
 
 		<!-- Version Information -->
-		<AssemblyVersion>1.3.0.0</AssemblyVersion>
-		<FileVersion>1.3.0.0</FileVersion>
-		<Version>1.3.0</Version>
+		<AssemblyVersion>1.4.0</AssemblyVersion>
+		<FileVersion>1.4.0.0</FileVersion>
+		<Version>1.4.0</Version>
 
 		<!-- Application Information -->
 		<AssemblyTitle>Symphex Music Downloader</AssemblyTitle>
 		<AssemblyDescription>Cross-platform music downloader for YouTube and Spotify with smart metadata detection</AssemblyDescription>
 		<AssemblyCompany>CyberNilsen</AssemblyCompany>
 		<AssemblyProduct>Symphex</AssemblyProduct>
-		<AssemblyCopyright>Copyright © 2026 CyberNilsen. All rights reserved.</AssemblyCopyright>
 		<AssemblyTrademark>Symphex™</AssemblyTrademark>
 
 		<!-- Additional Windows Properties -->
@@ -30,8 +29,8 @@
 		<CFBundleName>Symphex Music Downloader</CFBundleName>
 		<CFBundleDisplayName>Music Downloader</CFBundleDisplayName>
 		<CFBundleIdentifier>com.symphex.musicdownloader</CFBundleIdentifier>
-		<CFBundleVersion>1.3.0</CFBundleVersion>
-		<CFBundleShortVersionString>1.3.0</CFBundleShortVersionString>
+		<CFBundleVersion>1.4.0</CFBundleVersion>
+		<CFBundleShortVersionString>1.4.0</CFBundleShortVersionString>
 		<CFBundlePackageType>APPL</CFBundlePackageType>
 		<CFBundleSignature>????</CFBundleSignature>
 		<CFBundleExecutable>Symphex</CFBundleExecutable>
