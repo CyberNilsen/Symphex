@@ -75,8 +75,8 @@ namespace Symphex.Services
                         Debug.WriteLine($"[MetadataEnhancement] Searching for artwork...");
                         
                         // Parse filename to extract artist and title if metadata is missing
-                        string searchTitle = metadata.Title;
-                        string searchArtist = metadata.Artist;
+                        string searchTitle = metadata.Title ?? "";
+                        string searchArtist = metadata.Artist ?? "";
                         
                         if (string.IsNullOrWhiteSpace(searchTitle) || string.IsNullOrWhiteSpace(searchArtist))
                         {
