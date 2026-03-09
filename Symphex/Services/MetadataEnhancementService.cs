@@ -33,7 +33,8 @@ namespace Symphex.Services
             bool downloadArtwork = true,
             bool forceRedownload = false,
             IProgress<(int current, int total, string fileName)>? progress = null,
-            Action<string>? logCallback = null)
+            Action<string>? logCallback = null,
+            List<string>? localImageFiles = null)
         {
             int successCount = 0;
             int failedCount = 0;
@@ -125,6 +126,26 @@ namespace Symphex.Services
                         logCallback?.Invoke($"     - Album: {trackInfo.Album ?? "None"}");
                         logCallback?.Invoke($"     - Genre: {trackInfo.Genre ?? "None"}");
                         logCallback?.Invoke($"     - Year: {trackInfo.Year ?? "None"}");
+                        
+                        // If no artwork found online, try using local image files
+                        if (trackInfo.AlbumArt == null && localImageFiles != null && localImageFiles.Count > 0)
+                        {
+                            logCallback?.Invoke($"  🖼️ No online artwork found, using local image...");
+                            Debug.WriteLine($"[MetadataEnhancement] Using local image file");
+                            
+                            try
+                            {
+                                // Use the first available local image
+                                var localImagePath = localImageFiles[0];
+                                trackInfo.AlbumArt = new Bitmap(localImagePath);
+                                logCallback?.Invoke($"  ✅ Loaded local image: {Path.GetFileName(localImagePath)}");
+                            }
+                            catch (Exception imgEx)
+                            {
+                                logCallback?.Invoke($"  ⚠️ Failed to load local image: {imgEx.Message}");
+                                Debug.WriteLine($"[MetadataEnhancement] Failed to load local image: {imgEx.Message}");
+                            }
+                        }
                         
                         if (trackInfo.AlbumArt != null)
                         {

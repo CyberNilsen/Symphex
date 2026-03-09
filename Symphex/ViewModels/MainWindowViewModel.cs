@@ -1,4 +1,4 @@
-﻿﻿using Avalonia;
+﻿﻿﻿﻿using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Input;
@@ -229,6 +229,9 @@ namespace Symphex.ViewModels
 
         [ObservableProperty]
         private ObservableCollection<string> metadataFiles = new ObservableCollection<string>();
+
+        [ObservableProperty]
+        private ObservableCollection<string> metadataImageFiles = new ObservableCollection<string>();
 
         [ObservableProperty]
         private bool downloadMissingArtwork = true;
@@ -1161,7 +1164,8 @@ namespace Symphex.ViewModels
                         DownloadMissingArtwork,
                         ForceRedownloadArtwork,
                         progress,
-                        logMessage => CliOutput += logMessage + "\n");
+                        logMessage => CliOutput += logMessage + "\n",
+                        MetadataImageFiles.ToList());
 
                     IsDownloading = false;
                     DownloadProgress = 0;
@@ -2813,6 +2817,7 @@ namespace Symphex.ViewModels
             {
                 IsResizeMode = false; // Turn off resize mode
                 MetadataFiles.Clear();
+                MetadataImageFiles.Clear();
             }
             ShowToast(IsMetadataMode ? "🎵 Metadata Mode: Drag files to enhance" : "✅ Download Mode: Active");
         }
@@ -2925,37 +2930,60 @@ namespace Symphex.ViewModels
             try
             {
                 var musicFiles = new List<string>();
+                var imageFiles = new List<string>();
 
                 foreach (var path in paths)
                 {
                     if (Directory.Exists(path))
                     {
-                        var files = Directory.GetFiles(path, "*.*", SearchOption.AllDirectories)
-                            .Where(f => IsMusicFile(f))
-                            .ToList();
-                        musicFiles.AddRange(files);
+                        var files = Directory.GetFiles(path, "*.*", SearchOption.AllDirectories);
+                        musicFiles.AddRange(files.Where(f => IsMusicFile(f)));
+                        imageFiles.AddRange(files.Where(f => IsImageFile(f)));
                     }
-                    else if (File.Exists(path) && IsMusicFile(path))
+                    else if (File.Exists(path))
                     {
-                        musicFiles.Add(path);
+                        if (IsMusicFile(path))
+                            musicFiles.Add(path);
+                        else if (IsImageFile(path))
+                            imageFiles.Add(path);
                     }
                 }
 
-                if (musicFiles.Count == 0)
-                {
-                    ShowToast("❌ No music files found");
-                    return Task.CompletedTask;
-                }
+                int totalAdded = 0;
 
                 foreach (var file in musicFiles)
                 {
                     if (!MetadataFiles.Contains(file))
                     {
                         MetadataFiles.Add(file);
+                        totalAdded++;
                     }
                 }
 
-                ShowToast($"📁 Added {musicFiles.Count} file(s)");
+                foreach (var file in imageFiles)
+                {
+                    if (!MetadataImageFiles.Contains(file))
+                    {
+                        MetadataImageFiles.Add(file);
+                        totalAdded++;
+                    }
+                }
+
+                if (totalAdded == 0)
+                {
+                    ShowToast("❌ No music or image files found");
+                    return Task.CompletedTask;
+                }
+
+                string message = "";
+                if (musicFiles.Count > 0 && imageFiles.Count > 0)
+                    message = $"📁 Added {musicFiles.Count} music file(s) and {imageFiles.Count} image(s)";
+                else if (musicFiles.Count > 0)
+                    message = $"📁 Added {musicFiles.Count} music file(s)";
+                else
+                    message = $"📁 Added {imageFiles.Count} image(s)";
+
+                ShowToast(message);
             }
             catch (Exception ex)
             {
@@ -2977,6 +3005,11 @@ namespace Symphex.ViewModels
             var ext = Path.GetExtension(filePath).ToLowerInvariant();
             return ext == ".mp3" || ext == ".m4a" || ext == ".flac" || ext == ".wav" || ext == ".ogg" || ext == ".opus";
         }
+        private bool IsImageFile(string filePath)
+                {
+                    var ext = Path.GetExtension(filePath).ToLowerInvariant();
+                    return ext == ".jpg" || ext == ".jpeg" || ext == ".png" || ext == ".bmp" || ext == ".webp";
+                }
 
         private async Task ResizeAlbumArtForFile(string filePath)
         {
