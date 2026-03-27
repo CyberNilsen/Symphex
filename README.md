@@ -2,7 +2,7 @@
 
 **Open-source YouTube music downloader** - Extract high-quality MP3 audio from YouTube videos with automatic metadata detection, album artwork embedding, and cross-platform support for Windows, macOS, and Linux.
 
-<img width="1369" height="994" alt="Symphex" src="https://github.com/user-attachments/assets/cf36d4cb-79ec-4746-93e5-626e392e5524" />
+![Symphex](https://github.com/user-attachments/assets/2eef5f27-a443-4a26-ad23-40b1b4b57d48)
 
 [![GitHub release](https://img.shields.io/github/v/release/CyberNilsen/Symphex?style=for-the-badge)](https://github.com/CyberNilsen/Symphex/releases)
 [![GitHub stars](https://img.shields.io/github/stars/CyberNilsen/Symphex?style=for-the-badge)](https://github.com/CyberNilsen/Symphex/stargazers)
