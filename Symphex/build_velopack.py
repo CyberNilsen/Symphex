@@ -134,6 +134,8 @@ def pack_with_velopack(vpk_cmd, publish_dir, runtime, version, output_dir, icon_
         platform_name = "linux"
         icon_arg = []
     
+    icon_path = "/Users/06niland/Desktop/Symphex/Symphex/Assets/Symphex.icns" if platform_name == "osx" else "/Users/06niland/Desktop/Symphex/Symphex/Assets/SymphexLogo.ico"
+
     cmd = [
         vpk_cmd, "pack",
         "-u", PROJECT_NAME,
@@ -141,6 +143,7 @@ def pack_with_velopack(vpk_cmd, publish_dir, runtime, version, output_dir, icon_
         "-p", str(publish_dir),
         "-e", f"{PROJECT_NAME}.exe" if platform_name == "win" else PROJECT_NAME,
         "-o", str(output_dir),
+        "--icon", str(icon_path)
     ] + icon_arg
     
     result = run_command(cmd, check=False)
