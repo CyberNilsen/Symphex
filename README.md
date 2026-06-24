@@ -262,7 +262,6 @@ Symphex developers assume no responsibility for misuse of this software.
 ### Privacy & Data Collection
 - **No Telemetry**: Symphex collects no usage data or personal information
 - **No Analytics**: No tracking, no user behavior monitoring  
-- **Offline Capable**: Works completely offline after dependency setup
 - **Local Storage**: All data stays on your device
 
 ## 🙏 Acknowledgments & Credits
