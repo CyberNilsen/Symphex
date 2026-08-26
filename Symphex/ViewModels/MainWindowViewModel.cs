@@ -334,6 +334,22 @@ namespace Symphex.ViewModels
             };
         }
 
+        public async Task ReinitializeDependencies()
+        {
+            try
+            {
+                await dependencyManager.AutoInstallDependencies();
+                
+                await Dispatcher.UIThread.InvokeAsync(() => InitializeDownloadService());
+                
+                Debug.WriteLine("[MainWindowViewModel] Dependencies reinitialized successfully");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindowViewModel] Error reinitializing dependencies: {ex.Message}");
+            }
+        }
+
         partial void OnEnableAlbumArtDownloadChanged(bool value)
         {
             if (_downloadService != null)

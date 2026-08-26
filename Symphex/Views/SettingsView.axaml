@@ -571,6 +571,100 @@
 							</StackPanel>
 						</Border>
 
+						<!-- Reinstall Tools Card -->
+						<Border Classes="setting-card">
+							<StackPanel Spacing="16">
+								<StackPanel Orientation="Horizontal" Spacing="12">
+									<Border Width="48" Height="48" CornerRadius="12" Background="#06b6d4">
+										<materialIcons:MaterialIcon Kind="Cog" Width="28" Height="28" Foreground="White"/>
+									</Border>
+									<StackPanel VerticalAlignment="Center">
+										<TextBlock Text="Reinstall Tools" FontSize="18" FontWeight="Bold" Foreground="#ffffff"/>
+										<TextBlock Text="Reinstall yt-dlp and FFmpeg" FontSize="13" Foreground="#888888"/>
+									</StackPanel>
+								</StackPanel>
+
+								<Border Background="#0a0a0a" CornerRadius="10" Padding="16">
+									<StackPanel Spacing="8">
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<materialIcons:MaterialIcon Kind="AlertCircle" Width="14" Height="14" Foreground="#f59e0b"/>
+											<TextBlock Text="This will download and install the latest versions of yt-dlp and FFmpeg" FontSize="12" Foreground="#999999"/>
+										</StackPanel>
+										<StackPanel Orientation="Horizontal" Spacing="8">
+											<materialIcons:MaterialIcon Kind="Information" Width="14" Height="14" Foreground="#3b82f6"/>
+											<TextBlock Text="Useful if tools are corrupted or not working properly" FontSize="12" Foreground="#999999"/>
+										</StackPanel>
+									</StackPanel>
+								</Border>
+
+								<!-- Status Text -->
+								<Border Background="#0a0a0a" CornerRadius="10" Padding="16" BorderBrush="#3b82f6" BorderThickness="2" IsVisible="{Binding IsReinstallingTools}">
+									<StackPanel Spacing="12">
+										<StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+											<Border Width="24" Height="24" CornerRadius="12">
+												<ProgressBar IsIndeterminate="True" 
+													Background="Transparent"
+													Foreground="#3b82f6"/>
+											</Border>
+											<TextBlock Text="{Binding ToolReinstallStatusText}" 
+													   FontSize="14" 
+													   Foreground="#3b82f6"
+													   FontWeight="SemiBold"
+													   VerticalAlignment="Center"/>
+										</StackPanel>
+										<ProgressBar IsIndeterminate="True" Height="3" CornerRadius="2"/>
+									</StackPanel>
+								</Border>
+
+								<Button Command="{Binding ReinstallToolsCommand}"
+										HorizontalAlignment="Center"
+										Padding="20,10"
+										Background="#06b6d4"
+										Foreground="White"
+										CornerRadius="10"
+										BorderThickness="0"
+										Cursor="Hand"
+										IsEnabled="{Binding !IsReinstallingTools}">
+									<Button.Template>
+										<ControlTemplate>
+											<Border Background="{TemplateBinding Background}"
+													BorderBrush="{TemplateBinding BorderBrush}"
+													BorderThickness="{TemplateBinding BorderThickness}"
+													CornerRadius="{TemplateBinding CornerRadius}"
+													Padding="{TemplateBinding Padding}">
+												<ContentPresenter Content="{TemplateBinding Content}"
+																  Foreground="{TemplateBinding Foreground}"
+																  HorizontalContentAlignment="Center"
+																  VerticalContentAlignment="Center"/>
+											</Border>
+										</ControlTemplate>
+									</Button.Template>
+									<Button.Styles>
+										<Style Selector="Button:pointerover">
+											<Setter Property="Background" Value="#0891b2"/>
+											<Setter Property="RenderTransform" Value="scale(1.05)"/>
+											<Setter Property="Effect">
+												<DropShadowEffect Color="#06b6d4" Opacity="0.6" BlurRadius="15" OffsetX="0" OffsetY="4"/>
+											</Setter>
+										</Style>
+										<Style Selector="Button:pressed">
+											<Setter Property="Background" Value="#0e7490"/>
+											<Setter Property="RenderTransform" Value="scale(0.98)"/>
+										</Style>
+										<Style Selector="Button:disabled">
+											<Setter Property="Background" Value="#4b5563"/>
+											<Setter Property="Foreground" Value="#9ca3af"/>
+											<Setter Property="Opacity" Value="0.6"/>
+										</Style>
+									</Button.Styles>
+									<StackPanel Orientation="Horizontal" Spacing="8">
+										<materialIcons:MaterialIcon Kind="Cog" Width="18" Height="18" Foreground="White"/>
+										<TextBlock Text="Reinstall Tools" FontSize="14" FontWeight="SemiBold" Foreground="White"/>
+									</StackPanel>
+								</Button>
+							</StackPanel>
+						</Border>
+
 					</StackPanel>
 				</ScrollViewer>
 			</TabItem>

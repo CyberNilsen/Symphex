@@ -14,6 +14,7 @@ using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Velopack;
+using Symphex.Services;
 
 namespace Symphex.ViewModels
 {
@@ -50,6 +51,12 @@ namespace Symphex.ViewModels
 
         [ObservableProperty]
         private double albumArtSize = 600; // Default resize size
+
+        [ObservableProperty]
+        private bool isReinstallingTools = false;
+
+        [ObservableProperty]
+        private string toolReinstallStatusText = "Click to reinstall tools";
 
         public IRelayCommand? BackCommand { get; set; }
         
@@ -367,6 +374,45 @@ namespace Symphex.ViewModels
             finally
             {
                 IsCheckingForUpdates = false;
+            }
+        }
+
+        [RelayCommand]
+        private async Task ReinstallTools()
+        {
+            try
+            {
+                IsReinstallingTools = true;
+                ToolReinstallStatusText = "Reinstalling tools...";
+
+                var dependencyManager = new DependencyManager();
+
+                await dependencyManager.DownloadYtDlp();
+                ToolReinstallStatusText = "yt-dlp installed, installing FFmpeg...";
+
+                await dependencyManager.DownloadFfmpeg();
+                
+                ToolReinstallStatusText = "Tools reinstalled successfully!";
+                
+                if (_mainWindowViewModel != null)
+                {
+                    await _mainWindowViewModel.ReinitializeDependencies();
+                }
+
+                await Task.Delay(3000);
+                ToolReinstallStatusText = "Click to reinstall tools";
+            }
+            catch (Exception ex)
+            {
+                ToolReinstallStatusText = $"Error: {ex.Message}";
+                Debug.WriteLine($"[SettingsViewModel] Tool reinstall error: {ex}");
+                
+                await Task.Delay(5000);
+                ToolReinstallStatusText = "Click to reinstall tools";
+            }
+            finally
+            {
+                IsReinstallingTools = false;
             }
         }
 
