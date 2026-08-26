@@ -10,9 +10,9 @@
 		<ApplicationIcon>Assets\SymphexLogo.ico</ApplicationIcon>
 
 		<!-- Version Information -->
-		<AssemblyVersion>1.4.0</AssemblyVersion>
-		<FileVersion>1.4.0.0</FileVersion>
-		<Version>1.4.0</Version>
+		<AssemblyVersion>1.4.1</AssemblyVersion>
+		<FileVersion>1.4.1.0</FileVersion>
+		<Version>1.4.1</Version>
 
 		<!-- Application Information -->
 		<AssemblyTitle>Symphex Music Downloader</AssemblyTitle>
@@ -29,8 +29,8 @@
 		<CFBundleName>Symphex Music Downloader</CFBundleName>
 		<CFBundleDisplayName>Music Downloader</CFBundleDisplayName>
 		<CFBundleIdentifier>com.symphex.musicdownloader</CFBundleIdentifier>
-		<CFBundleVersion>1.4.0</CFBundleVersion>
-		<CFBundleShortVersionString>1.4.0</CFBundleShortVersionString>
+		<CFBundleVersion>1.4.1</CFBundleVersion>
+		<CFBundleShortVersionString>1.4.1</CFBundleShortVersionString>
 		<CFBundlePackageType>APPL</CFBundlePackageType>
 		<CFBundleSignature>????</CFBundleSignature>
 		<CFBundleExecutable>Symphex</CFBundleExecutable>
