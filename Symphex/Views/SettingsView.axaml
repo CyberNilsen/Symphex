@@ -597,18 +597,18 @@
 									</StackPanel>
 								</Border>
 
-								<!-- Status Text -->
-								<StackPanel Spacing="8" IsVisible="{Binding IsReinstallingTools}">
+								<StackPanel Spacing="8" IsVisible="{Binding ShowToolReinstallStatus}">
 									<StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-										<Border Width="24" Height="24" CornerRadius="12">
+										<Border Width="24" Height="24" CornerRadius="12" IsVisible="{Binding IsToolStatusAnimating}">
 										</Border>
+										<materialIcons:MaterialIcon Kind="CheckCircle" Width="24" Height="24" Foreground="#10b981" IsVisible="{Binding !IsToolStatusAnimating}"/>
 										<TextBlock Text="{Binding ToolReinstallStatusText}" 
 												   FontSize="14" 
 												   Foreground="#3b82f6"
 												   FontWeight="SemiBold"
 												   VerticalAlignment="Center"/>
 									</StackPanel>
-									<ProgressBar IsIndeterminate="True" Height="3" CornerRadius="2"/>
+									<ProgressBar IsIndeterminate="True" Height="3" CornerRadius="2" IsVisible="{Binding IsToolStatusAnimating}"/>
 								</StackPanel>
 
 								<Button Command="{Binding ReinstallToolsCommand}"

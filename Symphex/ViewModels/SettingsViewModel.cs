@@ -56,6 +56,12 @@ namespace Symphex.ViewModels
         private bool isReinstallingTools = false;
 
         [ObservableProperty]
+        private bool showToolReinstallStatus = false;
+
+        [ObservableProperty]
+        private bool isToolStatusAnimating = true;
+
+        [ObservableProperty]
         private string toolReinstallStatusText = "Click to reinstall tools";
 
         public IRelayCommand? BackCommand { get; set; }
@@ -383,6 +389,8 @@ namespace Symphex.ViewModels
             try
             {
                 IsReinstallingTools = true;
+                ShowToolReinstallStatus = true;
+                IsToolStatusAnimating = true;
                 ToolReinstallStatusText = "Reinstalling tools...";
 
                 var dependencyManager = new DependencyManager();
@@ -393,22 +401,18 @@ namespace Symphex.ViewModels
                 await dependencyManager.DownloadFfmpeg();
                 
                 ToolReinstallStatusText = "Tools reinstalled successfully!";
+                IsToolStatusAnimating = false;
                 
                 if (_mainWindowViewModel != null)
                 {
                     await _mainWindowViewModel.ReinitializeDependencies();
                 }
-
-                await Task.Delay(3000);
-                ToolReinstallStatusText = "Click to reinstall tools";
             }
             catch (Exception ex)
             {
                 ToolReinstallStatusText = $"Error: {ex.Message}";
                 Debug.WriteLine($"[SettingsViewModel] Tool reinstall error: {ex}");
-                
-                await Task.Delay(5000);
-                ToolReinstallStatusText = "Click to reinstall tools";
+                IsToolStatusAnimating = false;
             }
             finally
             {
