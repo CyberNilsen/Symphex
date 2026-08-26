@@ -598,23 +598,18 @@
 								</Border>
 
 								<!-- Status Text -->
-								<Border Background="#0a0a0a" CornerRadius="10" Padding="16" BorderBrush="#3b82f6" BorderThickness="2" IsVisible="{Binding IsReinstallingTools}">
-									<StackPanel Spacing="12">
-										<StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
-											<Border Width="24" Height="24" CornerRadius="12">
-												<ProgressBar IsIndeterminate="True" 
-													Background="Transparent"
-													Foreground="#3b82f6"/>
-											</Border>
-											<TextBlock Text="{Binding ToolReinstallStatusText}" 
-													   FontSize="14" 
-													   Foreground="#3b82f6"
-													   FontWeight="SemiBold"
-													   VerticalAlignment="Center"/>
-										</StackPanel>
-										<ProgressBar IsIndeterminate="True" Height="3" CornerRadius="2"/>
+								<StackPanel Spacing="8" IsVisible="{Binding IsReinstallingTools}">
+									<StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+										<Border Width="24" Height="24" CornerRadius="12">
+										</Border>
+										<TextBlock Text="{Binding ToolReinstallStatusText}" 
+												   FontSize="14" 
+												   Foreground="#3b82f6"
+												   FontWeight="SemiBold"
+												   VerticalAlignment="Center"/>
 									</StackPanel>
-								</Border>
+									<ProgressBar IsIndeterminate="True" Height="3" CornerRadius="2"/>
+								</StackPanel>
 
 								<Button Command="{Binding ReinstallToolsCommand}"
 										HorizontalAlignment="Center"
