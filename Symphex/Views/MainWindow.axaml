@@ -60,9 +60,9 @@
 			<Setter Property="Foreground" Value="White"/>
 			<Setter Property="BorderThickness" Value="0"/>
 			<Setter Property="CornerRadius" Value="12"/>
-			<Setter Property="Padding" Value="28,14"/>
+			<Setter Property="Padding" Value="20,8"/>
 			<Setter Property="FontWeight" Value="Bold"/>
-			<Setter Property="FontSize" Value="16"/>
+			<Setter Property="FontSize" Value="14"/>
 			<Setter Property="Cursor" Value="Hand"/>
 			<Setter Property="Effect">
 				<DropShadowEffect Color="#1e40af" Opacity="0.3" BlurRadius="15" OffsetX="0" OffsetY="5"/>
@@ -89,6 +89,11 @@
 		<Style Selector="Button.download:pressed">
 			<Setter Property="Background" Value="#1e3a8a"/>
 			<Setter Property="RenderTransform" Value="scale(0.98)"/>
+		</Style>
+		<Style Selector="Button.download:disabled">
+			<Setter Property="Opacity" Value="0.5"/>
+			<Setter Property="Foreground" Value="#888888"/>
+			<Setter Property="Cursor" Value="No"/>
 		</Style>
 
 		<Style Selector="Button.simple">
@@ -992,7 +997,9 @@
 
 							<StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
 								<Button Command="{Binding DownloadCommand}"
-										Classes="download" HorizontalAlignment="Center">
+										Classes="download" 
+										HorizontalAlignment="Center"
+										IsEnabled="{Binding !IsPlaylistDownload}">
 									<Button.Content>
 										<MultiBinding Converter="{x:Static converters:ResizeModeToButtonTextConverter.Instance}">
 											<Binding Path="IsResizeMode"/>

@@ -1558,6 +1558,11 @@ namespace Symphex.ViewModels
         {
             try
             {
+                // Enable download counter for batch processing
+                IsPlaylistDownload = true;
+                TotalDownloadsCount = urls.Count;
+                CurrentDownloadIndex = 0;
+                
                 var semaphore = new SemaphoreSlim(MaxConcurrentDownloads, MaxConcurrentDownloads);
                 var tasks = new List<Task>();
                 var completedCount = 0;
@@ -1570,6 +1575,8 @@ namespace Symphex.ViewModels
                         lock (lockObject)
                         {
                             completedCount++;
+                            CurrentDownloadIndex = completedCount;
+                            DownloadProgress = (double)completedCount / urls.Count * 100;
                             StatusText = $"Completed {completedCount}/{urls.Count} downloads...";
                         }
                     });
@@ -1582,12 +1589,14 @@ namespace Symphex.ViewModels
 
                 // Final cleanup
                 await CleanupBatchProcessing();
+                IsPlaylistDownload = false;
                 StatusText = $"Batch download complete! Downloaded {urls.Count} songs in parallel.";
                 CliOutput += $"\n=== PARALLEL BATCH PROCESSING COMPLETE ===\n";
                 CliOutput += $"Successfully processed {urls.Count} URLs in parallel.\n";
             }
             catch (Exception ex)
             {
+                IsPlaylistDownload = false;
                 CliOutput += $"Parallel processing error: {ex.Message}\n";
                 await CleanupBatchProcessing();
             }
@@ -1598,9 +1607,16 @@ namespace Symphex.ViewModels
         {
             try
             {
+                // Enable download counter for batch processing
+                IsPlaylistDownload = true;
+                TotalDownloadsCount = urls.Count;
+                CurrentDownloadIndex = 0;
+                
                 for (int i = 0; i < urls.Count; i++)
                 {
                     CurrentBatchIndex = i;
+                    CurrentDownloadIndex = i + 1;
+                    DownloadProgress = (double)(i + 1) / urls.Count * 100;
                     StatusText = $"Processing {i + 1}/{urls.Count}: {Path.GetFileName(urls[i])}";
 
                     try
@@ -1621,10 +1637,12 @@ namespace Symphex.ViewModels
                 }
 
                 await CleanupBatchProcessing();
+                IsPlaylistDownload = false;
                 StatusText = $"Batch download complete! Downloaded {urls.Count} songs sequentially.";
             }
             catch (Exception ex)
             {
+                IsPlaylistDownload = false;
                 CliOutput += $"Sequential processing error: {ex.Message}\n";
                 await CleanupBatchProcessing();
             }
