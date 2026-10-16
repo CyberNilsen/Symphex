@@ -17,6 +17,12 @@ import platform
 import argparse
 from pathlib import Path
 
+# Fix Unicode encoding on Windows
+if sys.platform == "win32":
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
 PROJECT_NAME = "Symphex"
 GITHUB_REPO = "CyberNilsen/Symphex"
 
@@ -122,7 +128,7 @@ def pack_with_velopack(vpk_cmd, publish_dir, runtime, version, output_dir, icon_
     # Determine platform-specific settings
     if runtime.startswith("win"):
         platform_name = "win"
-        # Use absolute path for icon
+        # Use absolute path for icon on Windows
         if icon_path and icon_path.exists():
             icon_arg = ["-i", str(icon_path.absolute())]
         else:
@@ -134,16 +140,13 @@ def pack_with_velopack(vpk_cmd, publish_dir, runtime, version, output_dir, icon_
         platform_name = "linux"
         icon_arg = []
     
-    icon_path = "/Users/06niland/Desktop/Symphex/Symphex/Assets/Symphex.icns" if platform_name == "osx" else "/Users/06niland/Desktop/Symphex/Symphex/Assets/SymphexLogo.ico"
-
     cmd = [
         vpk_cmd, "pack",
         "-u", PROJECT_NAME,
         "-v", version,
         "-p", str(publish_dir),
         "-e", f"{PROJECT_NAME}.exe" if platform_name == "win" else PROJECT_NAME,
-        "-o", str(output_dir),
-        "--icon", str(icon_path)
+        "-o", str(output_dir)
     ] + icon_arg
     
     result = run_command(cmd, check=False)

@@ -169,7 +169,7 @@ namespace Symphex.Views
                 if (!viewModel.IsResizeMode && !viewModel.IsMetadataMode)
                 {
                     // Check if the drag data contains text (URLs)
-                    if (e.Data?.Contains(DataFormats.Text) == true)
+                    if (e.DataTransfer?.Formats.Contains(DataFormat.Text) == true)
                     {
                         e.DragEffects = DragDropEffects.Copy;
                         e.Handled = true;
@@ -181,7 +181,7 @@ namespace Symphex.Views
                 if (viewModel.IsResizeMode || viewModel.IsMetadataMode)
                 {
                     // Check if the drag data contains files
-                    if (e.Data?.Contains(DataFormats.Files) == true)
+                    if (e.DataTransfer?.Formats.Contains(DataFormat.File) == true)
                     {
                         e.DragEffects = DragDropEffects.Copy;
                         e.Handled = true;
@@ -197,9 +197,9 @@ namespace Symphex.Views
                 // Handle URL text in normal mode
                 if (!viewModel.IsResizeMode && !viewModel.IsMetadataMode)
                 {
-                    if (e.Data?.Contains(DataFormats.Text) == true)
+                    if (e.DataTransfer?.Formats.Contains(DataFormat.Text) == true)
                     {
-                        var text = e.Data.GetText();
+                        var text = e.DataTransfer.TryGetText();
                         if (!string.IsNullOrWhiteSpace(text))
                         {
                             // Append the dropped text to existing URLs (with newline separator)
@@ -218,9 +218,9 @@ namespace Symphex.Views
                 }
 
                 // Handle files in resize/metadata modes
-                if (e.Data?.Contains(DataFormats.Files) == true)
+                if (e.DataTransfer?.Formats.Contains(DataFormat.File) == true)
                 {
-                    var files = e.Data.GetFiles();
+                    var files = e.DataTransfer.TryGetFiles();
                     if (files != null)
                     {
                         var paths = files.Select(f => f.Path.LocalPath).ToList();
