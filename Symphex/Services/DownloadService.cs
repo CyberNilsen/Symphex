@@ -70,6 +70,53 @@ namespace Symphex.Services
             Debug.WriteLine($"[DownloadService] Bitrate set to: {bitrate} kbps");
         }
 
+        /// <summary>
+        /// Check if a song with matching artist and title already exists in download folder
+        /// </summary>
+        public bool IsSongAlreadyDownloaded(string artist, string title)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(artist) || string.IsNullOrWhiteSpace(title))
+                    return false;
+
+                string cleanArtist = SanitizeFilename(artist).ToLower();
+                string cleanTitle = SanitizeFilename(title).ToLower();
+
+                if (!Directory.Exists(_downloadFolder))
+                    return false;
+
+                // Check for audio files with matching artist - title pattern
+                var audioExtensions = new[] { ".mp3", ".flac", ".wav", ".m4a", ".ogg", ".opus" };
+                var files = Directory.GetFiles(_downloadFolder);
+
+                foreach (var file in files)
+                {
+                    string fileName = Path.GetFileNameWithoutExtension(file).ToLower();
+                    
+                    // Check if filename contains "artist - title" pattern
+                    if (fileName.Contains($"{cleanArtist} - {cleanTitle}") || 
+                        fileName.Contains($"{cleanTitle} - {cleanArtist}"))
+                    {
+                        // Verify it's an audio file
+                        string ext = Path.GetExtension(file).ToLower();
+                        if (audioExtensions.Contains(ext))
+                        {
+                            Debug.WriteLine($"[DownloadService] Song already downloaded: {fileName}");
+                            return true;
+                        }
+                    }
+                }
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[DownloadService] Error checking for duplicates: {ex.Message}");
+                return false;
+            }
+        }
+
         public async Task<TrackInfo?> ExtractMetadata(string url, string thumbnailSizePreference = "Maximum Quality", bool skipThumbnail = false)
         {
             try

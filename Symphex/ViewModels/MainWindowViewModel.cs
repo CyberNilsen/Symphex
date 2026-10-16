@@ -266,6 +266,9 @@ namespace Symphex.ViewModels
         private int totalDownloadsCount = 0;
 
         [ObservableProperty]
+        private bool isPlaylistDownload = false;
+
+        [ObservableProperty]
         private int maxConcurrentDownloadsForPlaylists = 3; // Download 3 songs at once from playlists
 
         public MainWindowViewModel()
@@ -1188,6 +1191,7 @@ namespace Symphex.ViewModels
             DownloadProgress = 0;
             CurrentDownloadIndex = 0;
             TotalDownloadsCount = 0;
+            IsPlaylistDownload = false;
             ShowMetadata = false;
             CurrentTrack = new TrackInfo();
             IsBatchProcessing = false;
@@ -3281,7 +3285,9 @@ namespace Symphex.ViewModels
                 int totalVideos = playlistUrls.Count;
                 int completedDownloads = 0;
                 int failedDownloads = 0;
+                int skippedDownloads = 0;
 
+                IsPlaylistDownload = true;
                 TotalDownloadsCount = totalVideos;
                 CurrentDownloadIndex = 0;
 
@@ -3300,14 +3306,20 @@ namespace Symphex.ViewModels
                         onSuccess: () =>
                         {
                             completedDownloads++;
-                            CurrentDownloadIndex = completedDownloads;
-                            DownloadProgress = (double)completedDownloads / totalVideos * 100;
+                            CurrentDownloadIndex = completedDownloads + skippedDownloads;
+                            DownloadProgress = (double)(completedDownloads + skippedDownloads) / totalVideos * 100;
                             StatusText = $"Playlist: {completedDownloads}/{totalVideos} downloaded";
                         },
                         onFailed: () =>
                         {
                             failedDownloads++;
-                            CurrentDownloadIndex = completedDownloads + failedDownloads;
+                            CurrentDownloadIndex = completedDownloads + skippedDownloads + failedDownloads;
+                        },
+                        onSkipped: () =>
+                        {
+                            skippedDownloads++;
+                            CurrentDownloadIndex = completedDownloads + skippedDownloads;
+                            DownloadProgress = (double)(completedDownloads + skippedDownloads) / totalVideos * 100;
                         });
 
                     tasks.Add(task);
@@ -3318,21 +3330,25 @@ namespace Symphex.ViewModels
 
                 IsDownloading = false;
                 DownloadProgress = 100;
+                IsPlaylistDownload = false;
                 CliOutput += $"\n=== PLAYLIST DOWNLOAD COMPLETE ===\n";
                 CliOutput += $"Downloaded: {completedDownloads}\n";
+                CliOutput += $"Skipped (already have): {skippedDownloads}\n";
                 CliOutput += $"Failed: {failedDownloads}\n";
                 CliOutput += $"Check your download folder: {DownloadFolder}\n\n";
-                StatusText = $"Playlist complete: {completedDownloads} downloaded, {failedDownloads} failed";
+                StatusText = $"Playlist complete: {completedDownloads} downloaded, {skippedDownloads} skipped, {failedDownloads} failed";
                 ShowToast($"Playlist: {completedDownloads}/{totalVideos} downloaded");
             }
             catch (OperationCanceledException)
             {
+                IsPlaylistDownload = false;
                 StatusText = "Playlist download cancelled.";
                 CliOutput += "\n[USER] Playlist download cancelled.\n";
                 IsDownloading = false;
             }
             catch (Exception ex)
             {
+                IsPlaylistDownload = false;
                 StatusText = $"Playlist download error: {ex.Message}";
                 CliOutput += $"\nPlaylist error: {ex.Message}\n";
                 IsDownloading = false;
@@ -3343,7 +3359,7 @@ namespace Symphex.ViewModels
         /// Download a single video from a playlist with semaphore-controlled concurrency
         /// </summary>
         private async Task DownloadPlaylistVideoAsync(string videoUrl, int index, int total, SemaphoreSlim semaphore, 
-            CancellationToken cancellationToken, Action? onSuccess = null, Action? onFailed = null)
+            CancellationToken cancellationToken, Action? onSuccess = null, Action? onFailed = null, Action? onSkipped = null)
         {
             await semaphore.WaitAsync(cancellationToken);
 
@@ -3361,6 +3377,14 @@ namespace Symphex.ViewModels
 
                 if (trackInfo != null)
                 {
+                    // Check if song already exists
+                    if (_downloadService.IsSongAlreadyDownloaded(trackInfo.Artist, trackInfo.Title))
+                    {
+                        CliOutput += $"[Stream {index % MaxConcurrentDownloadsForPlaylists + 1}] Skipped (already downloaded): {trackInfo.Title} by {trackInfo.Artist}\n";
+                        onSkipped?.Invoke();
+                        return;
+                    }
+
                     CliOutput += $"[Stream {index % MaxConcurrentDownloadsForPlaylists + 1}] Found: {trackInfo.Title} by {trackInfo.Artist}\n";
                     
                     // Download the video

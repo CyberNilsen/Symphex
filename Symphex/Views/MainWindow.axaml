@@ -965,7 +965,8 @@
 
 								<TextBlock Text="{Binding CurrentDownloadIndex, StringFormat='Downloads: {0}/{1}'}" 
 										   FontSize="16" FontWeight="Bold"
-										   Foreground="#3b82f6" HorizontalAlignment="Center">
+										   Foreground="#3b82f6" HorizontalAlignment="Center"
+										   IsVisible="{Binding IsPlaylistDownload}">
 									<TextBlock.Text>
 										<MultiBinding StringFormat="Downloads: {0}/{1}">
 											<Binding Path="CurrentDownloadIndex"/>
