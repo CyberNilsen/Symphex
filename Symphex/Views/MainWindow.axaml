@@ -989,9 +989,13 @@
 									</TextBlock.Text>
 								</TextBlock>
 
-								<Border Classes="progress" Padding="1">
-									<Border CornerRadius="7" HorizontalAlignment="Left" Background="#3b82f6"
-											Width="{Binding DownloadProgress, Converter={x:Static converters:PercentageToWidthConverter.Instance}}"/>
+								<Border Classes="progress" Padding="0" Height="8" CornerRadius="4" Background="#2a2a2a">
+									<ProgressBar Value="{Binding DownloadProgress}" 
+												 Height="8" 
+												 CornerRadius="4"
+												 Background="Transparent"
+												 Foreground="#3b82f6"
+												 IsVisible="{Binding IsPlaylistDownload}"/>
 								</Border>
 							</StackPanel>
 
