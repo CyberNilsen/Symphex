@@ -256,6 +256,11 @@ namespace Symphex.ViewModels
         private readonly AlbumArtSearchService albumArtSearchService;
 
         private DownloadService? _downloadService;
+        
+        private PlaylistExtractionService? _playlistExtractionService;
+
+        [ObservableProperty]
+        private int maxConcurrentDownloadsForPlaylists = 3; // Download 3 songs at once from playlists
 
         public MainWindowViewModel()
         {
@@ -319,6 +324,9 @@ namespace Symphex.ViewModels
                 EnableAlbumArtDownload 
 
             );
+            
+            // Initialize Playlist Extraction Service
+            _playlistExtractionService = new PlaylistExtractionService(YtDlpPath);
             
             // Set audio format
             _downloadService.UpdateAudioFormat(SelectedAudioFormat);
@@ -1138,6 +1146,54 @@ namespace Symphex.ViewModels
         }
 
         [RelayCommand]
+        private void CancelDownload()
+        {
+            try
+            {
+                if (_downloadCancellationTokenSource != null && !_downloadCancellationTokenSource.Token.IsCancellationRequested)
+                {
+                    _downloadCancellationTokenSource.Cancel();
+                    StatusText = "Download cancelled by user.";
+                    CliOutput += "\n[USER] Download cancelled by user.\n";
+                    Debug.WriteLine("[MainWindowViewModel] Download cancelled by user");
+                    
+                    // Reset UI state
+                    ResetDownloadUI();
+                }
+                else
+                {
+                    StatusText = "No active download to cancel.";
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[MainWindowViewModel] Error cancelling download: {ex.Message}");
+                StatusText = $"Error cancelling download: {ex.Message}";
+                ResetDownloadUI();
+            }
+        }
+
+        /// <summary>
+        /// Reset all download-related UI state to initial conditions
+        /// </summary>
+        private void ResetDownloadUI()
+        {
+            IsDownloading = false;
+            DownloadProgress = 0;
+            ShowMetadata = false;
+            CurrentTrack = new TrackInfo();
+            IsBatchProcessing = false;
+            CurrentBatchIndex = 0;
+            TotalBatchCount = 0;
+            CurrentBatchFilePath = "";
+            ActiveDownloads = 0;
+            PendingUrls?.Clear();
+            RunningTasks.Clear();
+            CurrentProcessingUrl = "";
+            CliOutput += "UI reset to ready state.\n\n";
+        }
+
+        [RelayCommand]
         private async Task Download()
         {
             // Create new cancellation token source for this download
@@ -1290,6 +1346,35 @@ namespace Symphex.ViewModels
             {
                 await ProcessSpotifyDownload(singleUrl);
                 return;
+            }
+
+            // Check if it's a YouTube playlist
+            if (_playlistExtractionService != null && _playlistExtractionService.IsPlaylistUrl(singleUrl))
+            {
+                CliOutput += $"Playlist detected: {singleUrl}\n";
+                StatusText = "Extracting playlist videos...";
+                CliOutput += "Extracting all videos from playlist...\n";
+                
+                var playlistUrls = await _playlistExtractionService.ExtractPlaylistUrls(singleUrl);
+                
+                if (playlistUrls.Count > 0)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    
+                    StatusText = $"Playlist loaded: {playlistUrls.Count} videos found!";
+                    CliOutput += $"Found {playlistUrls.Count} videos in playlist\n";
+                    CliOutput += $"Starting concurrent download with {MaxConcurrentDownloadsForPlaylists} streams...\n\n";
+                    IsDownloading = true;
+
+                    await Task.Delay(1000, cancellationToken); // Brief pause for UI update
+                    await ProcessPlaylistDownloads(playlistUrls, cancellationToken);
+                    return;
+                }
+                else
+                {
+                    StatusText = "Could not extract playlist videos. Trying as regular URL...";
+                    CliOutput += "Could not extract playlist videos. Trying as regular URL...\n";
+                }
             }
 
             cancellationToken.ThrowIfCancellationRequested();
@@ -3176,6 +3261,144 @@ namespace Symphex.ViewModels
         private void DismissUpdate()
         {
             ShowUpdateNotification = false;
+        }
+
+        /// <summary>
+        /// Process playlist downloads with controlled concurrency (default 3 streams)
+        /// </summary>
+        private async Task ProcessPlaylistDownloads(List<string> playlistUrls, CancellationToken cancellationToken = default)
+        {
+            try
+            {
+                int totalVideos = playlistUrls.Count;
+                int completedDownloads = 0;
+                int failedDownloads = 0;
+
+                CliOutput += $"Starting playlist download with {MaxConcurrentDownloadsForPlaylists} concurrent streams\n";
+                CliOutput += $"Total videos: {totalVideos}\n\n";
+
+                // Use SemaphoreSlim to limit concurrent downloads
+                using var semaphore = new SemaphoreSlim(MaxConcurrentDownloadsForPlaylists, MaxConcurrentDownloadsForPlaylists);
+                var tasks = new List<Task>();
+
+                foreach (var (url, index) in playlistUrls.Select((url, i) => (url, i)))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    var task = DownloadPlaylistVideoAsync(url, index + 1, totalVideos, semaphore, cancellationToken, 
+                        onSuccess: () =>
+                        {
+                            completedDownloads++;
+                            DownloadProgress = (double)completedDownloads / totalVideos * 100;
+                            StatusText = $"Playlist: {completedDownloads}/{totalVideos} downloaded";
+                        },
+                        onFailed: () =>
+                        {
+                            failedDownloads++;
+                        });
+
+                    tasks.Add(task);
+                }
+
+                // Wait for all downloads to complete
+                await Task.WhenAll(tasks);
+
+                IsDownloading = false;
+                DownloadProgress = 100;
+                CliOutput += $"\n=== PLAYLIST DOWNLOAD COMPLETE ===\n";
+                CliOutput += $"Downloaded: {completedDownloads}\n";
+                CliOutput += $"Failed: {failedDownloads}\n";
+                CliOutput += $"Check your download folder: {DownloadFolder}\n\n";
+                StatusText = $"Playlist complete: {completedDownloads} downloaded, {failedDownloads} failed";
+                ShowToast($"Playlist: {completedDownloads}/{totalVideos} downloaded");
+            }
+            catch (OperationCanceledException)
+            {
+                StatusText = "Playlist download cancelled.";
+                CliOutput += "\n[USER] Playlist download cancelled.\n";
+                IsDownloading = false;
+            }
+            catch (Exception ex)
+            {
+                StatusText = $"Playlist download error: {ex.Message}";
+                CliOutput += $"\nPlaylist error: {ex.Message}\n";
+                IsDownloading = false;
+            }
+        }
+
+        /// <summary>
+        /// Download a single video from a playlist with semaphore-controlled concurrency
+        /// </summary>
+        private async Task DownloadPlaylistVideoAsync(string videoUrl, int index, int total, SemaphoreSlim semaphore, 
+            CancellationToken cancellationToken, Action? onSuccess = null, Action? onFailed = null)
+        {
+            await semaphore.WaitAsync(cancellationToken);
+
+            try
+            {
+                CliOutput += $"[Stream {index % MaxConcurrentDownloadsForPlaylists + 1}] Starting video {index}/{total}: {videoUrl}\n";
+
+                if (_downloadService == null)
+                {
+                    InitializeDownloadService();
+                }
+
+                // Extract metadata for this video
+                var trackInfo = await _downloadService!.ExtractMetadata(videoUrl, SelectedThumbnailSize, SkipThumbnailDownload);
+
+                if (trackInfo != null)
+                {
+                    CliOutput += $"[Stream {index % MaxConcurrentDownloadsForPlaylists + 1}] Found: {trackInfo.Title} by {trackInfo.Artist}\n";
+                    
+                    // Download the video
+                    string downloadedFile = await _downloadService.PerformDownload(videoUrl, trackInfo, cancellationToken);
+
+                    if (!string.IsNullOrEmpty(downloadedFile))
+                    {
+                        // Apply metadata and embed artwork
+                        try
+                        {
+                            string audioFilePath = Path.Combine(DownloadFolder, downloadedFile);
+                            if (File.Exists(audioFilePath))
+                            {
+                                await _downloadService.ApplyMetadata(trackInfo, audioFilePath);
+                                CliOutput += $"[Stream {index % MaxConcurrentDownloadsForPlaylists + 1}] Metadata & artwork applied\n";
+                            }
+                        }
+                        catch (Exception metadataEx)
+                        {
+                            CliOutput += $"[Stream {index % MaxConcurrentDownloadsForPlaylists + 1}] Warning: Could not apply metadata: {metadataEx.Message}\n";
+                        }
+
+                        CliOutput += $"[Stream {index % MaxConcurrentDownloadsForPlaylists + 1}] Completed: {trackInfo.Title}\n";
+                        onSuccess?.Invoke();
+                    }
+                    else
+                    {
+                        CliOutput += $"[Stream {index % MaxConcurrentDownloadsForPlaylists + 1}] Failed to download\n";
+                        onFailed?.Invoke();
+                    }
+                }
+                else
+                {
+                    CliOutput += $"[Stream {index % MaxConcurrentDownloadsForPlaylists + 1}] Could not extract metadata\n";
+                    onFailed?.Invoke();
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                CliOutput += $"[Stream {index % MaxConcurrentDownloadsForPlaylists + 1}] Cancelled\n";
+                onFailed?.Invoke();
+            }
+            catch (Exception ex)
+            {
+                CliOutput += $"[Stream {index % MaxConcurrentDownloadsForPlaylists + 1}] Error: {ex.Message}\n";
+                onFailed?.Invoke();
+            }
+            finally
+            {
+                semaphore.Release();
+            }
         }
     }
 }

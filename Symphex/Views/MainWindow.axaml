@@ -969,15 +969,38 @@
 								</Border>
 							</StackPanel>
 
-							<Button Command="{Binding DownloadCommand}"
-									Classes="download" HorizontalAlignment="Center">
-								<Button.Content>
-									<MultiBinding Converter="{x:Static converters:ResizeModeToButtonTextConverter.Instance}">
-										<Binding Path="IsResizeMode"/>
-										<Binding Path="IsMetadataMode"/>
-									</MultiBinding>
-								</Button.Content>
-							</Button>
+							<StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
+								<Button Command="{Binding DownloadCommand}"
+										Classes="download" HorizontalAlignment="Center">
+									<Button.Content>
+										<MultiBinding Converter="{x:Static converters:ResizeModeToButtonTextConverter.Instance}">
+											<Binding Path="IsResizeMode"/>
+											<Binding Path="IsMetadataMode"/>
+										</MultiBinding>
+									</Button.Content>
+								</Button>
+								
+								<!-- Cancel Button - Only visible while downloading -->
+								<Button Command="{Binding CancelDownloadCommand}"
+										IsVisible="{Binding IsDownloading}"
+										Classes="download"
+										Background="#dc2626"
+										HorizontalAlignment="Center">
+									<Button.Content>
+										<TextBlock Text="⏹ Cancel" />
+									</Button.Content>
+									<Button.Styles>
+										<Style Selector="Button:pointerover">
+											<Setter Property="Background" Value="#b91c1c"/>
+											<Setter Property="RenderTransform" Value="scale(1.02) translateY(-1px)"/>
+										</Style>
+										<Style Selector="Button:pressed">
+											<Setter Property="Background" Value="#991b1b"/>
+											<Setter Property="RenderTransform" Value="scale(0.98)"/>
+										</Style>
+									</Button.Styles>
+								</Button>
+							</StackPanel>
 
 							<StackPanel Spacing="12" HorizontalAlignment="Center">
 								<StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
