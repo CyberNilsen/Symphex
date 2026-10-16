@@ -260,6 +260,12 @@ namespace Symphex.ViewModels
         private PlaylistExtractionService? _playlistExtractionService;
 
         [ObservableProperty]
+        private int currentDownloadIndex = 0;
+
+        [ObservableProperty]
+        private int totalDownloadsCount = 0;
+
+        [ObservableProperty]
         private int maxConcurrentDownloadsForPlaylists = 3; // Download 3 songs at once from playlists
 
         public MainWindowViewModel()
@@ -1180,6 +1186,8 @@ namespace Symphex.ViewModels
         {
             IsDownloading = false;
             DownloadProgress = 0;
+            CurrentDownloadIndex = 0;
+            TotalDownloadsCount = 0;
             ShowMetadata = false;
             CurrentTrack = new TrackInfo();
             IsBatchProcessing = false;
@@ -3274,6 +3282,9 @@ namespace Symphex.ViewModels
                 int completedDownloads = 0;
                 int failedDownloads = 0;
 
+                TotalDownloadsCount = totalVideos;
+                CurrentDownloadIndex = 0;
+
                 CliOutput += $"Starting playlist download with {MaxConcurrentDownloadsForPlaylists} concurrent streams\n";
                 CliOutput += $"Total videos: {totalVideos}\n\n";
 
@@ -3289,12 +3300,14 @@ namespace Symphex.ViewModels
                         onSuccess: () =>
                         {
                             completedDownloads++;
+                            CurrentDownloadIndex = completedDownloads;
                             DownloadProgress = (double)completedDownloads / totalVideos * 100;
                             StatusText = $"Playlist: {completedDownloads}/{totalVideos} downloaded";
                         },
                         onFailed: () =>
                         {
                             failedDownloads++;
+                            CurrentDownloadIndex = completedDownloads + failedDownloads;
                         });
 
                     tasks.Add(task);
