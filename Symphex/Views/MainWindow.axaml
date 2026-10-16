@@ -825,7 +825,9 @@
 										   Foreground="#ffffff" HorizontalAlignment="Center"/>
 
 								<Border DragDrop.AllowDrop="True"
-										Background="Transparent">
+										Background="Transparent"
+										Name="UrlInputBorder"
+										CornerRadius="10">
 									<TextBox Name="UrlTextBox"
 											 Text="{Binding DownloadUrl}"
 											 Classes="large"
@@ -839,6 +841,13 @@
 											 TextWrapping="Wrap"
 											 VerticalContentAlignment="Top"
 											 ScrollViewer.VerticalScrollBarVisibility="Auto"/>
+									<Border.Styles>
+										<Style Selector="Border:dragging">
+											<Setter Property="Background" Value="#1a3a4a"/>
+											<Setter Property="BorderBrush" Value="#3b82f6"/>
+											<Setter Property="BorderThickness" Value="2"/>
+										</Style>
+									</Border.Styles>
 								</Border>
 							</StackPanel>
 

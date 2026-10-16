@@ -1,9 +1,11 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Platform;
 using Avalonia.Input;
 using System;
 using System.Linq;
+using System.Collections.Generic;
 
 namespace Symphex.Views
 {
@@ -163,13 +165,23 @@ namespace Symphex.Views
         {
             if (DataContext is ViewModels.MainWindowViewModel viewModel)
             {
+                // Allow URL text input in normal mode
+                if (!viewModel.IsResizeMode && !viewModel.IsMetadataMode)
+                {
+                    // Check if the drag data contains text (URLs)
+                    if (e.Data?.Contains(DataFormats.Text) == true)
+                    {
+                        e.DragEffects = DragDropEffects.Copy;
+                        e.Handled = true;
+                        return;
+                    }
+                }
+
+                // Handle files in resize/metadata modes
                 if (viewModel.IsResizeMode || viewModel.IsMetadataMode)
                 {
                     // Check if the drag data contains files
-                    #pragma warning disable CS0618
-                    var files = e.Data?.GetFiles();
-                    #pragma warning restore CS0618
-                    if (files?.Any() == true)
+                    if (e.Data?.Contains(DataFormats.Files) == true)
                     {
                         e.DragEffects = DragDropEffects.Copy;
                         e.Handled = true;
@@ -182,21 +194,45 @@ namespace Symphex.Views
         {
             if (DataContext is ViewModels.MainWindowViewModel viewModel)
             {
-                #pragma warning disable CS0618
-                var files = e.Data?.GetFiles();
-                #pragma warning restore CS0618
-                
-                if (files != null && files.Any())
+                // Handle URL text in normal mode
+                if (!viewModel.IsResizeMode && !viewModel.IsMetadataMode)
                 {
-                    var paths = files.Select(f => f.Path.LocalPath).ToList();
-                    
-                    if (viewModel.IsResizeMode)
+                    if (e.Data?.Contains(DataFormats.Text) == true)
                     {
-                        await viewModel.ProcessDroppedFilesAsync(paths);
+                        var text = e.Data.GetText();
+                        if (!string.IsNullOrWhiteSpace(text))
+                        {
+                            // Append the dropped text to existing URLs (with newline separator)
+                            if (!string.IsNullOrWhiteSpace(viewModel.DownloadUrl))
+                            {
+                                viewModel.DownloadUrl += "\n" + text;
+                            }
+                            else
+                            {
+                                viewModel.DownloadUrl = text;
+                            }
+                            e.Handled = true;
+                            return;
+                        }
                     }
-                    else if (viewModel.IsMetadataMode)
+                }
+
+                // Handle files in resize/metadata modes
+                if (e.Data?.Contains(DataFormats.Files) == true)
+                {
+                    var files = e.Data.GetFiles();
+                    if (files != null)
                     {
-                        await viewModel.ProcessMetadataSourceFilesAsync(paths);
+                        var paths = files.Select(f => f.Path.LocalPath).ToList();
+                        
+                        if (viewModel.IsResizeMode)
+                        {
+                            await viewModel.ProcessDroppedFilesAsync(paths);
+                        }
+                        else if (viewModel.IsMetadataMode)
+                        {
+                            await viewModel.ProcessMetadataSourceFilesAsync(paths);
+                        }
                     }
                 }
                 e.Handled = true;
